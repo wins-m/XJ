@@ -30,7 +30,6 @@ def get_long_short_group(df: pd.DataFrame, ngroups: int) -> pd.DataFrame:
     :param df: 因子值（经过标准化、中性化）
     :param ngroups: 分组数(+)；多头/空头内资产数量取负值(-)，若股池不够大，重叠部分不持有
     :return: 因子分组，nan仍为nan，其余为分组编号 0~(分组数-1)
-
     """
     res = None
     if ngroups < 0:
@@ -225,7 +224,7 @@ def turnover_from_weight(w) -> pd.DataFrame:
 
 
 def cal_turnover_long_short(long_short_group, idx_weight, ngroups, ishow=False, save_path=None) -> pd.DataFrame:
-    """由多空分组分别计算long, short, long_short的换手率和权重"""
+    """由多空分组分别计算long, short, long_short, baseline的换手率和权重"""
     w_long = rescale_weight(group_weight(long_short_group, idx_weight, ngroups-1))
     w_short = rescale_weight(group_weight(long_short_group, idx_weight, 0))
     w_long_short = rescale_weight(w_long - w_short)  # 多头资金量与空头资金量1:1
@@ -234,6 +233,7 @@ def cal_turnover_long_short(long_short_group, idx_weight, ngroups, ishow=False, 
     dw['long_short'] = turnover_from_weight(w_long_short)
     dw['long'] = turnover_from_weight(w_long)
     dw['short'] = turnover_from_weight(w_short)
+    dw['baseline'] = turnover_from_weight(rescale_weight(idx_weight))
 
     if save_path is not None:
         dw.to_csv(save_path)
@@ -287,18 +287,17 @@ def cal_ic_stat(data):
     t_value, p_value = stats.ttest_1samp(data, 0)  # 计算ic的t
     pdata = data[data >= 0]
     ndata = data[data < 0]
-    dataStat = list(zip(
+    data_stat = list(zip(
         data.mean(), data.std(), data.skew(), data.kurt(), t_value, p_value,
         pdata.mean(), ndata.mean(), pdata.std(), ndata.std(),
         ndata.isna().mean(), pdata.isna().mean(), data.mean() / data.std()
     ))
-    dataStat = pd.DataFrame(dataStat).T
-    dataStat.columns = data.columns
-    dataStat.index = ['mean', 'std', 'skew', 'kurt', 't_value', 'p_value',
-                      'mean+', 'mean-', 'std+', 'std-',
-                      'pos ratio', 'neg ratio', 'IR']
-
-    return dataStat
+    data_stat = pd.DataFrame(data_stat).T
+    data_stat.columns = data.columns
+    data_stat.index = ['mean', 'std', 'skew', 'kurt', 't_value', 'p_value',
+                       'mean+', 'mean-', 'std+', 'std-', 'pos ratio', 'neg ratio', 'IR']
+    #
+    return data_stat
 
 
 def cal_ic_decay(fval_neutralized, ret, maxlag=20, ishow=False, save_path=None) -> pd.DataFrame:
@@ -321,7 +320,7 @@ def cal_ic_decay(fval_neutralized, ret, maxlag=20, ishow=False, save_path=None) 
     return res
 
 
-def single_test(conf: dict, fname: str = None):
+def single_test(conf: dict):
     """单因子回测"""
     neu_mtd = conf['neu_mtd']
     stk_pool = conf['stk_pool']
@@ -361,9 +360,8 @@ def single_test(conf: dict, fname: str = None):
 
     # Baseline
     ret_baseline = (all_ret * idx_weight).sum(axis=1)  # Return
-    turnover_baseline = turnover_from_weight(rescale_weight(idx_weight))  # Turnover
-    cost_baseline = ret_baseline - turnover_baseline * cost_rate  # Cost
 
+    #
     fname, whether_backtest = 'pe_residual', 1
     for fname, whether_backtest in conf['fnames'].items():
 
@@ -373,28 +371,65 @@ def single_test(conf: dict, fname: str = None):
         else:
             print(fname)
 
-        # Result File Format
+        # Result File Format -> path_format: str
         save_path_ = f"""{res_path}{fname}_{neu_mtd}_{stk_pool}{stk_w}_{ngroups}g"""
         os.makedirs(save_path_, exist_ok=True)
         path_format = save_path_ + "/{}"
 
-        # Factor Value
+        # Factor Value -> fval: DataFrame<float>
         fval = read_single_factor(f'{csv_path}{fname}.csv', begin_date - timedelta(5), end_date, float, pool_multiplier)
         fval: pd.DataFrame = fval.shift(1).loc[begin_date:]  # 滞后一天，以昨日的因子值参与计算
         fval.head().sum(axis=1)  # check first date
         fval = fval * tradeable_multiplier.loc[begin_date:]
         fval = fval.astype(float)
 
-        # Factor Neutralization  # neu_mtd = 'iv'
+        # Factor Neutralization -> fval_neutralized: DataFrame<float>, ret: DataFrame<float>
         fval_neutralized = factor_neutralization(fval, neu_mtd, ind_citic_path, marketvalue_path)
         ret = all_ret.reindex_like(fval_neutralized)  # returns aligned with factor value
 
-        # Group Label Panel
+        # Group Label Panel -> long_short_group: DataFrame<int>
         long_short_group = get_long_short_group(fval_neutralized, ngroups)
 
-        # Group Absolute Return
+        # Group Absolute Return -> ret_group: DataFrame<float>, save_path: GroupRtns.csv
         save_path = path_format.format('GroupRtns.csv') if save_tables else None
         ret_group = cal_long_short_group_rtns(long_short_group, ret, idx_weight, ngroups, save_path)
+
+        # Turnover -> long_short_turnover: DataFrame<csv>, save_path: LSTurnover.csv
+        save_path = path_format.format('LSTurnover.csv') if save_tables else None
+        long_short_turnover = cal_turnover_long_short(long_short_group, idx_weight, ngroups, ishow, save_path)
+
+        # IC (distribution)
+        save_path = path_format.format('IC.png') if save_plots else None
+        ic = cal_ic(fval_neutralized, ret, rankIC=False, ishow=ishow, save_path=save_path)
+        save_path = path_format.format('ICRank.png') if save_plots else None
+        rank_ic = cal_ic(fval_neutralized, ret, rankIC=True, ishow=ishow, save_path=save_path)
+
+        # IC Stats
+        ic_stat = pd.DataFrame()
+        ic_stat['IC'] = cal_ic_stat(data=ic)
+        ic_stat['Rank IC'] = cal_ic_stat(data=rank_ic)
+        ic_stat.astype('float16').to_csv(path_format.format('ICStat.csv'))
+
+        # IC Decay
+        save_path = path_format.format('ICDecay.png') if save_plots else None
+        cal_ic_decay(fval_neutralized, ret, 20, ishow, save_path)
+
+        # Cumulated IC_IR
+
+
+        # %%
+        """
+        save_tables, save_plots, ishow, cost_rate, save_tables
+        path_format, ret_group, ret_baseline, long_short_turnover
+        
+        """
+        # Group Test Result -> save_path: ResGroup.png
+        save_path = path_format.format('ResGroup.png') if save_plots else None
+        plot_rtns_group(ret_group, ishow, save_path)
+
+        # Total Return of Group -> save_path: TotalRtnsGroup.png
+        save_path = path_format.format('TotalRtnsGroup.png') if save_plots else None
+        cal_total_ret_group(ret_group, ishow, save_path)
 
         # Long-Short Absolute Return No Cost
         save_path = path_format.format('LSRtnsNC.csv') if save_tables else None
@@ -420,13 +455,8 @@ def single_test(conf: dict, fname: str = None):
         save_path = path_format.format('LSMddNC.png') if save_plots else None
         cal_sr_max_drawdown(long_short_excess_nc['long_short'], ishow, title, save_path)
 
-        # Turnover
-        save_path = path_format.format('LSTurnover.csv') if save_tables else None
-        long_short_turnover = cal_turnover_long_short(long_short_group, idx_weight, ngroups, ishow, save_path)
-
         # Long-Short Absolute Return With Cost
-        long_short_return_wc = long_short_return_nc[['long_short', 'long', 'short']] - long_short_turnover * cost_rate
-        long_short_return_wc['baseline'] = cost_baseline
+        long_short_return_wc = long_short_return_nc - long_short_turnover * cost_rate
         if save_tables:
             long_short_return_wc.to_csv(path_format.format('LSRtnsWC.csv'))
 
@@ -450,14 +480,6 @@ def single_test(conf: dict, fname: str = None):
         save_path = path_format.format('LSMddWC.png') if save_plots else None
         cal_sr_max_drawdown(long_short_excess_wc['long_short'], ishow, title, save_path)
 
-        # Group Test Result
-        save_path = path_format.format('ResGroup.png') if save_plots else None
-        plot_rtns_group(ret_group=ret_group, ishow=ishow, save_path=save_path)
-
-        # Total Return of Group
-        save_path = path_format.format('TotalRtnsGroup.png') if save_plots else None
-        cal_total_ret_group(ret_group, ishow, save_path)
-
         # Annual Return No Cost
         title = 'Annual Return No Cost'
         save_path = path_format.format('LSYRtnsNC.png') if save_plots else None
@@ -478,25 +500,7 @@ def single_test(conf: dict, fname: str = None):
         save_path = path_format.format('LSYSharpWC.png') if save_plots else None
         cal_yearly_sharpe(long_short_return_wc, ishow, title, save_path)
 
-        # IC (distribution)
-        save_path = path_format.format('IC.png') if save_plots else None
-        ic = cal_ic(fval_neutralized, ret, rankIC=False, ishow=ishow, save_path=save_path)
-        save_path = path_format.format('ICRank.png') if save_plots else None
-        rank_ic = cal_ic(fval_neutralized, ret, rankIC=True, ishow=ishow, save_path=save_path)
 
-        # IC Stats
-        ic_stat = pd.DataFrame()
-        ic_stat['IC'] = cal_ic_stat(data=ic)
-        ic_stat['Rank IC'] = cal_ic_stat(data=rank_ic)
-        ic_stat.astype('float16').to_csv(path_format.format('ICStat.csv'))
-
-        # IC Decay
-        save_path = path_format.format('ICDecay.png') if save_plots else None
-        cal_ic_decay(fval_neutralized, ret, 20, ishow, save_path)
-
-        # Cumulated IC_IR
-
-        #
     #
 
 
