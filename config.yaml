@@ -1,0 +1,88 @@
+# paths
+project_path : "/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/"
+data_path : "/mnt/c/Users/Winst/Documents/data_local/"
+factorscsv_path : "/mnt/c/Users/Winst/Documents/factors_csv/"
+factorsres_path : "/mnt/c/Users/Winst/Documents/factors_res/"
+# hdf temp file
+a_list_tradeable : "/mnt/c/Users/Winst/Documents/data_local/a_list_tradeable.hdf"
+# csv data file
+idx_constituent : "/mnt/c/Users/Winst/Documents/data_local/idx_constituent_{}.csv"
+a_list_suspendsymbol : "/mnt/c/Users/Winst/Documents/data_local/a_list_suspendsymbol.csv"
+stk_ipo_date : "/mnt/c/Users/Winst/Documents/data_local/stk_ipo_date.csv"
+stk_maxupordown : "/mnt/c/Users/Winst/Documents/data_local/stk_maxupordown.csv"
+tdays_d : "/mnt/c/Users/Winst/Documents/data_local/tdays_d.csv"
+ind_citic : "/mnt/c/Users/Winst/Documents/data_local/ind_citic_constituent.csv"
+marketvalue : "/mnt/c/Users/Winst/Documents/data_local/stk_marketvalue.csv"
+closeAdj : "/mnt/c/Users/Winst/Documents/data_local/stk_marketdata_closeAdj.csv"
+
+# target period
+begin_date : '2015-01-01'
+end_date : '2021-12-31'
+
+# backtest (single_test.py)
+stk_pool : 'NA'  # NA CSI500 CSI300 [CSI800]
+stk_w : 'ew'  # idx, ew
+neu_mtd : 'iv'  # n, i, iv
+tc : 2e-3
+ngroups : 10  # 指定负值，表示多头/空头各(-)ngroup支
+fnames :
+  'pe_residual' : 1
+  'pe_residual_ols_1' : 1
+  'pe_residual_ols_2' : 1
+  'pe_residual_ols_3' : 1
+save_tables : True
+save_plots : True
+ishow : False
+
+# get_data.py
+access_target : "/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/data/access_target.xlsx"
+force_update : False
+
+# tradeable.py
+ipo_delay : 60  # days after ipo
+
+# pe_surprise.py
+pe_ols_group : 'all'
+save_panel : False  # 每次回归保存面板
+
+# save_remote.py
+tables :
+  pe_tables :
+    - False  # whether to upload
+    - 'pe_residual_20130101_20211231.csv'
+    - 'pe_residual_ols_3_20130101_20211231.csv'
+    - 'pe_residual_ols_2_20130101_20211231.csv'
+    - 'pe_residual_ols_1_20130101_20211231.csv'
+  pe_tables(depreciated) :
+    - False
+    - 'pe_residual_ols_1_2013-01-01_2021-12-31.csv'
+    - 'pe_residual_ols_2_2013-01-01_2021-12-31.csv'
+    - 'pe_residual_ols_3_2013-01-01_2021-12-31.csv'
+    - 'pe_residual_2013-01-01_2021-12-31.csv'
+
+# mysql port engine
+mysql_engine :
+  engine0 :
+    user : "intern01"
+    password : "rh35th"
+    host : '192.168.1.104'
+    port : '3306'
+    dbname : 'jeffdatabase'
+  engine1 :
+    user : "intern01"
+    password : "rh35th"
+    host : '192.168.1.104'
+    port : '3306'
+    dbname : 'factordatabase'
+  engine2 :
+    user : "intern02"
+    password : "fh840t"
+    host : '192.168.1.104'
+    port : '3306'
+    dbname : 'factordatabase'
+  engine3 :  # 上传使用engine3的配置，即存在intern库
+    user : "intern01"
+    password : "rh35th"
+    host : '192.168.1.104'
+    port : '3306'
+    dbname : 'intern'
