@@ -47,36 +47,19 @@ def get_long_short_group(df: pd.DataFrame, ngroups: int) -> pd.DataFrame:
     return res
 
 
-def cal_long_short_group_rtns(long_short_group, ret, idx_weight, ngroups, save_path: None) -> pd.DataFrame:
-    """
-    计算各组收益并存储
-    :param long_short_group:
-    :param ret:
-    :param idx_weight:
-    :param ngroups:
-    :param save_path:
-    :return:
-    """
+def group_weight(long_short_group, idx_weight, gn: int) -> pd.DataFrame:
+    """分组内各股权重，每日总和任意1"""
+    return idx_weight[long_short_group == gn].fillna(0)
 
-    long_short_group = long_short_group.reindex_like(ret)
-    if idx_weight is None:
-        idx_weight = ret * 0 + 1
-    else:
-        idx_weight = idx_weight.reindex_like(ret)
 
-    gn = 3 if ngroups < 0 else ngroups
-    ret_group = pd.DataFrame(index=ret.index)
-    gi = 0
-    for gi in range(gn):
-        mask = (long_short_group == gi)
-        ret1 = ret[mask]
-        w1 = idx_weight[mask].apply(lambda s: s/np.nansum(s), axis=1)
-        ret_group['$Group_{'+str(gi)+'}$'] = (ret1 * w1).sum(axis=1)
+def rescale_weight(df: pd.DataFrame, axis=1) -> pd.DataFrame:
+    """对每行的权重值标准化，使总和为1"""
+    return df.apply(lambda s: s / np.nansum(s.abs()), axis=axis)
 
-    if save_path is not None:  # 保存多空分组收益
-        ret_group.to_csv(save_path)
 
-    return ret_group
+def turnover_from_weight(w) -> pd.DataFrame:
+    """由权重计算换手率"""
+    return w.diff().abs().sum(axis=1)
 
 
 def panel_long_short_return(ret_group, ret_baseline, save_path=None) -> pd.DataFrame:
@@ -138,6 +121,53 @@ def panel_long_short_excess(long_short_absolute_nc, ishow=False, title='Long-Sho
             plt.close()
 
     return long_short_excess_nc
+
+
+def plot_rtns_group(ret_group: pd.DataFrame, ishow=False, save_path=None):
+    """分层收益情况"""
+    ret_group_cumulative = ret_group.add(1).cumprod()
+
+    if save_path is not None:
+        ret_group_cumulative.plot(grid=True, figsize=(16, 8), linewidth=3, title="Group Test Result")
+        plt.savefig(save_path)
+        if ishow:
+            plt.show()
+        else:
+            plt.close()
+
+    return ret_group_cumulative
+
+
+def cal_long_short_group_rtns(long_short_group, ret, idx_weight, ngroups, save_path: None) -> pd.DataFrame:
+    """
+    计算各组收益并存储
+    :param long_short_group:
+    :param ret:
+    :param idx_weight:
+    :param ngroups:
+    :param save_path:
+    :return:
+    """
+
+    long_short_group = long_short_group.reindex_like(ret)
+    if idx_weight is None:
+        idx_weight = ret * 0 + 1
+    else:
+        idx_weight = idx_weight.reindex_like(ret)
+
+    gn = 3 if ngroups < 0 else ngroups
+    ret_group = pd.DataFrame(index=ret.index)
+    gi = 0
+    for gi in range(gn):
+        mask = (long_short_group == gi)
+        ret1 = ret[mask]
+        w1 = idx_weight[mask].apply(lambda s: s/np.nansum(s), axis=1)
+        ret_group['$Group_{'+str(gi)+'}$'] = (ret1 * w1).sum(axis=1)
+
+    if save_path is not None:  # 保存多空分组收益
+        ret_group.to_csv(save_path)
+
+    return ret_group
 
 
 def cal_total_ret_group(ret_group, ishow=False, save_path=None) -> pd.DataFrame:
@@ -208,21 +238,6 @@ def cal_yearly_sharpe(data, ishow=False, title='Annual Sharpe', save_path=None, 
     return asharp
 
 
-def group_weight(long_short_group, idx_weight, gn: int) -> pd.DataFrame:
-    """分组内各股权重，每日总和任意1"""
-    return idx_weight[long_short_group == gn].fillna(0)
-
-
-def rescale_weight(df: pd.DataFrame, axis=1) -> pd.DataFrame:
-    """对每行的权重值标准化，使总和为1"""
-    return df.apply(lambda s: s / np.nansum(s.abs()), axis=axis)
-
-
-def turnover_from_weight(w) -> pd.DataFrame:
-    """由权重计算换手率"""
-    return w.diff().abs().sum(axis=1)
-
-
 def cal_turnover_long_short(long_short_group, idx_weight, ngroups, ishow=False, save_path=None) -> pd.DataFrame:
     """由多空分组分别计算long, short, long_short, baseline的换手率和权重"""
     w_long = rescale_weight(group_weight(long_short_group, idx_weight, ngroups-1))
@@ -246,21 +261,6 @@ def cal_turnover_long_short(long_short_group, idx_weight, ngroups, ishow=False, 
             plt.close()
 
     return dw
-
-
-def plot_rtns_group(ret_group: pd.DataFrame, ishow=False, save_path=None):
-    """分层收益情况"""
-    ret_group_cumulative = ret_group.add(1).cumprod()
-
-    if save_path is not None:
-        ret_group_cumulative.plot(grid=True, figsize=(16, 8), linewidth=3, title="Group Test Result")
-        plt.savefig(save_path)
-        if ishow:
-            plt.show()
-        else:
-            plt.close()
-
-    return ret_group_cumulative
 
 
 def cal_ic(fv_l1, ret, lag=1, rankIC=False, ishow=False, save_path=None) -> pd.DataFrame:
@@ -320,6 +320,7 @@ def cal_ic_decay(fval_neutralized, ret, maxlag=20, ishow=False, save_path=None) 
     return res
 
 
+# %%
 def single_test(conf: dict):
     """单因子回测"""
     neu_mtd = conf['neu_mtd']
@@ -339,6 +340,7 @@ def single_test(conf: dict):
     begin_date = pd.to_datetime(conf['begin_date'])
     end_date = pd.to_datetime(conf['end_date'])
     cost_rate = float(conf['tc'])
+    all_factornames = [k for k, v in conf['fnames'].items() if v == 1]
     print("CONFIG LOADED", neu_mtd, stk_pool)
 
     # Tradeable Sifter
@@ -362,14 +364,8 @@ def single_test(conf: dict):
     ret_baseline = (all_ret * idx_weight).sum(axis=1)  # Return
 
     #
-    fname, whether_backtest = 'pe_residual', 1
-    for fname, whether_backtest in conf['fnames'].items():
-
-        # 跳过config标记为0的因子
-        if whether_backtest == 0:
-            continue
-        else:
-            print(fname)
+    fname = 'pe_residual'
+    for fname in all_factornames:
 
         # Result File Format -> path_format: str
         save_path_ = f"""{res_path}{fname}_{neu_mtd}_{stk_pool}{stk_w}_{ngroups}g"""
@@ -408,7 +404,11 @@ def single_test(conf: dict):
         ic_stat = pd.DataFrame()
         ic_stat['IC'] = cal_ic_stat(data=ic)
         ic_stat['Rank IC'] = cal_ic_stat(data=rank_ic)
-        ic_stat.astype('float16').to_csv(path_format.format('ICStat.csv'))
+        ic_stat = ic_stat.astype('float16')
+        if save_tables:
+            ic_stat.to_csv(path_format.format('ICStat.csv'))
+        else:
+            print(ic_stat)
 
         # IC Decay
         save_path = path_format.format('ICDecay.png') if save_plots else None
@@ -459,6 +459,7 @@ def single_test(conf: dict):
         long_short_return_wc = long_short_return_nc - long_short_turnover * cost_rate
         if save_tables:
             long_short_return_wc.to_csv(path_format.format('LSRtnsWC.csv'))
+            #
 
         # Long-Short Absolute Result With Cost
         title = 'Long-Short Absolute Result With Cost'
@@ -500,7 +501,7 @@ def single_test(conf: dict):
         save_path = path_format.format('LSYSharpWC.png') if save_plots else None
         cal_yearly_sharpe(long_short_return_wc, ishow, title, save_path)
 
-
+        #
     #
 
 

@@ -1,3 +1,8 @@
+"""
+(created by swmao on Jan. 21st)
+因子统一处理，读取、中性化等
+
+"""
 import pandas as pd
 import numpy as np
 import sys

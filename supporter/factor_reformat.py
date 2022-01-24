@@ -43,9 +43,20 @@ def adjust_factor_pe_residual(conf: dict):
         # df.to_csv(conf['factorscsv_path'] + '_'.join(filename.split('_')[:-2]) + '.csv')
 
 
+def adjust_event_first_report(conf: dict):
+    path = conf['event_first_report']
+    csv_path = conf['factorscsv_path']
+    dur = 5
+    df = pd.read_csv(path, index_col=0, parse_dates=True)
+    df = df.fillna(method='ffill', limit=dur)
+    df = df.fillna(0)
+    df.to_csv(csv_path + 'first_report.csv')
+
+
 if __name__ == '__main__':
     import yaml
     conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/config.yaml'
     conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
     #
-    adjust_factor_pe_residual(conf)
+    # adjust_factor_pe_residual(conf)
+

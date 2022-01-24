@@ -1,3 +1,8 @@
+"""
+(created by swmao on Jan. 18th)
+获取可否交易的标签，去除新上市、停牌、涨跌停
+
+"""
 from datetime import timedelta
 from tqdm import tqdm
 import pandas as pd
@@ -15,7 +20,7 @@ def update_tradeable_label(conf):
 
     可交易的股票设定如下
     - columns为sto_ipo_date中的stockcode.unique()
-    - 上市满conf['ipo_delay']个自然日，取180天，未退市，根据`stk_ipo_date`下载到local
+    - 上市满conf['ipo_delay']个自然日，未退市，根据`stk_ipo_date`下载到local
     - 去除停牌，根据`a_list_suspendsymbol`下载到local
     - 去除涨跌停，根据`stk_maxupordown` WHERE maxupordown!=0下载到local
 
