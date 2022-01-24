@@ -220,8 +220,8 @@ def cal_yearly_return(data, ishow=False, title='Annual Return', save_path=None) 
     return aret
 
 
-def cal_yearly_sharpe(data, ishow=False, title='Annual Sharpe', save_path=None, y_len=252) -> pd.DataFrame:
-    """计算年度夏普（252天年化）"""
+def cal_yearly_sharpe(data, ishow=False, title='Annual Sharpe', save_path=None, y_len=240) -> pd.DataFrame:
+    """计算年度夏普（240天年化）"""
     year_group = data.index.to_series().apply(lambda dt: dt.year)
     asharp = data.groupby(year_group).apply(lambda s: s.mean() / s.std() * np.sqrt(y_len/s.count()))
 
@@ -317,6 +317,37 @@ def cal_ic_decay(fval_neutralized, ret, maxlag=20, ishow=False, save_path=None) 
         else:
             plt.close()
 
+    return res
+
+
+def cal_result_stat(df: pd.DataFrame, save_path: str = None) -> pd.DataFrame:
+    """
+    对日度收益序列df计算相关结果
+    :param df: 值为日收益率小r，列index为日期DateTime
+    :param save_path: 存储名（若有）
+    :return: 结果面板
+    """
+    df1 = df.add(1).cumprod()
+    data = df.copy()
+    data['Date'] = data.index
+    data['SemiYear'] = data['Date'].apply(lambda s: f'{s.year}-H{s.month // 7 + 1}')
+    res: pd.DataFrame = data.groupby('SemiYear')[['Date']].last().reset_index()
+    res.index = res['Date']
+    res['Cash'] = (2e7 * df1.loc[res.index]).round(1)
+    res['UnitValue'] = df1.loc[res.index]
+    res['TotalRet'] = res['UnitValue'] - 1
+    res['PeriodRetOnBookSize'] = res['UnitValue'].pct_change()
+    res.iloc[0, -1] = res['UnitValue'].iloc[0] - 1
+    res['PeriodSharpe'] = df.groupby(data.SemiYear).apply(lambda s: s.mean()/s.std()*np.sqrt(240/len(s))).values
+    mdd = df1 / df1.cummax() - 1
+    res['PeriodMaxDD'] = mdd.groupby(data.SemiYear).min().values
+    res['PeriodCalmar'] = res['PeriodRetOnBookSize'] / res['PeriodMaxDD'].abs()
+    res['TotalMaxDD'] = mdd.min().values[0]
+    res['TotalSharpe'] = (df.mean() / df.std() * np.sqrt(240 / len(df))).values[0]
+    res['AverageCalmar'] = res['TotalSharpe'] / res['TotalMaxDD'].abs()
+    res['TotalAnnualRet'] = (df1.iloc[-1]**(240/len(df1)) - 1).values[0]
+    if save_path is not None:
+        res.to_csv(save_path)
     return res
 
 
@@ -435,6 +466,18 @@ def single_test(conf: dict):
         save_path = path_format.format('LSRtnsNC.csv') if save_tables else None
         long_short_return_nc = panel_long_short_return(ret_group, ret_baseline, save_path)
 
+        # Long Only Statistics No Cost
+        save_path = path_format.format('ResLongNC.csv') if save_tables else None
+        cal_result_stat(long_short_return_nc[['long']], save_path)
+
+        # Short Only Statistics No Cost
+        save_path = path_format.format('ResShortNC.csv') if save_tables else None
+        cal_result_stat(long_short_return_nc[['short']], save_path)
+
+        # Long-Short Statistics No Cost
+        save_path = path_format.format('ResLongShortNC.csv') if save_tables else None
+        cal_result_stat(long_short_return_nc[['long_short']], save_path)
+
         # Long-Short Absolute Result No Cost
         title = 'Long-Short Absolute Result No Cost'
         save_path = path_format.format('LSAbsResNC.png') if save_plots else None
@@ -460,6 +503,18 @@ def single_test(conf: dict):
         if save_tables:
             long_short_return_wc.to_csv(path_format.format('LSRtnsWC.csv'))
             #
+
+        # Long Only Statistics With Cost
+        save_path = path_format.format('ResLongWC.csv') if save_tables else None
+        cal_result_stat(long_short_return_wc[['long']], save_path)
+
+        # Short Only Statistics With Cost
+        save_path = path_format.format('ResShortWC.csv') if save_tables else None
+        cal_result_stat(long_short_return_wc[['short']], save_path)
+
+        # Long-Short Statistics With Cost
+        save_path = path_format.format('ResLongShortWC.csv') if save_tables else None
+        cal_result_stat(long_short_return_wc[['long_short']], save_path)
 
         # Long-Short Absolute Result With Cost
         title = 'Long-Short Absolute Result With Cost'
