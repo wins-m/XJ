@@ -4,6 +4,8 @@
 """
 
 import pandas as pd
+import numpy as np
+from supporter.factor_operator import read_single_factor
 
 
 def adjust_factor_pe_residual(conf: dict):
@@ -49,7 +51,9 @@ def adjust_event_first_report(conf: dict):
     dur = 5
     df = pd.read_csv(path, index_col=0, parse_dates=True)
     df = df.fillna(method='ffill', limit=dur)
-    df = df.fillna(0)
+    template = read_single_factor(conf['a_list_tradeable'], hdf_k='tradeable')
+    df = df.reindex_like(template).fillna(0)
+    df = df * template.replace(False, np.nan)
     df.to_csv(csv_path + 'first_report.csv')
 
 

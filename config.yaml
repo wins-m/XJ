@@ -25,13 +25,13 @@ stk_pool : 'NA'  # NA CSI500 CSI300 [CSI800]
 stk_w : 'ew'  # idx, ew
 neu_mtd : 'n'  # n, i, iv
 tc : 2e-3
-ngroups : 5  # 指定负值，表示多头/空头各(-)ngroup支
+ngroups : -1000  # 指定负值，表示多头/空头各(-)ngroup支
 fnames :
-  'pe_residual' : 1
-  'pe_residual_ols_1' : 1
-  'pe_residual_ols_2' : 1
-  'pe_residual_ols_3' : 1
-  'first_report' : 0
+  'pe_residual' : 0
+  'pe_residual_ols_1' : 0
+  'pe_residual_ols_2' : 0
+  'pe_residual_ols_3' : 0
+  'first_report' : 1
 save_tables : True
 save_plots : True
 ishow : False
