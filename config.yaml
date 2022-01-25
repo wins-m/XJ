@@ -15,17 +15,22 @@ ind_citic : "/mnt/c/Users/Winst/Documents/data_local/ind_citic_constituent.csv"
 marketvalue : "/mnt/c/Users/Winst/Documents/data_local/stk_marketvalue.csv"
 closeAdj : "/mnt/c/Users/Winst/Documents/data_local/stk_marketdata_closeAdj.csv"
 event_first_report : "/mnt/c/Users/Winst/Documents/data_local/2d_event_first_report.csv"
+daily_close : "/mnt/c/Users/Winst/Documents/data_local/stk_marketdata_close.csv"
+daily_open : "/mnt/c/Users/Winst/Documents/data_local/stk_marketdata_open.csv"
+
 
 # target period
-begin_date : '2015-01-01'
+begin_date : '2016-01-01'
 end_date : '2021-12-31'
 
 # backtest (single_test.py)
+save_suffix : '(去除所有涨跌停)'
+with_updown : '_noupdown'  # '': exclude open  '_withupdown': keep  '_noupdown': exclude all
 stk_pool : 'NA'  # NA CSI500 CSI300 [CSI800]
 stk_w : 'ew'  # idx, ew
 neu_mtd : 'n'  # n, i, iv
 tc : 2e-3
-ngroups : -1000  # 指定负值，表示多头/空头各(-)ngroup支
+ngroups : 1  # <0: 多/空各(-)ngroup; 1: 稀疏事件信号
 fnames :
   'pe_residual' : 0
   'pe_residual_ols_1' : 0

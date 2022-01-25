@@ -48,12 +48,25 @@ def adjust_factor_pe_residual(conf: dict):
 def adjust_event_first_report(conf: dict):
     path = conf['event_first_report']
     csv_path = conf['factorscsv_path']
-    dur = 5
+    dur = 4
     df = pd.read_csv(path, index_col=0, parse_dates=True)
+    # df['000650.SZ'].dropna()
+    template = read_single_factor(conf['a_list_tradeable'], conf['begin_date'], conf['end_date'], hdf_k='tradeable')
+    df = df.reindex_like(template)
     df = df.fillna(method='ffill', limit=dur)
-    template = read_single_factor(conf['a_list_tradeable'], hdf_k='tradeable')
-    df = df.reindex_like(template).fillna(0)
-    df = df * template.replace(False, np.nan)
+    # df['000650.SZ'].dropna()
+    df = df.fillna(0)
+    # df = df * template.replace(False, np.nan)  # 不在此处筛选Tradeable
+
+    # tmp = df.loc['2018-07-06']
+    # tmp = tmp[tmp == 1]
+    # # tmp2 = pd.read_clipboard(sep=',', index_col=0)
+    # (len(tmp), len(tmp2))
+    # set(tmp.index) - set(tmp2['stockcode'])
+    # set(tmp2['stockcode']) - set(tmp.index)
+    # tmp.sum()
+    # df.loc['2018-07-09'].sum()
+
     df.to_csv(csv_path + 'first_report.csv')
 
 
@@ -63,4 +76,5 @@ if __name__ == '__main__':
     conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
     #
     # adjust_factor_pe_residual(conf)
+    adjust_event_first_report(conf)
 

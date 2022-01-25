@@ -1,8 +1,9 @@
-"""
+"""# `get_data.py`
 (created by swmao on Jan. 11th)
-# `get_data.py`
 下载单项指标（主要为因子）的面板数据，long转wide格式存入本地；
 - 所用表格在[access_target](./data/access_target.xlsx)中指定
+(update Jan. 25th)
+xlsx中指定起止日期
 
 """
 import pandas as pd
@@ -29,13 +30,13 @@ def save_marketdata(begin_date, end_date, engine, data_path):
     """
 
 
-def save_factor_panel(grid: pd.DataFrame, begin_date, end_date, engine_list, data_path):
+def save_factor_panel(grid: pd.DataFrame, engine_list, data_path):
     """对name_cols中的表格（以IND,COL,VAL二维获取），取到本地"""
     for i_row in grid.iterrows():
         tb = i_row[1]
         query = f"SELECT {tb['IND']},{tb['COL']},{tb['VAL']}" \
                 f" FROM {tb['TABLE']}" \
-                f" WHERE {tb['IND']}>='{begin_date}' AND {tb['IND']}<='{end_date}'" \
+                f" WHERE {tb['IND']}>='{tb['B_DATE']}' AND {tb['IND']}<='{tb['E_DATE']}'" \
                 f"{' AND '+tb['WHERE'] if isinstance(tb['WHERE'], str) else ''}" \
                 f" ORDER BY {tb['IND']};"  # f" FROM {tb['BASE']}.{tb['TABLE']}" \
         print(query)  # query sentence
@@ -65,7 +66,7 @@ def save_factor_panel(grid: pd.DataFrame, begin_date, end_date, engine_list, dat
         print("Local Table Updated.")
 
 
-def transfer_data(mysql_engine, begin_date, end_date, data_path, access_target, force_update=False):
+def transfer_data(mysql_engine, data_path, access_target, force_update=False):
     """准备访问服务器，获取数据到本地"""
     grid = pd.read_excel(access_target)
     grid = grid if force_update else grid[grid['UPDATE'] == 1]
@@ -77,7 +78,7 @@ def transfer_data(mysql_engine, begin_date, end_date, data_path, access_target, 
 
     print(mysql_query("SELECT tradingdate FROM jeffdatabase.tdays_d ORDER BY tradingdate DESC LIMIT 1", engine_list[0]))
 
-    save_factor_panel(grid, begin_date, end_date, engine_list, data_path)
+    save_factor_panel(grid, engine_list, data_path)
     engine = engine_list[0]
 
 
@@ -85,11 +86,12 @@ def get_data(conf):
     """main"""
     mysql_engine = conf['mysql_engine']
     force_update = conf['force_update']
-    begin_date = conf['begin_date']
-    end_date = conf['end_date']
+    # begin_date = conf['begin_date']
+    # end_date = conf['end_date']
     data_path = conf['data_path']
     access_target = conf['access_target']
-    transfer_data(mysql_engine, begin_date, end_date, data_path, access_target, force_update)
+    # transfer_data(mysql_engine, begin_date, end_date, data_path, access_target, force_update)
+    transfer_data(mysql_engine, data_path, access_target, force_update)
 
 
 if __name__ == '__main__':

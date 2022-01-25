@@ -87,9 +87,12 @@ def panel_long_short_return(ret_group, ret_baseline, save_path=None) -> pd.DataF
     return long_short_return_nc
 
 
-def panel_long_short_absolute(long_short_return_nc, ishow=False, title='Long-Short Absolute Result', save_path=None) -> pd.DataFrame:
+def panel_long_short_absolute(long_short_return_nc, ishow=False, title='', save_path=None, cumsum=True) -> pd.DataFrame:
     """多空累计绝对收益面板"""
-    long_short_absolute_nc = long_short_return_nc.add(1).cumprod()
+    if cumsum:
+        long_short_absolute_nc = long_short_return_nc.cumsum()  # 用累加
+    else:
+        long_short_absolute_nc = long_short_return_nc.add(1).cumprod()  # 用累乘
 
     if save_path is not None:
         long_short_absolute_nc.plot(figsize=(10, 5), grid=True, title=title)
@@ -127,9 +130,12 @@ def panel_long_short_excess(long_short_absolute_nc, ishow=False, title='Long-Sho
     return long_short_excess_nc
 
 
-def plot_rtns_group(ret_group: pd.DataFrame, ishow=False, save_path=None):
+def plot_rtns_group(ret_group: pd.DataFrame, ishow=False, save_path=None, cumsum=True):
     """分层收益情况"""
-    ret_group_cumulative = ret_group.add(1).cumprod()
+    if cumsum:
+        ret_group_cumulative = ret_group.cumsum()
+    else:
+        ret_group_cumulative = ret_group.add(1).cumprod()
 
     if save_path is not None:
         ret_group_cumulative.plot(grid=True, figsize=(16, 8), linewidth=3, title="Group Test Result")
@@ -159,7 +165,7 @@ def cal_long_short_group_rtns(long_short_group, ret, idx_weight, ngroups, save_p
     else:
         idx_weight = idx_weight.reindex_like(ret)
 
-    gn = 3 if ngroups < 0 else 2 if ngroups==1 else ngroups
+    gn = 3 if ngroups < 0 else 2 if ngroups == 1 else ngroups
     ret_group = pd.DataFrame(index=ret.index)
     gi = 0
     for gi in range(gn):
@@ -342,16 +348,16 @@ def cal_result_stat(df: pd.DataFrame, save_path: str = None) -> pd.DataFrame:
     res['TotalRet'] = res['UnitValue'] - 1
     res['PeriodRetOnBookSize'] = res['UnitValue'].pct_change()
     res.iloc[0, -1] = res['UnitValue'].iloc[0] - 1
-    res['PeriodSharpe'] = df.groupby(data.SemiYear).apply(lambda s: s.mean()/s.std()*np.sqrt(240/len(s))).values
+    res['PeriodSharpe'] = df.groupby(data.SemiYear).apply(lambda s: s.mean()/s.std()*np.sqrt(240)).values
     mdd = df1 / df1.cummax() - 1
     res['PeriodMaxDD'] = mdd.groupby(data.SemiYear).min().values
     res['PeriodCalmar'] = res['PeriodRetOnBookSize'] / res['PeriodMaxDD'].abs()
     res['TotalMaxDD'] = mdd.min().values[0]
-    res['TotalSharpe'] = (df.mean() / df.std() * np.sqrt(240 / len(df))).values[0]
+    res['TotalSharpe'] = (df.mean() / df.std() * np.sqrt(240)).values[0]
     res['AverageCalmar'] = res['TotalSharpe'] / res['TotalMaxDD'].abs()
     res['TotalAnnualRet'] = (df1.iloc[-1]**(240/len(df1)) - 1).values[0]
     if save_path is not None:
-        res.to_csv(save_path)
+        res.to_excel(save_path.replace('.csv', '.xlsx'))
     return res
 
 
@@ -376,10 +382,13 @@ def single_test(conf: dict):
     end_date = pd.to_datetime(conf['end_date'])
     cost_rate = float(conf['tc'])
     all_factornames = [k for k, v in conf['fnames'].items() if v == 1]
+    with_updown = 'tradeable' + conf['with_updown']
+    save_suffix = conf['save_suffix']
     print("CONFIG LOADED", neu_mtd, stk_pool)
+    # ishow = True
 
     # Tradeable Sifter (a_list_tradeable)
-    a_list_tradeable = read_single_factor(tradeable_path, begin_date - timedelta(60), end_date, bool, hdf_k='tradeable')
+    a_list_tradeable = read_single_factor(tradeable_path, begin_date - timedelta(60), end_date, bool, hdf_k=with_updown)
     tradeable_multiplier = a_list_tradeable.replace(False, np.nan).dropna(axis=1, how='all')
 
     # idx_weight: a_list_tradeable @ stk_pool @ stk_w
@@ -403,7 +412,7 @@ def single_test(conf: dict):
     for fname in all_factornames:
 
         # Result File Format: *args -> path_format
-        save_path_ = f"""{res_path}{fname}_{neu_mtd}_{stk_pool}{stk_w}_{ngroups}g"""
+        save_path_ = f"""{res_path}{fname}_{neu_mtd}_{stk_pool}{stk_w}_{ngroups}g""" + save_suffix
         os.makedirs(save_path_, exist_ok=True)
         path_format = save_path_ + "/{}"
 
@@ -413,14 +422,14 @@ def single_test(conf: dict):
         fval.head().sum(axis=1)  # check first date
         fval = fval * tradeable_multiplier.loc[begin_date:]
         fval = fval.astype(float)
+        ret = all_ret.reindex_like(fval)  # returns aligned with factor value
 
         if ngroups == 1:
+            fval_neutralized = fval.copy()
             long_short_group = fval.copy()
         else:
             # Factor Neutralization: fval, neu_mtd, ind_citic_path, marketvalue_path -> fval_neutralized, ret
             fval_neutralized = factor_neutralization(fval, neu_mtd, ind_citic_path, marketvalue_path)
-            ret = all_ret.reindex_like(fval_neutralized)  # returns aligned with factor value
-
             # Group Label Panel: fval_neutralized, ngroups -> long_short_group
             long_short_group = get_long_short_group(fval_neutralized, ngroups)
 
@@ -438,7 +447,7 @@ def single_test(conf: dict):
         save_path = path_format.format('ICRank.png') if save_plots else None
         rank_ic = cal_ic(fval_neutralized, ret, rankIC=True, ishow=ishow, save_path=save_path)
 
-        if (ic.isna().prod().values[0] != 1) and (rank_ic.isna().prod().values[0] != 1):
+        if (ngroups != 1) and (ic.isna().prod().values[0] != 1) and (rank_ic.isna().prod().values[0] != 1):
             # IC Stats: ic -> ICStat.csv
             ic_stat = pd.DataFrame()
             ic_stat['IC'] = cal_ic_stat(data=ic)
@@ -476,13 +485,14 @@ def single_test(conf: dict):
         save_path = path_format.format('ResLongNC.csv') if save_tables else None
         cal_result_stat(long_short_return_nc[['long']], save_path)
 
-        # Short Only Statistics No Cost: long_short_return_nc -> ResShortNC.csv
-        save_path = path_format.format('ResShortNC.csv') if save_tables else None
-        cal_result_stat(long_short_return_nc[['short']], save_path)
+        if ngroups != 1:
+            # Short Only Statistics No Cost: long_short_return_nc -> ResShortNC.csv
+            save_path = path_format.format('ResShortNC.csv') if save_tables else None
+            cal_result_stat(long_short_return_nc[['short']], save_path)
 
-        # Long-Short Statistics No Cost: long_short_return_nc -> ResLongShortNC.csv
-        save_path = path_format.format('ResLongShortNC.csv') if save_tables else None
-        cal_result_stat(long_short_return_nc[['long_short']], save_path)
+            # Long-Short Statistics No Cost: long_short_return_nc -> ResLongShortNC.csv
+            save_path = path_format.format('ResLongShortNC.csv') if save_tables else None
+            cal_result_stat(long_short_return_nc[['long_short']], save_path)
 
         # Long-Short Absolute Result No Cost: long_short_return_nc -> long_short_absolute_nc, LSAbsResNC.png
         title = 'Long-Short Absolute Result No Cost'
@@ -499,10 +509,11 @@ def single_test(conf: dict):
         save_path = path_format.format('LMddNC.png') if save_plots else None
         cal_sr_max_drawdown(long_short_absolute_nc['long'], ishow, title, save_path)
 
-        # Long-Short-Absolute MaxDrawdown No Cost
-        title = 'Long-Short-Absolute MaxDrawdown No Cost'
-        save_path = path_format.format('LSMddNC.png') if save_plots else None
-        cal_sr_max_drawdown(long_short_absolute_nc['long_short'], ishow, title, save_path)
+        if ngroups != 1:
+            # Long-Short-Absolute MaxDrawdown No Cost
+            title = 'Long-Short-Absolute MaxDrawdown No Cost'
+            save_path = path_format.format('LSMddNC.png') if save_plots else None
+            cal_sr_max_drawdown(long_short_absolute_nc['long_short'], ishow, title, save_path)
 
         # Long-Short Absolute Return With Cost
         long_short_return_wc = long_short_return_nc - long_short_turnover * cost_rate
@@ -514,13 +525,14 @@ def single_test(conf: dict):
         save_path = path_format.format('ResLongWC.csv') if save_tables else None
         cal_result_stat(long_short_return_wc[['long']], save_path)
 
-        # Short Only Statistics With Cost
-        save_path = path_format.format('ResShortWC.csv') if save_tables else None
-        cal_result_stat(long_short_return_wc[['short']], save_path)
+        if ngroups != 1:
+            # Short Only Statistics With Cost
+            save_path = path_format.format('ResShortWC.csv') if save_tables else None
+            cal_result_stat(long_short_return_wc[['short']], save_path)
 
-        # Long-Short Statistics With Cost
-        save_path = path_format.format('ResLongShortWC.csv') if save_tables else None
-        cal_result_stat(long_short_return_wc[['long_short']], save_path)
+            # Long-Short Statistics With Cost
+            save_path = path_format.format('ResLongShortWC.csv') if save_tables else None
+            cal_result_stat(long_short_return_wc[['long_short']], save_path)
 
         # Long-Short Absolute Result With Cost
         title = 'Long-Short Absolute Result With Cost'
@@ -537,10 +549,11 @@ def single_test(conf: dict):
         save_path = path_format.format('LMddWC.png') if save_plots else None
         cal_sr_max_drawdown(long_short_absolute_wc['long'], ishow, title, save_path)
 
-        # Long-Short-Absolute MaxDrawdown With Cost
-        title = 'Long-Short-Absolute MaxDrawdown With Cost'
-        save_path = path_format.format('LSMddWC.png') if save_plots else None
-        cal_sr_max_drawdown(long_short_absolute_wc['long_short'], ishow, title, save_path)
+        if ngroups != 1:
+            # Long-Short-Absolute MaxDrawdown With Cost
+            title = 'Long-Short-Absolute MaxDrawdown With Cost'
+            save_path = path_format.format('LSMddWC.png') if save_plots else None
+            cal_sr_max_drawdown(long_short_absolute_wc['long_short'], ishow, title, save_path)
 
         # Annual Return No Cost
         title = 'Annual Return No Cost'

@@ -1,6 +1,9 @@
 """
 (created by swmao on Jan. 18th)
-获取可否交易的标签，去除新上市、停牌、涨跌停
+- 获取可否交易的标签，去除新上市、停牌、涨跌停
+(updated Jan. 25th)
+- 用行情数据，识别开盘涨停，只去除开盘涨停
+- 多个csv：多个筛选条件
 
 """
 from datetime import timedelta
@@ -30,48 +33,71 @@ def update_tradeable_label(conf):
     """
     # stockcode@tradingdate 填充以False
     stk_ipo_date = pd.read_csv(conf['stk_ipo_date'])
-    col = stk_ipo_date['stockcode'].sort_values().unique()
-    ind = pd.read_csv(conf['tdays_d'], header=None, index_col=0, parse_dates=True)
-    # .loc[conf['begin_date']:conf['end_date']]
+    col = stk_ipo_date['stockcode'].sort_values().unique()  # 有stk_ipo_date记录的个股
+    print('模板内个股总数: %d' % len(col))
+    ind = pd.read_csv(conf['tdays_d'], header=None, index_col=0, parse_dates=True)  # 交易日2000-2021手动数据库
+    # .loc['2010-01-01':'2021-12-31']
     df = pd.DataFrame(index=ind.index.rename(''), columns=col).fillna(False)
-    print(f"""个股上市日期，（{conf['ipo_delay']}）天后开始设置为True""")
-    begin_date = df.index[0]
-    end_date = df.index[-1]
+    for irow in tqdm(stk_ipo_date.iterrows()):
+        stk = irow[1]['stockcode']
+        d0 = str(irow[1]['ipo_date'])
+        d1 = str(irow[1]['delist_date'])
+        d1 = '2022-12-31' if (d1 == 'nan') else d1
+        df.loc[d0:d1, stk:stk] = True
+    print('上市后+退市前保存于 %s, key=%s' % (conf['a_list_tradeable'], 'ipo'))
+    df.to_hdf(conf['a_list_tradeable'], key='ipo')
+    ipo = df.copy()
+
+    # 新股上市{conf['ipo_delay']}内不交易
     for irow in tqdm(stk_ipo_date.iterrows()):
         stk = irow[1]['stockcode']
         d0 = pd.to_datetime(irow[1]['ipo_date'])
-        d1 = pd.to_datetime(d0) + timedelta(days=conf['ipo_delay'])
-        d1 = d1 if d1 > begin_date else begin_date
-        d2 = str(irow[1]['delist_date'])
-        d2 = end_date if (d2 == 'nan' or end_date < pd.to_datetime(d2)) else pd.to_datetime(d2)
-        df.loc[d1:d2, stk:stk] = True
+        d0id = len(ind)-1
+        d1 = d0
+        try:
+            d0id = ind.index.get_loc(d0)
+            d1 = ind.index[d0id + conf['ipo_delay']]
+        except KeyError:
+            d1 = d0 + timedelta(conf['ipo_delay'] * 1.5)  # ipo日在2000年以前，则加上1.5*ipo_delay个自然日
+        except IndexError:
+            d1 = ind.index[min(d0id + conf['ipo_delay'], len(ind)-1)]
+        finally:
+            df.loc[d0:d1, stk:stk] = False  # 新股改False
+    print('上市%s日后+退市前保存于 %s, key=%s' % (conf['ipo_delay'], conf['a_list_tradeable'], f"ipo{conf['ipo_delay']}"))
+    df.to_hdf(conf['a_list_tradeable'], key=f"ipo{conf['ipo_delay']}")
+    ipo_delay = df.copy()
 
-    print('停牌，设为False')
+    # 停牌，设为False
     a_list_suspendsymbol = pd.read_csv(conf['a_list_suspendsymbol'], index_col=0, parse_dates=True)
-    # for irow in tqdm(a_list_suspendsymbol.iterrows()):
-    #     td = irow[0]
-    #     stk = irow[1]['stockcode']
-    #     df.loc[td:td, stk:stk] = False
     a_list_suspendsymbol['suspend'] = False
-    tmp = a_list_suspendsymbol.reset_index().pivot(index='tradingdate', columns='stockcode', values='suspend')
-    tmp = tmp.reindex_like(df).fillna(True)  # 空，非停牌，填充True
-    df = df * tmp
+    suspend = a_list_suspendsymbol.reset_index().pivot(index='tradingdate', columns='stockcode', values='suspend')
+    suspend = suspend.reindex_like(df).fillna(True)  # 空，非停牌，填充True
+    print('停牌为False保存于 %s, key=%s' % (conf['a_list_tradeable'], 'suspend'))
+    suspend.to_hdf(conf['a_list_tradeable'], key='suspend')
 
-    print('涨跌停，当天为False')
+    # 涨跌停，当天为False
     stk_maxupordown = pd.read_csv(conf['stk_maxupordown'], index_col=0, parse_dates=True)
-    # for irow in tqdm(stk_maxupordown.iterrows()):
-    #     if irow[1]['maxupordown'] in [1, -1]:
-    #         td = irow[0]
-    #         stk = irow[1]['stockcode']
-    #         df.loc[td:td, stk:stk] = False
-    tmp = stk_maxupordown.reset_index().pivot(index='tradingdate', columns='stockcode', values='maxupordown')
-    tmp = tmp.reindex_like(df).isna()  # 空，意味着非涨跌停
-    df = df * tmp
+    updown = stk_maxupordown.reset_index().pivot(index='tradingdate', columns='stockcode', values='maxupordown')
+    updown = updown.reindex_like(df).isna()
+    print('筛去所有涨跌停保存于 %s, key=%s' % (conf['a_list_tradeable'], 'updown'))
+    updown.to_hdf(conf['a_list_tradeable'], key='updown')
+    is_maxupordown = ~updown
+    # 开盘涨跌停，开盘价=收盘价
+    daily_open = pd.read_csv(conf['daily_open'], index_col=0, parse_dates=True)
+    daily_close = pd.read_csv(conf['daily_close'], index_col=0, parse_dates=True)
+    eq = (daily_open == daily_close).reindex_like(is_maxupordown)
+    updown_open = ~(is_maxupordown & eq)  # 非（涨跌停 且 开=收），即非“开盘即涨跌停”
+    print('筛去开盘涨跌停保存于 %s, key=%s' % (conf['a_list_tradeable'], 'updown_open'))
+    updown_open.to_hdf(conf['a_list_tradeable'], key='updown_open')
 
-    print('存一份到本地（1-True, 0-False）')
-    # df.astype(int).to_csv(conf['a_list_tradeable'].replace('hdf', 'csv'))
-    df.to_hdf(conf['a_list_tradeable'], key='tradeable')
-    print(f"""PANEL {df.shape} SAVE IN {conf['a_list_tradeable']}""")
+    print('ipo%s & suspend & updown_open 保存于 %s, key=%s' % (conf['ipo_delay'], conf['a_list_tradeable'], 'updown_open'))
+    tradeable = ipo_delay & suspend & updown_open
+    tradeable.to_hdf(conf['a_list_tradeable'], key='tradeable')
+    tradeable1 = ipo & suspend
+    tradeable1.to_hdf(conf['a_list_tradeable'], key='tradeable_withupdown')
+    tradeable2 = ipo_delay & suspend & updown
+    tradeable2.to_hdf(conf['a_list_tradeable'], key='tradeable_noupdown')
+    print(f"""PANEL {tradeable.shape} SAVE IN {conf['a_list_tradeable']}""")
 
 
 if __name__ == '__main__':
