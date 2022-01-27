@@ -23,7 +23,6 @@ daily_close : "/mnt/c/Users/Winst/Documents/data_local/stk_marketdata_close.csv"
 daily_open : "/mnt/c/Users/Winst/Documents/data_local/stk_marketdata_open.csv"
 instnum_180 : "/mnt/c/Users/Winst/Documents/data_local/2d_stk_west_instnum_180.csv"
 
-
 # target period
 begin_date : '2016-01-01'
 end_date : '2021-12-31'
