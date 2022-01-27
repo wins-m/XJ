@@ -36,11 +36,14 @@ class TradeDate(object):
         return self.data.index[l0], abs(l1-l0)
 
 
-def adjacent_abnormal_returns(conf: dict, gap=20, drop_dret_over=.20):
+def table_ar_adjacent_events(conf: dict, gap=20, drop_dret_over=.20):
     """计算机构首次关注event（原instnum<5)前后-gap~gap+1日的超额收益，大市为等权"""
     data_path = conf['data_path']
+    res_path = conf['factorsres_path']
+    save_path = res_path + 'event_first_report/'
+    os.makedirs(save_path, exist_ok=True)
     # 存储地址
-    save_path = data_path + 'event_abnormal_returns.csv'  # 'event_adjacent_returns.csv'
+    save_path = save_path + 'event_abnormal_returns.csv'  # 'event_adjacent_returns.csv'
     # 事件记录：stockcode, tradingdate, fv(==1)
     event = pd.read_csv(data_path + 'event_first_report.csv')
     # 机构关注数
@@ -49,7 +52,7 @@ def adjacent_abnormal_returns(conf: dict, gap=20, drop_dret_over=.20):
     tradedates = pd.read_csv(conf['tdays_d'], header=None, index_col=0, parse_dates=True)
     TD = TradeDate(tradedates)
     # ipo 60 天后
-    ipo60 = pd.read_hdf(conf['a_list_tradeable'], key='ipo60').replace(False, np.nan)
+    ipo60 = pd.DataFrame(pd.read_hdf(conf['a_list_tradeable'], key='ipo60')).replace(False, np.nan)
     # 复权收盘价
     adjclose = pd.read_csv(conf['closeAdj'], index_col=0, parse_dates=True)
     # 复权收盘价收益
@@ -87,7 +90,7 @@ def adjacent_abnormal_returns(conf: dict, gap=20, drop_dret_over=.20):
     event_adjacent_returns.to_csv(save_path)
 
 
-def graph_abnormal_returns(conf):
+def graph_ar_car(conf):
 
     def plot_ar_car(ar, save_path=None):
         car = ar.cumsum()
@@ -109,13 +112,12 @@ def graph_abnormal_returns(conf):
             plt.savefig(save_path)
             plt.close()
 
-    data_path = conf['data_path']
+    # data_path = conf['data_path']
     res_path = conf['factorsres_path']
-
     save_path = res_path + 'event_first_report/'
     os.makedirs(save_path, exist_ok=True)
 
-    event_abnormal_returns = pd.read_csv(data_path + 'event_abnormal_returns.csv', index_col=0, parse_dates=True)
+    event_abnormal_returns = pd.read_csv(save_path + 'event_abnormal_returns.csv', index_col=0, parse_dates=True)
     """tmp = event_abnormal_returns.copy()
     tmp.apply(lambda s: (s > s.median() + s.std() * 8).sum(), axis=1).plot(); plt.show()
     tmp.apply(lambda s: (s.median() + s.std() * 8), axis=1).plot(); plt.show()
@@ -136,20 +138,20 @@ def graph_abnormal_returns(conf):
         #
 
 
-def cumsum_daily_ar_corr(conf, ishow=False):
+def graph_corr_d_ar_cumsum(conf, ishow=False):
     """
     绘制相关热力图。计算方式
     - 事前j天，日后k天
     - -j天到-1天该公司股票复权收盘价总收益；事后1天到k天复权收盘价总收益
-    -
+
     """
-    data_path = conf['data_path']
+    # data_path = conf['data_path']
     res_path = conf['factorsres_path']
     save_path = res_path + 'event_first_report/'
     os.makedirs(save_path, exist_ok=True)
-    event_abnormal_returns = pd.read_csv(data_path + 'event_abnormal_returns.csv', index_col=0, parse_dates=True)
-    # %
-    cumsumret0 = event_abnormal_returns.loc[-1:-120:-1, :].cumsum().loc[::-1,:].T
+    event_abnormal_returns = pd.read_csv(save_path + 'event_abnormal_returns.csv', index_col=0, parse_dates=True)
+
+    cumsumret0 = event_abnormal_returns.loc[-1:-120:-1, :].cumsum().loc[::-1].T
     cumsumret1 = event_abnormal_returns.loc[1:120, :].cumsum().T
     cumsumret = pd.concat([cumsumret0, cumsumret1], axis=1)
 
@@ -161,64 +163,31 @@ def cumsum_daily_ar_corr(conf, ishow=False):
     subcorrmatrix2 = corrmatrix2.loc[-120:-1, 1:120].iloc[::-1]
     subcorrmatrix2.to_excel(save_path + 'ar_cumsum_corr(spearman).xlsx')
 
-    # %
-    gap = 25
-    x = subcorrmatrix.iloc[:gap, :gap]
-    annot = True if gap <= 25 else False
-    f, ax = plt.subplots(figsize=(20, 16))
-    sns.heatmap(x, annot=annot, cmap='RdBu', ax=ax, annot_kws={'size': 9, 'weight': 'bold', 'color': 'white'})
-    title = f'corr{gap}_pearson'
-    plt.title(title)
-    plt.savefig(save_path+f'{title}.png')
-    if ishow:
-        plt.show()
-    else:
-        plt.close()
-
-    x = subcorrmatrix2.iloc[:gap, :gap]
-    f, ax = plt.subplots(figsize=(20, 16))
-    sns.heatmap(x, annot=annot, cmap='RdBu', ax=ax, annot_kws={'size': 9, 'weight': 'bold', 'color': 'white'})
-    title = f'corr{gap}_spearman'
-    plt.title(title)
-    plt.savefig(save_path+f'{title}.png')
-    if ishow:
-        plt.show()
-    else:
-        plt.close()
-    # %
-
-    """
-    wlen = 5
-    gap = 1
-    w_range0 = range(-gap, -wlen-1, -gap)
-    w_range1 = range(gap, wlen+1, gap)
-    # w_range0 = range(-120, 0, 5)
-    # w_range1 = range(5, 121, 5)
-    result = pd.DataFrame(index=w_range0, columns=w_range1)
-    gap0, gap1 = -5, 1
-    for gap0 in tqdm(w_range0):
-        for gap1 in w_range1:
-            ret0 = event_abnormal_returns.loc[gap0:-1].apply(lambda s: np.prod(s + 1) - 1)
-            ret1 = event_abnormal_returns.loc[1:gap1].apply(lambda s: np.prod(s + 1) - 1)
-            val = ret0.corr(other=ret1, method='pearson')
-            if np.isnan(val):
-                break
-            result.loc[gap0, gap1] = val
-
-    plt.imshow(result.astype(float))
-    plt.show()
-    print(result)
-    """
+    gap, data = 25, subcorrmatrix
+    for gap in [25, 120]:
+        for mtd, data in zip(['pearson', 'spearman'], [subcorrmatrix, subcorrmatrix2]):
+            x = data.iloc[:gap, :gap]
+            annot = True if gap <= 25 else False
+            f, ax = plt.subplots(figsize=(20, 16))
+            sns.heatmap(x, annot=annot, cmap='RdBu', ax=ax, annot_kws={'size': 9, 'weight': 'bold', 'color': 'white'})
+            title = f'corr{gap}_{mtd}'
+            plt.title(title)
+            plt.savefig(save_path+f'{title}.png')
+            if ishow:
+                plt.show()
+            else:
+                plt.close()
+    #
 
 
-def afterwards_daily_ar_dist(conf, ishow=False):
+def graph_dist_d_ar_afterwards(conf, ishow=False):
     """日超额收益的分布"""
-    data_path = conf['data_path']
+    # data_path = conf['data_path']
     res_path = conf['factorsres_path']
     save_path = res_path + 'event_first_report/'
 
     os.makedirs(save_path, exist_ok=True)
-    event_abnormal_returns = pd.read_csv(data_path + 'event_abnormal_returns.csv', index_col=0, parse_dates=True)
+    event_abnormal_returns = pd.read_csv(save_path + 'event_abnormal_returns.csv', index_col=0, parse_dates=True)
 
     # % Violin Plot
     for di in [5, 20, 60]:
@@ -245,14 +214,14 @@ def afterwards_daily_ar_dist(conf, ishow=False):
         plt.close()
 
 
-def table_one_day_2d(conf):
+def table_2d_one_day(conf):
     """K个2d面板，若有事件，则为事件后第K天的超额收益"""
-    data_path = conf['data_path']
+    # data_path = conf['data_path']
     res_path = conf['factorsres_path']
     save_path = res_path + 'event_first_report/'
     os.makedirs(save_path, exist_ok=True)
 
-    event_abnormal_returns = pd.read_csv(data_path + 'event_abnormal_returns.csv', index_col=0, parse_dates=True)
+    event_abnormal_returns = pd.read_csv(save_path + 'event_abnormal_returns.csv', index_col=0, parse_dates=True)
 
     # 000001 -> 000001.SZ
     ipo60 = pd.DataFrame(pd.read_hdf(conf['a_list_tradeable'], key='ipo60'))
@@ -284,8 +253,8 @@ if __name__ == '__main__':
     conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
     gap = 240
 
-    # adjacent_abnormal_returns(conf, gap, drop_dret_over=0.10)
-    # graph_abnormal_returns(conf)
-    # cumsum_daily_ar_corr(conf)
-    # afterwards_daily_ar_dist(conf, ishow=False)
-    # table_one_day_2d(conf)
+    # table_ar_adjacent_events(conf, gap, drop_dret_over=0.10)
+    # graph_ar_car(conf)
+    # graph_corr_d_ar_cumsum(conf)
+    # graph_dist_d_ar_afterwards(conf, ishow=False)
+    # table_2d_one_day(conf)
