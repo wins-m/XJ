@@ -51,21 +51,6 @@ def get_long_short_group(df: pd.DataFrame, ngroups: int) -> pd.DataFrame:
     return res
 
 
-def group_weight(long_short_group, idx_weight, gn: int) -> pd.DataFrame:
-    """分组内各股权重，每日总和任意1"""
-    return idx_weight[long_short_group == gn].fillna(0)
-
-
-def rescale_weight(df: pd.DataFrame, axis=1) -> pd.DataFrame:
-    """对每行的权重值标准化，使总和为1"""
-    return df.apply(lambda s: s / np.nansum(s.abs()), axis=axis)
-
-
-def turnover_from_weight(w) -> pd.DataFrame:
-    """由权重计算换手率"""
-    return w.diff().abs().sum(axis=1)
-
-
 def panel_long_short_return(ret_group, ret_baseline, save_path=None) -> pd.DataFrame:
     """
     由各分组收益以及基准收益，准备多空绝对收益的面板
@@ -250,9 +235,22 @@ def cal_yearly_sharpe(data, ishow=False, title='Annual Sharpe', save_path=None, 
 
 def cal_turnover_long_short(long_short_group, idx_weight, ngroups, ishow=False, save_path=None) -> pd.DataFrame:
     """由多空分组分别计算long, short, long_short, baseline的换手率和权重"""
-    w_long = rescale_weight(group_weight(long_short_group, idx_weight, ngroups-1))
-    w_short = rescale_weight(group_weight(long_short_group, idx_weight, 0))
-    w_long_short = rescale_weight(w_long - w_short)  # 多头资金量与空头资金量1:1
+
+    def group_weight(df: pd.DataFrame, w: pd.DataFrame, g: int) -> pd.DataFrame:
+        """分组内各股权重，空仓则为0：df(分组标签2D), w(全市场权重2D), g(第g组)"""
+        return w[df == g].fillna(0)
+
+    def rescale_weight(df: pd.DataFrame, axis=1) -> pd.DataFrame:
+        """对每行的权重值标准化，使绝对值总和为1"""
+        return df.apply(lambda s: s / np.nansum(s.abs()), axis=axis)
+
+    def turnover_from_weight(w: pd.DataFrame) -> pd.DataFrame:
+        """由权重计算双边换手率"""
+        return w.diff().abs().sum(axis=1)
+
+    w_long = rescale_weight(group_weight(long_short_group, idx_weight, max(ngroups-1, 1)))  # 最大编号组，做多
+    w_short = rescale_weight(group_weight(long_short_group, idx_weight, 0))  # 0编号组，做空
+    w_long_short = rescale_weight(w_long - w_short)  # 多头资金量与空头资金量1:1，合并换手率
 
     dw = pd.DataFrame()
     dw['long_short'] = turnover_from_weight(w_long_short)
@@ -262,7 +260,6 @@ def cal_turnover_long_short(long_short_group, idx_weight, ngroups, ishow=False, 
 
     if save_path is not None:
         dw.to_csv(save_path)
-
         dw[['long', 'short']].plot(figsize=(10, 5), grid=True, title='Turnover')
         plt.savefig(save_path.replace('.csv', '.png'))
         if ishow:
