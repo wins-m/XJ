@@ -3,6 +3,7 @@ project_path : "/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmPr
 data_path : "/mnt/c/Users/Winst/Documents/data_local/"
 factorscsv_path : "/mnt/c/Users/Winst/Documents/factors_csv/"
 factorsres_path : "/mnt/c/Users/Winst/Documents/factors_res/"
+level2_path : '/mnt/c/Users/Winst/Documents/level2/'
 # hdf temp file
 a_list_tradeable : "/mnt/c/Users/Winst/Documents/data_local/a_list_tradeable.hdf"
         # key: ipo, ipo60, suspend, updown, updown_open
