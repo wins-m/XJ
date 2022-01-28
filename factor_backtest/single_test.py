@@ -4,7 +4,7 @@
 """
 import os, sys
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
-from supporter.factor_operator import *
+from supporter.backtester import *
 import pandas as pd
 import numpy as np
 from scipy import stats
@@ -414,11 +414,13 @@ def single_test(conf: dict):
         path_format = save_path_ + "/{}"
 
         # Factor Value: *args -> fval
-        fval = read_single_factor(f'{csv_path}{fname}.csv', begin_date - timedelta(5), end_date, float, pool_multiplier)
-        fval: pd.DataFrame = fval.shift(1).loc[begin_date:]  # 滞后一天，以昨日的因子值参与计算
-        fval.head().sum(axis=1)  # check first date
-        fval = fval * tradeable_multiplier.loc[begin_date:]
-        fval = fval.astype(float)
+        fval = pd.read_csv(f'{csv_path}{fname}.csv', dtype=float, index_col=0, parse_dates=True)
+        signal = Signal(fval, begin_date, end_date)
+        signal.shift_1d(T=1)  # 滞后一天，以昨日的因子值参与计算
+        signal.keep_tradeable(tradeable_multiplier)
+        fval = signal.get_fv()
+        fval.head().sum(axis=1)
+
         ret = all_ret.reindex_like(fval)  # returns aligned with factor value
 
         if ngroups == 1:
@@ -426,7 +428,8 @@ def single_test(conf: dict):
             long_short_group = fval.copy()
         else:
             # Factor Neutralization: fval, neu_mtd, ind_citic_path, marketvalue_path -> fval_neutralized, ret
-            fval_neutralized = factor_neutralization(fval, neu_mtd, ind_citic_path, marketvalue_path)
+            signal.neutralize_by(neu_mtd, ind_citic_path, marketvalue_path)
+            fval_neutralized = signal.get_fv()
             # Group Label Panel: fval_neutralized, ngroups -> long_short_group
             long_short_group = get_long_short_group(fval_neutralized, ngroups)
 
