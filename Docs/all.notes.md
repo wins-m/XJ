@@ -111,22 +111,24 @@
     - [ ] 先验概率；后验概率 -> 下注权重
         - [x] 先验
         - [ ] 新上市
-    - [ ] 后验
+    - [ ] 后验 : 线性模型 or 非线性？
         - [ ] 次日开盘涨跌停
         - [ ] 次日涨跌停（非开盘）
 - [ ] 调整回测
     - [x] 针对事件信号（多数0，不可交易nan，少数1）
     - [ ] 因子收益计算，显著性，打分
-    - [ ] 整理到class
-        - [ ] self.tab_fv, self.tab_weight (mtd), self.tab_turnover, self.tab_return
-        - [ ] self.stk_pool 全市场、300、500、800、1000、机构关注、券商金股与调研
-        - [ ] self.baseline(Turnover, Return)
-        - [ ] self.freqency 交易频率（短、中、长）
-        - [ ] self.strategy_type 不同类型（多空测试、头部测试、事件测试）
+    - [ ] 整理class
+        - [ ] StkPool
+        - [ ] Portfolio
+        - [x] Signal
+        - [ ] Strategy : strategy_type 不同类型（多空测试、头部测试、事件测试）
+            - [ ] self.stk_pool 全市场、300、500、800、1000、机构关注、券商金股与调研
+            - [ ] self.baseline(Turnover, Return)
+            - [ ] self.freqency 交易频率（短、中、长）
     - [ ] 最好合并图表到一张图
 - [ ] level2数据
-    - [ ] 解压、存储
-    - [ ] csv转hdf
+    - [x] 解压、存储
+    - [x] csv转hdf
     - [ ] 输入层因子构造式
 
 #### 策略表现
