@@ -1,3 +1,5 @@
 /Docs/
 /Docs/*
 /Docs/*.md
+*/__pycache__/
+*.pyc
