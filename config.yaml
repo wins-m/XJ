@@ -1,15 +1,19 @@
+## config files
+
 # paths
 project_path : "/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/"
 data_path : "/mnt/c/Users/Winst/Documents/data_local/"
 factorscsv_path : "/mnt/c/Users/Winst/Documents/factors_csv/"
 factorsres_path : "/mnt/c/Users/Winst/Documents/factors_res/"
 level2_path : '/mnt/c/Users/Winst/Documents/level2/'
+
 # hdf temp file
 a_list_tradeable : "/mnt/c/Users/Winst/Documents/data_local/a_list_tradeable.hdf"
         # key: ipo, ipo60, suspend, updown, updown_open
         # tradeable(ipo_delay & suspend & updown_open)
         # tradeable_withupdown(ipo & suspend)
         # tradeable_noupdown(ipo_delay & suspend & updown)
+
 # csv data file
 idx_constituent : "/mnt/c/Users/Winst/Documents/data_local/idx_constituent_{}.csv"
 a_list_suspendsymbol : "/mnt/c/Users/Winst/Documents/data_local/a_list_suspendsymbol.csv"
