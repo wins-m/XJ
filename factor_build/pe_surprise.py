@@ -71,7 +71,7 @@ import time
 import statsmodels.formula.api as sm
 import sys
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
-from supporter.neu import get_winsorize_sr
+from supporter.transformer import get_winsorize_sr
 # from matplotlib import pyplot as plt
 
 

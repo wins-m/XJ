@@ -9,7 +9,7 @@
 - `factor_operator.py` 因子统一处理，读取、中性化等
 - `io.py` 磁盘文件交互
 - `mysql.py` 与mysql服务器交互的支持
-- `neu.py` 中性化模块
+- `transformer.py` 转换器（中性化模块）
 
 
 - ***文件夹./factor_build/***

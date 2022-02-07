@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 import sys
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
-from supporter.neu import get_neutralize_sector, get_neutralize_sector_size, get_winsorize, get_standardize
+from supporter.transformer import get_neutralize_sector, get_neutralize_sector_size, get_winsorize, get_standardize
 
 
 # def keep_pool_stk(df: pd.DataFrame, pool_multi: pd.DataFrame):
