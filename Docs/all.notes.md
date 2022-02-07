@@ -41,6 +41,16 @@
 
 # note.week2.by.swmao
 
+```
+---
+theme: gaia
+_class: lead
+paginate: true
+backgroundColor: #fff
+backgroundImage: url('https://marp.app/assets/hero-background.svg')
+---
+```
+
 #### 工作内容
 
 - [ ] 建立一套多因子回测框架
@@ -101,6 +111,8 @@
 
 ---
 
+
+
 # notes.week3.by.swmao
 
 #### 工作内容
@@ -133,7 +145,21 @@
 
 #### 策略表现
 
-**5天持仓信号（等权）**
+**首次关注 event_first_report**
+$$
+{AR}' = Mean{ [ R_{i} - \hat{R}_{i, [-120, 0)}^{ols, capm} ] }
+\\
+{AR} = Mean{ [ R_{i} - R_{mkt} ] }
+$$
+*事前信息累计：-80天开始*
+
+![AR_CAR_240](all.notes.assets/AR_CAR_240.png)
+
+*事后超额信息：3天内衰减*
+
+![AR_CAR_15](all.notes.assets/AR_CAR_15.png)
+
+*主要来自涨停公司（事件发生后持有五天）*
 
 | PeriodRetOnBookSize | 不去涨跌停 | 去开盘涨跌停 | 去所有涨跌停 |
 |---------------------|-------|--------|--------|
@@ -165,16 +191,24 @@
 | 2021-H1      | 4.58  | 4.47   | 2.69   |
 | 2021-H2      | 4.35  | 4.31   | 1.56   |
 
-**滞后期的检验**
+*事后AR中位值均<0*
 
-- 几张[图](C:\Users\Winst\Documents\factors_res\event_first_report)
-- 分别回测连续1...5日持仓信号，表现递减！
+<img src="all.notes.assets/violin5.png" alt="violin5" style="zoom:50%;" />
+
+*事件发生后持仓1天最优*
+
+![15compar](all.notes.assets/15compar.png)
+
+![LSAbsResNC](all.notes.assets/LSAbsResNC.png)![LSAbsResWC](all.notes.assets/LSAbsResWC.png)
+
+*CAR（前、后）相关性*
+
+![corr120_spearman](all.notes.assets/corr120_spearman.png)
 
 #### 所需帮助
 
-- 次新股：ipo后60日
-- 停牌后？例如 20210809000792    3.050272
-- ST PT？
+- 次新股——ipo后至少60日
+- ST PT？（停牌后，例如 20210809000792    3.050272）
 
 ---
 
@@ -191,4 +225,36 @@ Vyas, K., & van Baren, M. (2021). Should Equity Factors Be Betting on Industries
 > - 因子模型中，对于行业暴露的控制可以精细化到不同的因子中，而不要一刀切的对所有因子进行行业中性化。
 
 
+
+
+
+```
+---
+theme: gaia
+_class: lead
+paginate: true
+backgroundColor: #fff
+backgroundImage: url('https://marp.app/assets/hero-background.svg')
+---
+
+# **实习周报**
+
+毛思文  
+*2022.2.7*
+
+---
+#### 工作内容
+
+---
+#### 策略表现
+
+
+---
+#### 所需帮助
+
+
+---
+#### 后续计划
+
+```
 
