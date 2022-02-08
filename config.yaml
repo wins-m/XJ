@@ -29,6 +29,8 @@ event_first_report : "/mnt/c/Users/Winst/Documents/data_local/2d_event_first_rep
 daily_close : "/mnt/c/Users/Winst/Documents/data_local/stk_marketdata_close.csv"
 daily_open : "/mnt/c/Users/Winst/Documents/data_local/stk_marketdata_open.csv"
 instnum_180 : "/mnt/c/Users/Winst/Documents/data_local/2d_stk_west_instnum_180.csv"
+turnover : "/mnt/c/Users/Winst/Documents/data_local/2d_stk_marketdata_turn.csv"
+turnover_free : "/mnt/c/Users/Winst/Documents/data_local/2d_stk_marketdata_freeturn.csv"
 
 # target period
 begin_date : '2016-01-01'
@@ -37,11 +39,11 @@ end_date : '2021-12-31'
 # backtest (single_test.py)
 with_updown : ''  # '': exclude open  '_withupdown': keep  '_noupdown': exclude all
 save_suffix : '(去开盘涨跌停)'
-stk_pool : 'NA'  # NA CSI500 CSI300 [CSI800]
+stk_pool : 'CSI500'  # NA CSI500 CSI300 [CSI800]
 stk_w : 'ew'  # idx, ew
-neu_mtd : 'n'  # n, i, iv
+neu_mtd : 'iv'  # n, i, iv
 tc : 2e-3  # 手续费（双边）
-ngroups : 1  # <0: 多/空各(-)ngroup; 1: 稀疏事件信号
+ngroups : 5  # <0: 多/空各(-)ngroup支; 1: 稀疏事件信号
 fnames :
   'pe_residual' : 0
   'pe_residual_ols_1' : 0
@@ -52,6 +54,7 @@ fnames :
   'first_report_dur3' : 0
   'first_report_dur4' : 0
   'first_report_dur5' : 0  # 'first_report' : 0
+  'turnover5D' : 1
 save_tables : True
 save_plots : True
 ishow : False
