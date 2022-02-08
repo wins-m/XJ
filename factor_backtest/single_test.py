@@ -187,12 +187,17 @@ def cal_sr_max_drawdown(df: pd.Series, ishow=False, title=None, save_path=None) 
     mdd[f'{df.name}_maxdd'] = df / cm - 1
 
     if save_path is not None:
-        mdd.plot(kind='area', figsize=(10, 5), grid=True, color='y', alpha=.5, title=title)
-        plt.savefig(save_path)
-        if ishow:
-            plt.show()
-        else:
-            plt.close()
+        try:
+            mdd.plot(kind='area', figsize=(10, 5), grid=True, color='y', alpha=.5, title=title)
+        except ValueError:
+            mdd[mdd > 0] = 0
+            mdd.plot(kind='area', figsize=(10, 5), grid=True, color='y', alpha=.5, title=title)
+        finally:
+            plt.savefig(save_path)
+            if ishow:
+                plt.show()
+            else:
+                plt.close()
 
     return mdd
 
