@@ -8,9 +8,10 @@ import time
 
 def break_confirm(bo, msg):
     """返回1，强制终止"""
-    res = True
+    res = False
     cmd = 'N'
     if bo:
+        res = True
         cmd = input(f'{msg}, confirm?')
         if cmd == 'Y' or cmd == 'y':
             res = False

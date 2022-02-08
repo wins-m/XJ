@@ -105,6 +105,6 @@ if __name__ == '__main__':
     conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/config.yaml'
     conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
 
-    re_generate = False
-    remove_raw = True
+    re_generate = True
+    remove_raw = False
     lv2_csv2hdf(conf, re_generate, remove_raw)
