@@ -253,8 +253,8 @@ if __name__ == '__main__':
     conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
     gap = 240
 
-    # table_ar_adjacent_events(conf, gap, drop_dret_over=0.10)
-    # graph_ar_car(conf)
-    # graph_corr_d_ar_cumsum(conf)
-    # graph_dist_d_ar_afterwards(conf, ishow=False)
-    # table_2d_one_day(conf)
+    table_ar_adjacent_events(conf, gap, drop_dret_over=0.10)
+    graph_ar_car(conf)
+    graph_corr_d_ar_cumsum(conf)
+    graph_dist_d_ar_afterwards(conf, ishow=False)
+    table_2d_one_day(conf)
