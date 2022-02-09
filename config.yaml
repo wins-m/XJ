@@ -1,5 +1,5 @@
 ## config files
-core_number : 3
+core_number : 5
 
 # paths
 project_path : "/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/"
@@ -34,29 +34,46 @@ turnover : "/mnt/c/Users/Winst/Documents/data_local/2d_stk_marketdata_turn.csv"
 turnover_free : "/mnt/c/Users/Winst/Documents/data_local/2d_stk_marketdata_freeturn.csv"
 
 # target period
-begin_date : '2016-01-01'
-end_date : '2018-12-31'
+begin_date : '2017-01-01'
+end_date : '2017-12-31'
 
 # backtest (single_test.py)
 with_updown : ''  # '': exclude open  '_withupdown': keep  '_noupdown': exclude all
 save_suffix : '(去开盘涨跌停)'
-stk_pool : 'NA'  # NA CSI500 CSI300 [CSI800]
-stk_w : 'idx'  # idx, ew
+stk_pool : 'CSI500'  # NA CSI500 CSI300 [CSI800]
+stk_w : 'ew'  # idx, ew
 neu_mtd : 'n'  # n, i, iv
 tc : 2e-3  # 手续费（双边）
 ngroups : 5  # <0: 多/空各(-)ngroup支; 1: 稀疏事件信号
 fnames :
-  'pe_residual' : 0
-  'pe_residual_ols_1' : 0
-  'pe_residual_ols_2' : 0
-  'pe_residual_ols_3' : 0
-  'first_report_dur1' : 0
-  'first_report_dur2' : 0
-  'first_report_dur3' : 0
-  'first_report_dur4' : 0
-  'first_report_dur5' : 0  # 'first_report' : 0
-  'turnover5D' : 0
-  'free_turnover5D': 1
+  pe_residual : 0
+  pe_residual_ols_1 : 0
+  pe_residual_ols_2: 0
+  pe_residual_ols_3: 0
+  first_report_dur1: 0
+  first_report_dur2: 0
+  first_report_dur3: 0
+  first_report_dur4: 0
+  first_report_dur5: 0  # 'first_report: 0
+  turnover5D: 0
+  free_turnover5D: 0
+  amountbuy_exlarge: 1
+  amountsell_exlarge: 1
+  amountbuy_large: 1
+  amountsell_large: 1
+  amountbuy_med: 1
+  amountsell_med: 1
+  amountbuy_small: 1
+  amountsell_small: 1
+  amountdiff_small: 1
+  amountdiff_smallact: 1
+  amountdiff_med: 1
+  amountdiff_medact: 1
+  amountdiff_large: 1
+  amountdiff_largeact: 1
+  amountdiff_exlarge: 1
+  amountdiff_exlargeact: 1
+
 save_tables : True
 save_plots : True
 ishow : False
@@ -68,7 +85,7 @@ force_update : False
 # feature_extraction_level2.py
 feature_level2 : "/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/factor_build/feature_level2.xlsx"
 feature_begin : '201801'
-feature_end : '201803'
+feature_end : '201802'
 
 # tradeable.py
 ipo_delay : 60  # days after ipo
