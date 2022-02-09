@@ -134,10 +134,9 @@ def panel_save_2d(panel_df: pd.DataFrame, csv_path: str):
         panel2d = panel_df.pivot(index='tradedate', columns='stockcode', values=feature)
 
         filename = feature + '.csv'
-        if filename in os.listdir(csv_path):
-            # 若已存在因子文件，则只添加原有最后一天之后的新值
-            panel2d_raw = pd.read_csv(csv_path + filename)
-            mask = (panel2d.index > panel2d_raw.tradedate.max())
+        if filename in os.listdir(csv_path):  # 若已存在因子文件，则只添加原有最后一天之后的新值
+            panel2d_raw = pd.read_csv(csv_path + filename, index_col=0)
+            mask = (panel2d.index > panel2d_raw.index.max())
             if mask.sum() > 0:
                 panel2d.to_csv(csv_path + f'[{str(datetime.today())}]' + filename)  # 另存冲突的新结果
                 pd.concat((panel2d_raw, panel2d[mask]), axis=0).to_csv(csv_path + filename)
@@ -170,7 +169,7 @@ def get_fv_in_process(features: list, file: str, key: str) -> list:
     return res
 
 
-def feature_extraction(path_lvl2, feature_begin, feature_end, feature_level2, csv_path, test=True):
+def feature_extraction(path_lvl2, feature_begin, feature_end, feature_level2, csv_path, test=True, pn=6):
     """
     多进程计算因子；一次性指定尽量多的因子；保存
     :param path_lvl2: config.lvl2_path
@@ -178,6 +177,7 @@ def feature_extraction(path_lvl2, feature_begin, feature_end, feature_level2, cs
     :param feature_end: config.feature_end
     :param feature_level2: config.feature_level2
     :param csv_path: config.factorcsv_path
+    :param pn: core number used
     :return:
     """
     folders = [f'{path_lvl2}{xx}/{x}/' for xx in os.listdir(path_lvl2) for
@@ -192,7 +192,7 @@ def feature_extraction(path_lvl2, feature_begin, feature_end, feature_level2, cs
     # feature_values_panel = pd.DataFrame(columns=['tradedate', 'stockcode'] + features2update.F_NAME.to_list())
     all_result = []
 
-    p = Pool(6)
+    p = Pool(pn)
     file = hdf_files[0]
     for file in hdf_files[:]:
         # 取出单日行情hdf中的key（对应一支个股）
@@ -228,6 +228,7 @@ if __name__ == '__main__':
     feature_level2 = conf['feature_level2']
     csv_path = conf['factorscsv_path']
     if_test = False  # 此处更改，是否不进入多进程
+    core_number = conf['core_number']
 
     # %%
-    feature_extraction(path_lvl2, feature_begin, feature_end, feature_level2, csv_path, test=if_test)
+    feature_extraction(path_lvl2, feature_begin, feature_end, feature_level2, csv_path, test=if_test, pn=core_number)

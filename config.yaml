@@ -1,13 +1,15 @@
 ## config files
 
+core_number : 3
+
 # paths
 project_path : "/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/"
 data_path : "/mnt/c/Users/Winst/Documents/data_local/"
 factorscsv_path : "/mnt/c/Users/Winst/Documents/factors_csv/"
 factorsres_path : "/mnt/c/Users/Winst/Documents/factors_res/"
 level2_path : '/mnt/c/Users/Winst/Documents/level2/'
-#level2_path2 : '/mnt/g/高频数据-hdf5格式/'
-level2_path2 : '/mnt/c/Users/Winst/Documents/lvl2/'
+level2_path2 : '/mnt/g/高频数据-hdf5格式/'
+#level2_path2 : '/mnt/c/Users/Winst/Documents/lvl2/'
 
 # hdf temp file
 a_list_tradeable : "/mnt/c/Users/Winst/Documents/data_local/a_list_tradeable.hdf"
@@ -39,7 +41,7 @@ end_date : '2018-12-31'
 # backtest (single_test.py)
 with_updown : ''  # '': exclude open  '_withupdown': keep  '_noupdown': exclude all
 save_suffix : '(去开盘涨跌停)'
-stk_pool : 'CSI500'  # NA CSI500 CSI300 [CSI800]
+stk_pool : 'NA'  # NA CSI500 CSI300 [CSI800]
 stk_w : 'idx'  # idx, ew
 neu_mtd : 'n'  # n, i, iv
 tc : 2e-3  # 手续费（双边）
@@ -54,7 +56,8 @@ fnames :
   'first_report_dur3' : 0
   'first_report_dur4' : 0
   'first_report_dur5' : 0  # 'first_report' : 0
-  'turnover5D' : 1
+  'turnover5D' : 0
+  'free_turnover5D': 1
 save_tables : True
 save_plots : True
 ishow : False
@@ -65,8 +68,8 @@ force_update : False
 
 # feature_extraction_level2.py
 feature_level2 : "/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/factor_build/feature_level2.xlsx"
-feature_begin : '201701'
-feature_end : '201701'
+feature_begin : '201801'
+feature_end : '201803'
 
 # tradeable.py
 ipo_delay : 60  # days after ipo

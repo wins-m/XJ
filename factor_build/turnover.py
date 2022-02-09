@@ -21,3 +21,7 @@ if __name__ == '__main__':
     fv_turnover = read_single_factor(conf['turnover'])
     fv_turnover5D = (fv_turnover * -1).rolling(5).mean()
     fv_turnover5D.to_csv(csv_path + 'turnover5D.csv')
+
+    fv_turnover = read_single_factor(conf['turnover_free'])
+    fv_turnover5D = (fv_turnover * -1).rolling(5).mean()
+    fv_turnover5D.to_csv(csv_path + 'free_turnover5D.csv')
