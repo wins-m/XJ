@@ -13,9 +13,9 @@ level2_path2 : '/mnt/g/高频数据-hdf5格式/'
 # hdf temp file
 a_list_tradeable : "/mnt/c/Users/Winst/Documents/data_local/a_list_tradeable.hdf"
         # key: ipo, ipo60, suspend, updown, updown_open
-        # tradeable(ipo_delay & suspend & updown_open)
+        # tradeable(ipo_60 & suspend & updown_open)
         # tradeable_withupdown(ipo & suspend)
-        # tradeable_noupdown(ipo_delay & suspend & updown)
+        # tradeable_noupdown(ipo_60 & suspend & updown)
 
 # csv data file
 idx_constituent : "/mnt/c/Users/Winst/Documents/data_local/idx_constituent_{}.csv"
@@ -83,8 +83,8 @@ force_update : False
 
 # feature_extraction_level2.py
 feature_level2 : "/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/factor_build/feature_level2.xlsx"
-feature_begin : '201803'
-feature_end : '201806'
+feature_begin : '201807'
+feature_end : '201912'
 
 # tradeable.py
 ipo_delay : 60  # days after ipo

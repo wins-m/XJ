@@ -45,7 +45,12 @@ class TradeDate(object):
 
 
 def table_ar_adjacent_events(conf: dict, gap=20, drop_dret_over=.20, folder='event_first_report/'):
-    """计算机构首次关注event（原instnum<5)前后-gap~gap+1日的超额收益，大市为等权"""
+    """计算事件超额收益
+        - 机构首次关注event（原instnum<5)前后-gap~gap+1日，大市为等权
+
+
+    """
+    # %%
     data_path = conf['data_path']
     res_path = conf['factorsres_path']
     save_path = res_path + folder
@@ -59,20 +64,70 @@ def table_ar_adjacent_events(conf: dict, gap=20, drop_dret_over=.20, folder='eve
     # 交易日列表
     tradedates = pd.read_csv(conf['tdays_d'], header=None, index_col=0, parse_dates=True)
     TD = TradeDate(tradedates)
-    # ipo 60 天后
+    # 可交易：ipo 60 天后
     ipo60 = pd.DataFrame(pd.read_hdf(conf['a_list_tradeable'], key='ipo60')).replace(False, np.nan)
     # 复权收盘价
     adjclose = pd.read_csv(conf['closeAdj'], index_col=0, parse_dates=True)
     # 复权收盘价收益
-    adjret = adjclose.pct_change()
+    adjret_raw = adjclose.pct_change()
     # 去除新上市60日
-    adjret = adjret * ipo60.reindex_like(adjclose)
+    adjret = adjret_raw * ipo60.reindex_like(adjclose)
     # 去除异常值
-    adjret[adjret.abs() > drop_dret_over] = np.nan
-    # 异常收益（去除大市等权）
+    # adjret_raw = adjret.copy()  # 备份原始值
+    # adjret[adjret.abs() > drop_dret_over] = np.nan
+    # 大市等权收益
     adjret_mkt = adjret.apply(lambda s: s.mean(), axis=1)
-    # adjret_ab = adjret.apply(lambda s: s - s.mean(), axis=1)  # 异常大，为什么？
-    # 表：记录id，事件日+-120日（不够则空），复权收盘价收益率（当日比昨日）
+    # 异常收益（去异常的大市等权）
+    adjret_ab = adjret.apply(lambda s: s - s.mean(), axis=1)  # 异常大，特殊公司，此处保留异常
+
+    # %% eventid为index的面板
+    event_panel = event[['id', 'tradingdate', 'stockcode', 'stockname']].copy().sort_values('id')
+    mask = event_panel.tradingdate <= '2021-12-31'
+    event_panel = event_panel[mask]
+
+    # %% T-120 ~ T+20 R
+    def visit_2d_v(td, stk, df, shift=0):
+        td_idx = -1
+        try:
+            td_idx = df.index.get_loc(td) + shift
+        except KeyError:
+            print(f'KeyError: ({td}, {stk})')
+            return np.nan
+        finally:
+            if (td_idx < 0) or (td_idx > len(df)):
+                return np.nan
+            return df.iloc[td_idx, :].loc[stk]
+    
+    df_key = event_panel[['tradingdate', 'stockcode']]
+    
+    print('instnum...')
+    event_panel['instnum'] = df_key.apply(lambda s: visit_2d_v(s.iloc[0], s.iloc[1], instnum), axis=1)
+    print(f'nan:{event_panel.instnum.isna().mean() * 100: 6.2f} % (instnum未找到)')
+
+    print('r0...')
+    event_panel['r0'] = df_key.apply(lambda s: visit_2d_v(s.iloc[0], s.iloc[1], adjret), axis=1)
+    print(f'nan:{event_panel.r0.isna().mean() * 100: 6.2f} % (新上市60日内或根据marketdata无法计算)')
+
+    print('r1...')
+    event_panel['r1'] = df_key.apply(lambda s: visit_2d_v(s.iloc[0], s.iloc[1], adjret, shift=1), axis=1)
+    print(f'nan:{event_panel.r0.isna().mean() * 100: 6.2f} % (新上市60日内或根据marketdata无法计算)')
+
+    print('r_1...')
+    event_panel['r_1'] = df_key.apply(lambda s: visit_2d_v(s.iloc[0], s.iloc[1], adjret, shift=-1), axis=1)
+    print(f'nan:{event_panel.r0.isna().mean() * 100: 6.2f} % (新上市60日内或根据marketdata无法计算)')
+
+    # %%
+    hdf_file = save_path + 'event_panel.h5'
+    try:
+        event_panel.to_hdf(hdf_file, key=folder, append=True, complevel=9, complib='blosc',
+                  data_columns=event_panel.columns)
+    except FileNotFoundError:
+        event_panel.to_hdf(hdf_file, key=folder, mode='w', format='table', complevel=9, complib='blosc',
+                  data_columns=event_panel.columns)
+    finally:
+        print(f'Save current panel in {hdf_file}')
+
+    # %% 表：记录id，事件日+-120日（不够则空），复权收盘价收益率（当日比昨日）
     event_adjacent_returns = pd.DataFrame(columns=event.id, index=range(-gap, gap+1))
     for irow in tqdm(range(len(event))):  # 15996个事件，规模极大
         row = event.iloc[irow, :]
@@ -261,11 +316,12 @@ if __name__ == '__main__':
     import yaml
     conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/config.yaml'
     conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
-    dir_name = 'event_first_report/'
+    folder = 'event_first_report/'
+    drop_dret_over = 0.10
 
     # %%
-    table_ar_adjacent_events(conf, gap=240, drop_dret_over=0.10, folder=dir_name)
-    graph_ar_car(conf, folder=dir_name)
-    graph_corr_d_ar_cumsum(conf, ishow=False, folder=dir_name)
-    graph_dist_d_ar_afterwards(conf, ishow=False, folder=dir_name)
-    table_2d_one_day(conf, folder=dir_name)
+    table_ar_adjacent_events(conf, gap=240, drop_dret_over=drop_dret_over, folder=folder)
+    graph_ar_car(conf, folder=folder)
+    graph_corr_d_ar_cumsum(conf, ishow=False, folder=folder)
+    graph_dist_d_ar_afterwards(conf, ishow=False, folder=folder)
+    table_2d_one_day(conf, folder=folder)
