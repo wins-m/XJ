@@ -366,6 +366,7 @@ def cal_result_stat(df: pd.DataFrame, save_path: str = None) -> pd.DataFrame:
 # %%
 def single_test(conf: dict):
     """单因子回测"""
+    # %%
     neu_mtd = conf['neu_mtd']
     stk_pool = conf['stk_pool']
     stk_w = conf['stk_w']
@@ -584,9 +585,12 @@ def single_test(conf: dict):
     #
 
 
+# %%
 if __name__ == '__main__':
+    # %%
     import yaml
     conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/config.yaml'
     conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
 
+    # %%
     single_test(conf)

@@ -73,7 +73,6 @@ fnames :
   amountdiff_largeact: 1
   amountdiff_exlarge: 1
   amountdiff_exlargeact: 1
-
 save_tables : True
 save_plots : True
 ishow : False
@@ -84,8 +83,8 @@ force_update : False
 
 # feature_extraction_level2.py
 feature_level2 : "/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/factor_build/feature_level2.xlsx"
-feature_begin : '201801'
-feature_end : '201802'
+feature_begin : '201803'
+feature_end : '201806'
 
 # tradeable.py
 ipo_delay : 60  # days after ipo
