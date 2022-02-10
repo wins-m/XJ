@@ -4,6 +4,8 @@
 (updated Jan. 25th)
 - 用行情数据，识别开盘涨停，只去除开盘涨停
 - 多个csv：多个筛选条件
+(modified Feb. 10th)
+- 以收盘加交易，当日不可实现是因为昨日停牌/涨跌停，因此shift(1)
 
 """
 from datetime import timedelta
@@ -91,11 +93,11 @@ def update_tradeable_label(conf):
     updown_open.to_hdf(conf['a_list_tradeable'], key='updown_open')
 
     print('ipo%s & suspend & updown_open 保存于 %s, key=%s' % (conf['ipo_delay'], conf['a_list_tradeable'], 'updown_open'))
-    tradeable = ipo_delay & suspend & updown_open
+    tradeable = ipo_delay & suspend.shift(1) & updown_open.shift(1)  # 以收盘加交易，当日不可实现是因为昨日停牌/涨跌停
     tradeable.to_hdf(conf['a_list_tradeable'], key='tradeable')
-    tradeable1 = ipo & suspend
+    tradeable1 = ipo & suspend.shift(1)
     tradeable1.to_hdf(conf['a_list_tradeable'], key='tradeable_withupdown')
-    tradeable2 = ipo_delay & suspend & updown
+    tradeable2 = ipo_delay & suspend.shift(1) & updown.shift(1)
     tradeable2.to_hdf(conf['a_list_tradeable'], key='tradeable_noupdown')
     print(f"""PANEL {tradeable.shape} SAVE IN {conf['a_list_tradeable']}""")
 
