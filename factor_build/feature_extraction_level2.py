@@ -180,8 +180,8 @@ def feature_extraction(path_lvl2, feature_begin, feature_end, feature_level2, cs
     :param pn: core number used
     :return:
     """
-    folders = [f'{path_lvl2}{xx}/{x}/' for xx in os.listdir(path_lvl2) for
-               x in os.listdir(path_lvl2 + xx) if (x >= feature_begin) and (x <= feature_end)]
+    folders = sorted([f'{path_lvl2}{xx}/{x}/' for xx in os.listdir(path_lvl2) for
+                      x in os.listdir(path_lvl2 + xx) if (x >= feature_begin) and (x <= feature_end)])
     hdf_files = [x + xx for x in folders for xx in os.listdir(x)]
     features2update: pd.DataFrame = pd.read_excel(feature_level2, index_col=0).loc[1:1]
     features = features2update.F_NAME.to_list()
