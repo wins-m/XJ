@@ -38,6 +38,7 @@ begin_date : '2016-01-01'
 end_date : '2022-12-31'
 
 # backtest (single_test.py)
+factors_tested : "/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/factor_backtest/factors_tested.xlsx"
 with_updown : ''  # '': exclude open  '_withupdown': keep  '_noupdown': exclude all
 save_suffix : '(回测中去一字涨跌停)'
 stk_pool : 'NA'  # NA CSI500 CSI300 [CSI800]
@@ -45,39 +46,6 @@ stk_w : 'ew'  # idx, ew
 neu_mtd : 'n'  # n, i, iv
 tc : 2e-3  # 手续费（双边）
 ngroups : 1  # less than 0: 多/空各(-)ngroup支;    1: 稀疏事件信号
-
-fnames :
-  pe_residual : 0
-  pe_residual_ols_1: 0
-  pe_residual_ols_2: 0
-  pe_residual_ols_3: 0
-  first_report_dur1: 0 
-  first_report_dur2: 0
-  first_report_dur3: 0 
-  first_report_dur3_noupdown: 0
-  first_report_dur3_withupdown: 0 
-  first_report_dur3_updown : 0 
-  first_report_dur3_updown_open : 1 
-  first_report_dur4: 0
-  first_report_dur5: 0  # 'first_report: 0
-  turnover5D: 0
-  free_turnover5D: 0
-  amountbuy_exlarge: 0
-  amountsell_exlarge: 0
-  amountbuy_large: 0
-  amountsell_large: 0
-  amountbuy_med: 0
-  amountsell_med: 0
-  amountbuy_small: 0
-  amountsell_small: 0
-  amountdiff_small: 0
-  amountdiff_smallact: 0
-  amountdiff_med: 0
-  amountdiff_medact: 0
-  amountdiff_large: 0
-  amountdiff_largeact: 0
-  amountdiff_exlarge: 0
-  amountdiff_exlargeact: 0
 
 save_tables : True
 save_plots : True

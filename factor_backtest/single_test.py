@@ -1,6 +1,8 @@
 """
 (created by swmao on Jan. 17th)
 
+(Feb. 11th)
+
 """
 import os, sys
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
@@ -377,29 +379,30 @@ def cal_result_stat(df: pd.DataFrame, save_path: str = None, kind='cumsum') -> p
 def single_test(conf: dict):
     """单因子回测"""
     # %%
-    neu_mtd = conf['neu_mtd']
-    stk_pool = conf['stk_pool']
-    stk_w = conf['stk_w']
     csv_path = conf['factorscsv_path']
     res_path = conf['factorsres_path']
     idx_constituent = conf['idx_constituent']
     tradeable_path = conf['a_list_tradeable']
     ind_citic_path = conf['ind_citic']
     marketvalue_path = conf['marketvalue']
-    ngroups = conf['ngroups']
     close_path = conf['closeAdj']
-    save_tables = conf['save_tables']
-    save_plots = conf['save_plots']
-    ishow = conf['ishow']
-    begin_date = pd.to_datetime(conf['begin_date'])
-    end_date = pd.to_datetime(conf['end_date'])
-    cost_rate = float(conf['tc'])
-    all_factornames = [k for k, v in conf['fnames'].items() if v == 1]
+
+    all_factornames: list = pd.read_excel(conf['factors_tested'], index_col=0).loc[1:1].iloc[:, 0].to_list()
+    # all_factornames = [k for k, v in conf['fnames'].items() if v == 1]
+    stk_pool, stk_w = conf['stk_pool'], conf['stk_w']
     with_updown = 'tradeable' + conf['with_updown']
+    neu_mtd = conf['neu_mtd']
+    ngroups = conf['ngroups']
+    cost_rate = float(conf['tc'])
+    begin_date, end_date = pd.to_datetime(conf['begin_date']), pd.to_datetime(conf['end_date'])
+
+    save_tables, save_plots, ishow = conf['save_tables'], conf['save_plots'], conf['ishow']
     save_suffix = conf['save_suffix']
-    print("CONFIG LOADED", neu_mtd, stk_pool)
     # ishow = True
 
+    print("CONFIG LOADED", neu_mtd, stk_pool)
+
+    # %%
     # Tradeable Sifter (a_list_tradeable)
     a_list_tradeable = read_single_factor(tradeable_path, begin_date - timedelta(60), end_date, bool, hdf_k=with_updown)
     tradeable_multiplier = a_list_tradeable.replace(False, np.nan).dropna(axis=1, how='all')
