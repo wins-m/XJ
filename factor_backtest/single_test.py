@@ -4,7 +4,7 @@
 (Feb. 11th)
 
 """
-import os, sys
+import os, sys, time
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
 from supporter.backtester import *
 import pandas as pd
@@ -24,6 +24,35 @@ def get_idx_weight(pool_path, begin_date, end_date, mtd='idx'):
         df1 = (df.T * 0 + 1 / df.count(axis=1)).T
     assert round(df1.abs().sum(axis=1).prod(), 2) == 1
     return df1
+
+
+def cal_weight_from_long_short_group(long_short_group, ngroups, idx_weight, fbegin_date, fend_date, holddays, ic_mean=0,
+                                     save_path=None):
+    """Position weight: long, short, long-short 对holdday处理交易频率"""
+
+    def weight_with_holdday(w: pd.DataFrame, hd) -> pd.DataFrame:
+        """hd日交易一次，调整持仓权重"""
+        return w.iloc[::hd].reindex_like(w).fillna(method='ffill')
+
+    long_position = (long_short_group == ngroups - 1) * idx_weight.loc[fbegin_date:fend_date]
+    long_position = long_position.apply(lambda s: s / s.sum(), axis=1)
+    short_position = (long_short_group == 0) * idx_weight.loc[fbegin_date:fend_date]
+    short_position = short_position.apply(lambda s: s / s.sum(), axis=1)
+    long_short_position = (long_position - short_position).apply(lambda s: s / s.abs().sum(), axis=1)
+    assert round(long_short_position.dropna(how='all').abs().sum(axis=1).prod(), 4) == 1
+
+    w_long = weight_with_holdday(long_position, holddays)
+    w_short = weight_with_holdday(short_position, holddays)
+    w_long_short = weight_with_holdday(long_short_position, holddays)
+    if (ngroups != 1) and (ic_mean < 0):
+        w_long, w_short, w_long_short = w_short, w_long, -w_long_short
+
+    if save_path:
+        w_long.to_csv(save_path.format('long'))
+        w_short.to_csv(save_path.format('short'))
+        w_long_short.to_csv(save_path.format('long_short'))
+
+    return w_long, w_short, w_long_short
 
 
 def get_long_short_group(df: pd.DataFrame, ngroups: int, save_path=None) -> pd.DataFrame:
@@ -376,6 +405,16 @@ def cal_result_stat(df: pd.DataFrame, save_path: str = None, kind='cumsum') -> p
 
 
 # %%
+def main():
+    # %%
+    import yaml
+    conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/config.yaml'
+    conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
+
+    # %%
+    single_test(conf)
+
+
 def single_test(conf: dict):
     """单因子回测"""
     # %%
@@ -386,69 +425,102 @@ def single_test(conf: dict):
     ind_citic_path = conf['ind_citic']
     marketvalue_path = conf['marketvalue']
     close_path = conf['closeAdj']
+    open_path = conf['openAdj']
 
     all_factornames: list = pd.read_excel(conf['factors_tested'], index_col=0).loc[1:1].iloc[:, 0].to_list()
     # all_factornames = [k for k, v in conf['fnames'].items() if v == 1]
-    stk_pool, stk_w = conf['stk_pool'], conf['stk_w']
-    with_updown = 'tradeable' + conf['with_updown']
+    exclude_tradeable = conf['exclude_tradeable']
+    # with_updown = 'tradeable' + conf['with_updown']
     neu_mtd = conf['neu_mtd']
+    stk_pool, stk_w = conf['stk_pool'], conf['stk_w']
+    return_kind = conf['return_kind']
     ngroups = conf['ngroups']
+    holddays = conf['holddays']
+
     cost_rate = float(conf['tc'])
     begin_date, end_date = pd.to_datetime(conf['begin_date']), pd.to_datetime(conf['end_date'])
+    begin_date_nd60 = begin_date - timedelta(60)
 
     save_tables, save_plots, ishow = conf['save_tables'], conf['save_plots'], conf['ishow']
-    save_suffix = conf['save_suffix']
+    save_suffix = conf['save_suffix'] if conf['save_suffix'] != '' else time.strftime("%m%d_%H%M%S", time.localtime())
     # ishow = True
 
-    print("CONFIG LOADED", neu_mtd, stk_pool)
+    suffix = f"""{neu_mtd}_{stk_pool}_{stk_w}_{ngroups}g_{return_kind}_{holddays}hd({save_suffix})"""
+    print("CONFIG LOADED", suffix)
 
     # %%
     # Tradeable Sifter (a_list_tradeable)
-    a_list_tradeable = read_single_factor(tradeable_path, begin_date - timedelta(60), end_date, bool, hdf_k=with_updown)
+    def read_tradeable(hdf_k='ipo'):
+        """可改写装饰器，获取可交易乘子，不可为False，可为True"""
+        df = read_single_factor(tradeable_path, begin_date_nd60, end_date, bool, hdf_k=hdf_k)
+        # df = df.replace(False, np.nan).astype(float)
+        if return_kind == 'ctc':
+            df = df.shift(1).iloc[1:]  # 因子是昨日的，昨日收盘价买入今日收盘价卖出的return，可交易是昨日可否买入
+        return df
+
+    # a_list_tradeable = read_single_factor(tradeable_path, begin_date_nd60, end_date, bool, hdf_k=with_updown)
+    a_list_tradeable = read_tradeable(hdf_k='ipo')
+    for k, v in exclude_tradeable.items():
+        if v == 0:
+            print(f'Sift tradeable stocks via `{k}`')
+            a_list_tradeable &= read_tradeable(hdf_k=k)
     tradeable_multiplier = a_list_tradeable.replace(False, np.nan).dropna(axis=1, how='all')
 
-    # idx_weight: a_list_tradeable @ stk_pool @ stk_w
+    # idx_weight: tradeable @ stk_pool @ stk_w
     if stk_pool is None or stk_pool == 'NA':  # 未指定股池，则由全市场的`a_list_tradeable`生成mask
-        idx_weight = tradeable_multiplier.apply(lambda s: s/s.sum(), axis=1)
-        pool_multiplier = tradeable_multiplier * 1
+        idx_weight = tradeable_multiplier.copy()
     else:
         idx_weight = get_idx_weight(idx_constituent.format(stk_pool), begin_date - timedelta(60), end_date, stk_w)  # 股池内权重
-        pool_multiplier = idx_weight * 0 + 1
+        idx_weight = idx_weight * tradeable_multiplier.reindex_like(idx_weight)
+    idx_weight = idx_weight.fillna(0).apply(lambda s: s/s.sum(), axis=1)
     idx_weight = idx_weight.loc[begin_date:end_date]  # sum(axis=1)均为1
+    tradeable_multiplier = tradeable_multiplier.reindex_like(idx_weight)  # 对齐 tradeable 和 idx_weight
+    # (idx_weight>0).sum(axis=1).plot(); plt.show()  # pool size
 
-    # Stock Returns
-    close = read_single_factor(close_path, begin_date - timedelta(5), end_date, float, pool_multiplier)  # 日收盘价
-    all_ret: pd.DataFrame = close.pct_change().loc[begin_date:end_date]  # 收盘价日收益率，停牌第二天存在误差
+    # Stock Returns: (0211 config.return_kind指定ctc或oto)
+    if return_kind == 'ctc':  # 今日收益率：昨日信号，昨日收盘买入，今日收盘卖出
+        sell_price = pd.read_csv(close_path, index_col=0, parse_dates=True)
+    elif return_kind == 'oto':  # 今日收益率：昨日信号，今日开盘买入，明日开盘卖出
+        sell_price = pd.read_csv(open_path, index_col=0, parse_dates=True).shift(-1)
+    else:
+        raise ValueError(f"""Invalid config.return_kind {return_kind}""")
+    all_ret: pd.DataFrame = sell_price.pct_change().reindex_like(idx_weight) * tradeable_multiplier
+    # pool_multiplier = (idx_weight > 0)  # 用于close获取
+    # close = read_single_factor(close_path, begin_date - timedelta(5), end_date, float, pool_multiplier)  # 日收盘价
+    # all_ret: pd.DataFrame = close.pct_change().loc[begin_date:end_date]  # 收盘价日收益率，停牌第二天存在误差
 
     # Baseline
+    assert round(idx_weight.abs().sum(axis=1).prod(), 4) == 1  # 大盘/指数全股仓位权重绝对值之和为1
     ret_baseline = (all_ret * idx_weight).sum(axis=1)  # Return
 
     # Loop All Factors
-    fname = 'first_report'
+    fname = 'amountbuy_small'
+    # %%
     for fname in all_factornames:
-
+        print(f'\n({fname})')
+        ic_mean = 0
+        # %%
         # Result File Format: *args -> path_format
-        save_path_ = f"""{res_path}{fname}_{neu_mtd}_{stk_pool}{stk_w}_{ngroups}g""" + save_suffix
+        save_path_ = f"""{res_path}{fname}_{suffix}"""
         os.makedirs(save_path_, exist_ok=True)
         path_format = save_path_ + "/{}"
 
         # Factor Value: *args -> fval
         fval = pd.read_csv(f'{csv_path}{fname}.csv', dtype=float, index_col=0, parse_dates=True)
-        signal = Signal(fval, begin_date, end_date)
+
+        # if from_weight:
+        fbegin_date, fend_date = max(fval.index[0], begin_date), min(fval.index[-1], end_date)
+        signal = Signal(fval, fbegin_date, fend_date)
         signal.shift_1d(T=1)  # 滞后一天，以昨日的因子值参与计算
-        signal.keep_tradeable(tradeable_multiplier)
-        fval = signal.get_fv()
-        fval.head().sum(axis=1)
-
-        ret = all_ret.reindex_like(fval)  # returns aligned with factor value
-
-        if ngroups == 1:
-            fval_neutralized = fval.copy()
-            # long_short_group = fval.copy()
-        else:
+        signal.keep_tradeable(tradeable_multiplier.loc[fbegin_date:fend_date])
+        if ngroups != 1:
             # Factor Neutralization: fval, neu_mtd, ind_citic_path, marketvalue_path -> fval_neutralized, ret
             signal.neutralize_by(neu_mtd, ind_citic_path, marketvalue_path)
-            fval_neutralized = signal.get_fv()
+        fval_neutralized = signal.get_fv()
+        fval_neutralized.head().sum(axis=1)
+
+        # Holddays : aligned with fval (clip via hd)
+        ret = all_ret.loc[fbegin_date:fend_date]  # returns aligned with factor value
 
         # Group Label Panel: fval_neutralized, ngroups -> long_short_group
         save_path = path_format.format('LSGroup.csv') if save_tables else None
@@ -458,50 +530,140 @@ def single_test(conf: dict):
         save_path = path_format.format('GroupRtns.csv') if save_tables else None
         ret_group = cal_long_short_group_rtns(long_short_group, ret, idx_weight, ngroups, save_path)
 
-        # Turnover: long_short_turnover -> LSTurnover.csv
-        save_path = path_format.format('LSTurnover.csv') if save_tables else None
-        long_short_turnover = cal_turnover_long_short(long_short_group, idx_weight, ngroups, ishow, save_path)
-
-        # IC (distribution): fval_neutralized, ret -> IC, IC.png
-        save_path = path_format.format('IC.png') if save_plots else None
-        ic = cal_ic(fval_neutralized, ret, rankIC=False, ishow=ishow, save_path=save_path)
-        save_path = path_format.format('ICRank.png') if save_plots else None
-        rank_ic = cal_ic(fval_neutralized, ret, rankIC=True, ishow=ishow, save_path=save_path)
-
-        if (ngroups != 1) and (ic.isna().prod().values[0] != 1) and (rank_ic.isna().prod().values[0] != 1):
-            # IC Stats: ic -> ICStat.csv
-            ic_stat = pd.DataFrame()
-            ic_stat['IC'] = cal_ic_stat(data=ic)
-            ic_stat['Rank IC'] = cal_ic_stat(data=rank_ic)
-            ic_stat = ic_stat.astype('float16')
-            if save_tables:
-                ic_stat.to_csv(path_format.format('ICStat.csv'))
-            else:
-                print(ic_stat)
-
-            # IC Decay: fval_neutralized, ret -> ICDecay.png
-            save_path = path_format.format('ICDecay.png') if save_plots else None
-            cal_ic_decay(fval_neutralized, ret, 20, ishow, save_path)
-
-            # Cumulated IC_IR
-
-        """
-        save_tables, save_plots, ishow, cost_rate, save_tables
-        path_format, ret_group, ret_baseline, long_short_turnover
-        
-        """
         # Group Test Result: ret_group -> ResGroup.png
         save_path = path_format.format('ResGroup.png') if save_plots else None
         plot_rtns_group(ret_group, ishow, save_path)
 
         # Total Return of Group: ret_group -> TotalRtnsGroup.png
         save_path = path_format.format('TotalRtnsGroup.png') if save_plots else None
-        cal_total_ret_group(ret_group, ishow, save_path)
+        print(cal_total_ret_group(ret_group, ishow, save_path))
 
-        # Long-Short Absolute Return No Cost: ret_group, ret_baseline -> long_short_return_nc, LSRtnsNC.csv
-        save_path = path_format.format('LSRtnsNC.csv') if save_tables else None
-        long_short_return_nc = panel_long_short_return(ret_group, ret_baseline, save_path)
+        # IC
+        if ngroups != 1:
+            # IC (distribution): fval_neutralized, ret -> IC, IC.png
+            save_path = path_format.format('IC.png') if save_plots else None
+            ic = cal_ic(fval_neutralized, ret, rankIC=False, ishow=ishow, save_path=save_path)
+            save_path = path_format.format('ICRank.png') if save_plots else None
+            rank_ic = cal_ic(fval_neutralized, ret, rankIC=True, ishow=ishow, save_path=save_path)
 
+            # IC Stats: ic -> ICStat.csv
+            ic_stat = pd.DataFrame()
+            ic_stat['IC'] = cal_ic_stat(data=ic)
+            ic_stat['Rank IC'] = cal_ic_stat(data=rank_ic)
+            ic_stat = ic_stat.astype('float16')
+            ic_mean = ic_stat.loc['mean', 'Rank IC']
+            if save_tables:
+                ic_stat.to_csv(path_format.format('ICStat.csv'))
+            print(ic_stat)
+
+            # IC Decay: fval_neutralized, ret -> ICDecay.png
+            ic_decay = cal_ic_decay(fval_neutralized, ret, 20, ishow, save_path=path_format.format('ICDecay.png') if save_plots else None)
+            print(ic_decay.iloc[1:6])
+
+            # Cumulated IC_IR
+            pass
+
+        # %% Long-Short Strategy
+        save_path = path_format.format('positionWeight_{}.csv') if save_tables else None
+        w_long, w_short, w_long_short = cal_weight_from_long_short_group(
+            long_short_group, ngroups, idx_weight, fbegin_date, fend_date, holddays, ic_mean, save_path)
+
+        # %% Portfolio Turnover, NStocks, Return, Wealth
+        def portfolio_panels_from_weight(w_long, w_short, w_long_short, idx_weight, cost_rate, all_ret, path_format, save_tables, fbegin_date, fend_date):
+            """根据持仓和收益,得到组合表现面板"""
+
+            def portfolio_statistics_from_weight(weight, cost_rate, all_ret, save_path=None):
+                """对持仓计算结果"""
+                res = pd.DataFrame(index=weight.index)
+                res['NStocks'] = (weight.abs() > 0).sum(axis=1)
+                res['Turnover'] = weight.diff().abs().sum(axis=1)
+                res['Return'] = (all_ret.reindex_like(weight) * weight).sum(axis=1)
+                # res['Wealth(cumsum)'] = res['Return'].cumsum().add(1)
+                # res['Wealth(cumprod)'] = res['Return'].add(1).cumprod()
+                res['Return_wc'] = res['Return'] - res['Turnover'] * cost_rate
+                # res['Wealth_wc(cumsum)'] = res['Return_wc'].cumsum().add(1)
+                # res['Wealth_wc(cumprod)'] = res['Return_wc'].add(1).cumprod()
+                if save_path:
+                    res.to_csv(save_path)
+                return res
+
+            panel_long = portfolio_statistics_from_weight(w_long, cost_rate, all_ret, save_path=path_format.format('PanelLong.csv') if save_tables else None)
+            panel_short = portfolio_statistics_from_weight(w_short, cost_rate, all_ret, save_path=path_format.format('PanelShort.csv') if save_tables else None)
+            panel_long_short = portfolio_statistics_from_weight(w_long_short, cost_rate, all_ret, save_path=path_format.format('PanelLongShort.csv') if save_tables else None)
+            panel_baseline = portfolio_statistics_from_weight(idx_weight.loc[fbegin_date:fend_date], cost_rate, all_ret)
+            all_panels = {'long_short': panel_long_short,
+                          'long': panel_long,
+                          'short': panel_short,
+                          'baseline': panel_baseline}
+
+            return all_panels
+
+        all_panels = portfolio_panels_from_weight(w_long, w_short, w_long_short, idx_weight, cost_rate, all_ret,
+                                                  path_format, save_tables, fbegin_date, fend_date)
+        # # Turnover: long_short_turnover -> LSTurnover.csv
+        # save_path = path_format.format('LSTurnover.csv') if save_tables else None
+        # long_short_turnover = cal_turnover_long_short(long_short_group, idx_weight, ngroups, ishow, save_path)
+        # long_short_turnover = pd.concat([df['Turnover'].rename(k) for k, df in all_panels.items()], axis=1)
+
+        # %% Return
+
+        # # Long-Short Absolute Return No Cost: ret_group, ret_baseline -> long_short_return_nc, LSRtnsNC.csv
+        # save_path = path_format.format('LSRtnsNC.csv') if save_tables else None
+        # long_short_return_nc = panel_long_short_return(ret_group, ret_baseline, save_path)
+        long_short_return_nc = pd.concat([df['Return'].rename(k) for k, df in all_panels.items()], axis=1)
+
+        # # Long-Short Absolute Return With Cost
+        # long_short_return_wc = long_short_return_nc - long_short_turnover * cost_rate
+        # if save_tables:
+        #     long_short_return_wc.to_csv(path_format.format('LSRtnsWC.csv'))
+        long_short_return_wc = pd.concat([df['Return_wc'].rename(k) for k, df in all_panels.items()], axis=1)
+
+        # Long-Short Absolute Result No Cost: long_short_return_nc -> long_short_absolute_nc, LSAbsResNC.png
+        title = 'Long-Short Absolute Result No Cost'
+        save_path = path_format.format('LSAbsResNC.png') if save_plots else None
+        long_short_absolute_nc = panel_long_short_absolute(long_short_return_nc, ishow, title, save_path)
+
+        # Long-Short Absolute Result With Cost
+        title = 'Long-Short Absolute Result With Cost'
+        save_path = path_format.format('LSAbsResWC.png') if save_plots else None
+        long_short_absolute_wc = panel_long_short_absolute(long_short_return_wc, ishow, title, save_path)
+
+        # Long-Short Excess Result No Cost
+        title = 'Long-Short Excess Result No Cost'
+        save_path = path_format.format('LSExcResNC.png') if save_plots else None
+        long_short_excess_nc = panel_long_short_excess(long_short_absolute_nc, ishow, title, save_path)
+        # long_short_excess_nc = long_short_return_nc.iloc[:, :3] - long_short_return_nc.iloc[:, 3].values.reshape(-1, 1)
+
+        # Long-Short Excess Result With Cost
+        title = 'Long-Short Excess Result With Cost'
+        save_path = path_format.format('LSExcResWC') if save_tables else None
+        long_short_excess_wc = panel_long_short_excess(long_short_absolute_wc, ishow, title, save_path)
+        # long_short_excess_wc = long_short_return_wc.iloc[:, :3] - long_short_return_wc.iloc[:, 3].values.reshape(-1, 1)
+
+        # %% max drawdown
+        # Long-Absolute MaxDrawdown No Cost
+        title = 'Long-Absolute MaxDrawdown No Cost'
+        save_path = path_format.format('LMddNC.png') if save_plots else None
+        cal_sr_max_drawdown(long_short_absolute_nc['long'], ishow, title, save_path)
+
+        if ngroups != 1:
+            # Long-Short-Absolute MaxDrawdown No Cost
+            title = 'Long-Short-Absolute MaxDrawdown No Cost'
+            save_path = path_format.format('LSMddNC.png') if save_plots else None
+            cal_sr_max_drawdown(long_short_absolute_nc['long_short'], ishow, title, save_path)
+
+        # Long-Absolute MaxDrawdown With Cost
+        title = 'Long-Absolute MaxDrawdown With Cost'
+        save_path = path_format.format('LMddWC.png') if save_plots else None
+        cal_sr_max_drawdown(long_short_absolute_wc['long'], ishow, title, save_path)
+
+        if ngroups != 1:
+            # Long-Short-Absolute MaxDrawdown With Cost
+            title = 'Long-Short-Absolute MaxDrawdown With Cost'
+            save_path = path_format.format('LSMddWC.png') if save_plots else None
+            cal_sr_max_drawdown(long_short_absolute_wc['long_short'], ishow, title, save_path)
+
+        # %% Portfolio Statistics
         # Long Only Statistics No Cost: long_short_return_nc -> ResLongNC.csv
         save_path = path_format.format('ResLongNC.csv') if save_tables else None
         cal_result_stat(long_short_return_nc[['long']], save_path)
@@ -514,33 +676,6 @@ def single_test(conf: dict):
             # Long-Short Statistics No Cost: long_short_return_nc -> ResLongShortNC.csv
             save_path = path_format.format('ResLongShortNC.csv') if save_tables else None
             cal_result_stat(long_short_return_nc[['long_short']], save_path)
-
-        # Long-Short Absolute Result No Cost: long_short_return_nc -> long_short_absolute_nc, LSAbsResNC.png
-        title = 'Long-Short Absolute Result No Cost'
-        save_path = path_format.format('LSAbsResNC.png') if save_plots else None
-        long_short_absolute_nc = panel_long_short_absolute(long_short_return_nc, ishow, title, save_path)
-
-        # Long-Short Excess Result No Cost
-        title = 'Long-Short Excess Result No Cost'
-        save_path = path_format.format('LSExcResNC.png') if save_plots else None
-        long_short_excess_nc = panel_long_short_excess(long_short_absolute_nc, ishow, title, save_path)
-
-        # Long-Absolute MaxDrawdown No Cost
-        title = 'Long-Absolute MaxDrawdown No Cost'
-        save_path = path_format.format('LMddNC.png') if save_plots else None
-        cal_sr_max_drawdown(long_short_absolute_nc['long'], ishow, title, save_path)
-
-        if ngroups != 1:
-            # Long-Short-Absolute MaxDrawdown No Cost
-            title = 'Long-Short-Absolute MaxDrawdown No Cost'
-            save_path = path_format.format('LSMddNC.png') if save_plots else None
-            cal_sr_max_drawdown(long_short_absolute_nc['long_short'], ishow, title, save_path)
-
-        # Long-Short Absolute Return With Cost
-        long_short_return_wc = long_short_return_nc - long_short_turnover * cost_rate
-        if save_tables:
-            long_short_return_wc.to_csv(path_format.format('LSRtnsWC.csv'))
-            #
 
         # Long Only Statistics With Cost
         save_path = path_format.format('ResLongWC.csv') if save_tables else None
@@ -555,26 +690,7 @@ def single_test(conf: dict):
             save_path = path_format.format('ResLongShortWC.csv') if save_tables else None
             cal_result_stat(long_short_return_wc[['long_short']], save_path)
 
-        # Long-Short Absolute Result With Cost
-        title = 'Long-Short Absolute Result With Cost'
-        save_path = path_format.format('LSAbsResWC.png') if save_plots else None
-        long_short_absolute_wc = panel_long_short_absolute(long_short_return_wc, ishow, title, save_path)
-
-        # Long-Short Excess Result With Cost
-        title = 'Long-Short Excess Result With Cost'
-        save_path = path_format.format('LSExcResWC') if save_tables else None
-        long_short_excess_wc = panel_long_short_excess(long_short_absolute_wc, ishow, title, save_path)
-
-        # Long-Absolute MaxDrawdown With Cost
-        title = 'Long-Absolute MaxDrawdown With Cost'
-        save_path = path_format.format('LMddWC.png') if save_plots else None
-        cal_sr_max_drawdown(long_short_absolute_wc['long'], ishow, title, save_path)
-
-        if ngroups != 1:
-            # Long-Short-Absolute MaxDrawdown With Cost
-            title = 'Long-Short-Absolute MaxDrawdown With Cost'
-            save_path = path_format.format('LSMddWC.png') if save_plots else None
-            cal_sr_max_drawdown(long_short_absolute_wc['long_short'], ishow, title, save_path)
+        # %% Annual Result
 
         # Annual Return No Cost
         title = 'Annual Return No Cost'
@@ -597,15 +713,10 @@ def single_test(conf: dict):
         cal_yearly_sharpe(long_short_return_wc, ishow, title, save_path)
 
         #
+        print(f'Graphs & Tables Saved in {path_format}')
     #
 
 
 # %%
 if __name__ == '__main__':
-    # %%
-    import yaml
-    conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/config.yaml'
-    conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
-
-    # %%
-    single_test(conf)
+    main()

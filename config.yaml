@@ -12,7 +12,7 @@ level2_path2 : '/mnt/g/高频数据-hdf5格式/'
 
 # hdf temp file
 a_list_tradeable : "/mnt/c/Users/Winst/Documents/data_local/a_list_tradeable.hdf"
-        # key: ipo, ipo60, suspend, updown, updown_open
+        # key: ipo, ipo60, suspend, updown, up, down, updown_open
         # tradeable(ipo_60 & suspend_L1 & updown_open_L1)
         # tradeable_withupdown(ipo_60 & suspend_L1)
         # tradeable_noupdown(ipo_60 & suspend_L1 & updown_L1)
@@ -25,10 +25,11 @@ stk_maxupordown : "/mnt/c/Users/Winst/Documents/data_local/stk_maxupordown.csv"
 tdays_d : "/mnt/c/Users/Winst/Documents/data_local/tdays_d.csv"
 ind_citic : "/mnt/c/Users/Winst/Documents/data_local/ind_citic_constituent.csv"
 marketvalue : "/mnt/c/Users/Winst/Documents/data_local/stk_marketvalue.csv"
-closeAdj : "/mnt/c/Users/Winst/Documents/data_local/stk_marketdata_closeAdj.csv"
-event_first_report : "/mnt/c/Users/Winst/Documents/data_local/2d_event_first_report.csv"
 daily_close : "/mnt/c/Users/Winst/Documents/data_local/stk_marketdata_close.csv"
 daily_open : "/mnt/c/Users/Winst/Documents/data_local/stk_marketdata_open.csv"
+closeAdj : "/mnt/c/Users/Winst/Documents/data_local/stk_marketdata_closeAdj.csv"
+openAdj : "/mnt/c/Users/Winst/Documents/data_local/stk_marketdata_openAdj.csv"
+event_first_report : "/mnt/c/Users/Winst/Documents/data_local/2d_event_first_report.csv"
 instnum_180 : "/mnt/c/Users/Winst/Documents/data_local/2d_stk_west_instnum_180.csv"
 turnover : "/mnt/c/Users/Winst/Documents/data_local/2d_stk_marketdata_turn.csv"
 turnover_free : "/mnt/c/Users/Winst/Documents/data_local/2d_stk_marketdata_freeturn.csv"
@@ -39,14 +40,25 @@ end_date : '2022-12-31'
 
 # backtest (single_test.py)
 factors_tested : "/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/factor_backtest/factors_tested.xlsx"
-with_updown : ''  # '': exclude open  '_withupdown': keep  '_noupdown': exclude all
-save_suffix : '(回测中去一字涨跌停)'
+#with_updown : ''  # '': exclude open  '_withupdown': keep  '_noupdown': exclude all
+exclude_tradeable :   # 0: excluded
+  ipo60 : 0
+  suspend: 0
+  updown : 1 
+  up : 1
+  down : 1
+  updown_open : 0 
+  up_open : 1
+  down_open : 1
+neu_mtd : 'iv'  # n, i, iv
 stk_pool : 'NA'  # NA CSI500 CSI300 [CSI800]
 stk_w : 'ew'  # idx, ew
-neu_mtd : 'n'  # n, i, iv
-tc : 2e-3  # 手续费（双边）
-ngroups : 1  # less than 0: 多/空各(-)ngroup支;    1: 稀疏事件信号
+ngroups : 5  # less than 0: 多/空各(-)ngroup支;    1: 稀疏事件信号
+return_kind : 'oto'  # ctc, oto, vtv
+holddays : 2  # 交易频率，如1天一换仓
+save_suffix : ''  # 空字段，则后缀为回测开始的时间
 
+tc : 2e-3  # 手续费（双边）
 save_tables : True
 save_plots : True
 ishow : False
