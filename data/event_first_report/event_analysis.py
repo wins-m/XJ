@@ -53,6 +53,7 @@ def table_ar_adjacent_events(conf: dict, gap=20, drop_dret_over=.20, folder='eve
     # %%
     data_path = conf['data_path']
     res_path = conf['factorsres_path']
+    tradeable_path = conf['a_list_tradeable']
     save_path = res_path + folder
     os.makedirs(save_path, exist_ok=True)
     # 存储地址
@@ -76,7 +77,7 @@ def table_ar_adjacent_events(conf: dict, gap=20, drop_dret_over=.20, folder='eve
     # adjret_raw = adjret.copy()  # 备份原始值
     # adjret[adjret.abs() > drop_dret_over] = np.nan
     # 大市等权收益
-    adjret_mkt = adjret.apply(lambda s: s.mean(), axis=1)
+    adjret_mkt = pd.DataFrame(adjret.apply(lambda s: s.mean(), axis=1), columns=['mkt'])
     # 异常收益（去异常的大市等权）
     adjret_ab = adjret.apply(lambda s: s - s.mean(), axis=1)  # 异常大，特殊公司，此处保留异常
 
@@ -86,6 +87,37 @@ def table_ar_adjacent_events(conf: dict, gap=20, drop_dret_over=.20, folder='eve
     event_panel = event_panel[mask]
 
     # %% T-120 ~ T+20 R
+    td, stk = '2017-01-03','000001.SZ'
+    shift_, shift = -120, 20
+
+    df = adjret.copy()
+    def visit_2d_ls(df, td, stk, shift_=0, shift=0) -> list:
+        """返回列表，长度为 shift - shift_ + 1"""
+        td_i0 = df.index.get_loc(td)
+        td_i_ = td_i0 + shift_
+        td_i1 = td_i0 + shift
+        td_i_, na_ = (0, - td_i_) if (td_i_ < 0) else (td_i_, 0)
+        td_i1, na1 = (len(df) - 1, td_i1 - len(df) + 1) if (td_i1 >= len(df)) else (td_i1, 0)
+        res = df[stk].iloc[td_i_:td_i1+1].to_list()
+        res = [np.nan for _ in range(na_)] + res + [np.nan for _ in range(na1)]
+        return res
+
+    def r2cr(r:list, idx0=0):
+
+    # absolute return
+    r141: list = visit_2d_ls(adjret, td, stk, shift_, shift); len(r141)
+    # excess return
+    ar141: list = visit_2d_ls(adjret_ab, td, stk, shift_, shift); len(ar141)
+    # market return
+    mr141: list = visit_2d_ls(adjret_mkt, td, 'mkt', shift_, shift); len(mr141)
+    # keep 2 from 3
+    np.array(r141) - np.array(mr141) - np.array(ar141)
+    # cumulative excess return
+
+
+
+
+    # %%
     def visit_2d_v(td, stk, df, shift=0):
         td_idx = -1
         try:
@@ -97,6 +129,13 @@ def table_ar_adjacent_events(conf: dict, gap=20, drop_dret_over=.20, folder='eve
             if (td_idx < 0) or (td_idx > len(df)):
                 return np.nan
             return df.iloc[td_idx, :].loc[stk]
+
+    def column_look_up(tgt, src, delay = -1, kw = 'r_1', msg='(not found in `src`)'):
+        key = tgt[['tradingdate', 'stockcode']]
+        print(f'{kw}...')
+        tgt[kw] = key.apply(lambda s: visit_2d_v(s.iloc[0], s.iloc[1], src, shift=delay), axis=1)
+        print(f"""nan:{tgt[kw].isna().mean() * 100: 6.2f} % {msg}""")
+        return tgt
     
     df_key = event_panel[['tradingdate', 'stockcode']]
     
@@ -110,11 +149,71 @@ def table_ar_adjacent_events(conf: dict, gap=20, drop_dret_over=.20, folder='eve
 
     print('r1...')
     event_panel['r1'] = df_key.apply(lambda s: visit_2d_v(s.iloc[0], s.iloc[1], adjret, shift=1), axis=1)
-    print(f'nan:{event_panel.r0.isna().mean() * 100: 6.2f} % (新上市60日内或根据marketdata无法计算)')
+    print(f'nan:{event_panel.r1.isna().mean() * 100: 6.2f} % (新上市60日内或根据marketdata无法计算)')
 
-    print('r_1...')
-    event_panel['r_1'] = df_key.apply(lambda s: visit_2d_v(s.iloc[0], s.iloc[1], adjret, shift=-1), axis=1)
-    print(f'nan:{event_panel.r0.isna().mean() * 100: 6.2f} % (新上市60日内或根据marketdata无法计算)')
+    print('r2...')
+    event_panel['r2'] = df_key.apply(lambda s: visit_2d_v(s.iloc[0], s.iloc[1], adjret, shift=2), axis=1)
+    print(f'nan:{event_panel.r2.isna().mean() * 100: 6.2f} % (新上市60日内或根据marketdata无法计算)')
+
+    delay, kw = 3, 'r3'
+    print(f'{kw}...')
+    event_panel[kw] = df_key.apply(lambda s: visit_2d_v(s.iloc[0], s.iloc[1], adjret, shift=delay), axis=1)
+    print(f"""nan:{event_panel[kw].isna().mean() * 100: 6.2f} % (新上市60日内或根据marketdata无法计算)""")
+
+    delay, kw = -1, 'r_1'
+    print(f'{kw}...')
+    event_panel[kw] = df_key.apply(lambda s: visit_2d_v(s.iloc[0], s.iloc[1], adjret, shift=delay), axis=1)
+    print(f"""nan:{event_panel[kw].isna().mean() * 100: 6.2f} % (新上市60日内或根据marketdata无法计算)""")
+
+    event_panel = column_look_up(tgt=event_panel, src=adjret, delay=-2, kw='r_2')
+    event_panel = column_look_up(tgt=event_panel, src=adjret, delay=4, kw='r4')
+    event_panel = column_look_up(tgt=event_panel, src=adjret, delay=5, kw='r5')
+
+    # maxupdown
+    updown = (1 - pd.DataFrame(pd.read_hdf(tradeable_path, key='updown')))  # 1: 当天涨跌停
+    updown_o = (1 - pd.DataFrame(pd.read_hdf(tradeable_path, key='updown_open')))  # 1: 当天一字涨跌停
+
+    event_panel = column_look_up(tgt=event_panel, src=updown, delay=0, kw='maxupdown0')
+    event_panel = column_look_up(tgt=event_panel, src=updown_o, delay=0, kw='open_maxupdown0')
+    event_panel = column_look_up(tgt=event_panel, src=updown, delay=-1, kw='maxupdown_1')
+    event_panel = column_look_up(tgt=event_panel, src=updown_o, delay=-1, kw='open_maxupdown_1')
+    # event_panel.rename(columns={'maxupdown0_1':'maxupdown_1', 'open_maxupdown0_1':'open_maxupdown_1'}, inplace=True)
+
+    # check holding
+    # path_noupdown = '/mnt/c/Users/Winst/Documents/factors_res/first_report_dur3_noupdown_n_NAew_1g(回测中不筛涨跌停)/LSGroup.csv'
+    path_noupdown = '/mnt/c/Users/Winst/Documents/factors_res/first_report_dur3_updown_n_NAew_1g(回测中去新上市和停牌)/LSGroup.csv'
+    # path_withupdown = '/mnt/c/Users/Winst/Documents/factors_res/first_report_dur3_withupdown_n_NAew_1g(回测中不筛涨跌停)/LSGroup.csv'
+    path_withupdown = '/mnt/c/Users/Winst/Documents/factors_res/first_report_dur3_n_NAew_1g(回测中去新上市和停牌)/LSGroup.csv'
+
+    df0 = pd.read_csv(path_noupdown, index_col=0, parse_dates=True)
+    df1 = pd.read_csv(path_withupdown, index_col=0, parse_dates=True)
+    td, td1 = '2021-10-11', '2021-10-08'
+    tmp = pd.concat([df0.loc[td], df1.loc[td]], axis=1); tmp.columns=['no', 'with']
+    difference_of_holding_weight = tmp[df1.loc[td] - df0.loc[td] > 0]
+    sig0 = '/mnt/c/Users/Winst/Documents/factors_csv/first_report_dur3_updown.csv'
+    sig1 = '/mnt/c/Users/Winst/Documents/factors_csv/first_report_dur3.csv'
+    sig = pd.concat([pd.read_csv(sig0,index_col=0,parse_dates=True).loc[td1],
+                     pd.read_csv(sig1,index_col=0,parse_dates=True).loc[td1]],axis=1)
+    sig.columns = ['no', 'with']
+    difference_of_raw_signal = sig[sig['with'] - sig['no'] != 0].dropna(axis=0)
+    assert set(difference_of_raw_signal.index) == set(difference_of_holding_weight.index)
+    print(difference_of_raw_signal.index.to_list())
+    tmp = adjret[['002170.SZ', '300179.SZ', '300472.SZ']]
+    mask = (tmp.index >= '2021-09-27') & (tmp.index <= '2021-10-11')
+    tmp = tmp[mask]
+    tmp = tmp.sum(axis=1) / df1.loc[td].sum()  # 去权重
+
+    mask = (event_panel.tradingdate >= '2021-09-29') & (event_panel.tradingdate < '2021-10-11')
+    # & (event_panel[['MUD0', 'OMUD0']].sum(axis=1) > 0)
+    tmp = event_panel[mask].copy()
+
+    tmp.to_csv('/home/swmao/tmp.csv', encoding='GBK')
+
+
+
+    # %%
+    hdf_file = save_path + 'event_panel.h5'
+    event_panel = pd.DataFrame(pd.read_hdf(hdf_file, key=folder))
 
     # %%
     hdf_file = save_path + 'event_panel.h5'
