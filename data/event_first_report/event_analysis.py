@@ -102,8 +102,6 @@ def table_ar_adjacent_events(conf: dict, gap=20, drop_dret_over=.20, folder='eve
         res = [np.nan for _ in range(na_)] + res + [np.nan for _ in range(na1)]
         return res
 
-    def r2cr(r:list, idx0=0):
-
     # absolute return
     r141: list = visit_2d_ls(adjret, td, stk, shift_, shift); len(r141)
     # excess return
