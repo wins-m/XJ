@@ -22,3 +22,8 @@ def create_table_rating_avg(username, password, dbname, tname):
                       Column('tradingdate', DATE(), nullable=False),
                       )
     metadata.create_all(engine)
+
+
+# %% 02-10 tz 小分队群
+import pandas as pd
+pd.io.sql.to_sql(data, 'tablename', engine, schema='databasename', if_exists='append', index=False)  # 写入数据库的函数
