@@ -4,6 +4,7 @@
 """
 
 import pandas as pd
+import numpy as np
 import sys
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
 from supporter.factor_operator import read_single_factor
@@ -46,13 +47,17 @@ def adjust_factor_pe_residual(conf: dict):
         # df.to_csv(conf['factorscsv_path'] + '_'.join(filename.split('_')[:-2]) + '.csv')
 
 
-def adjust_event_first_report(conf: dict, dur=5):
+def adjust_event_first_report(conf: dict, dur=5, kind=None):
     path = conf['event_first_report']
     csv_path = conf['factorscsv_path']
     df = pd.read_csv(path, index_col=0, parse_dates=True)
     # df['000650.SZ'].dropna()
-    template = read_single_factor(conf['a_list_tradeable'], conf['begin_date'], conf['end_date'], hdf_k='tradeable')
-    df = df.reindex_like(template)
+
+    # 预处理，T0若新上市/停牌/涨跌停，删除信号
+    if kind is not None:
+        tradeable = read_single_factor(conf['a_list_tradeable'], conf['begin_date'], conf['end_date'], hdf_k=kind)
+        df = df.reindex_like(tradeable) * tradeable.replace(False, np.nan)
+
     if dur > 1:
         df = df.fillna(method='ffill', limit=dur-1)
     elif dur == 1:
@@ -72,14 +77,22 @@ def adjust_event_first_report(conf: dict, dur=5):
     # tmp.sum()
     # df.loc['2018-07-09'].sum()
 
-    df.to_csv(csv_path + f'first_report_dur{dur}.csv')
+    df.to_csv(csv_path + f"""first_report_dur{dur}{'_' + kind if kind else ''}.csv""")
+    print(f"""first_report_dur{dur}{'_' + kind if kind else ''}.csv""", 'saved.')
 
 
+# %%
 if __name__ == '__main__':
+    # %%
     import yaml
     conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/config.yaml'
     conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
-    #
+
+    # %%
     # adjust_factor_pe_residual(conf)
-    for d in range(1, 6):
-        adjust_event_first_report(conf, dur=d)
+    # %%
+    kind = 'updown'
+    dur = 3
+    # for d in range(1, 6):
+    for kind in [None, 'updown', 'updown_open']:
+        adjust_event_first_report(conf, dur=dur, kind=kind)

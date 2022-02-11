@@ -24,11 +24,12 @@ def get_idx_weight(pool_path, begin_date, end_date, mtd='idx'):
     return df1
 
 
-def get_long_short_group(df: pd.DataFrame, ngroups: int) -> pd.DataFrame:
+def get_long_short_group(df: pd.DataFrame, ngroups: int, save_path=None) -> pd.DataFrame:
     """
     因子值替换为分组标签
     :param df: 因子值（经过标准化、中性化）
     :param ngroups: 分组数(+)；多头/空头内资产数量取负值(-)，若股池不够大，重叠部分不持有
+    :param save_path: 若有，分组情况存到本地
     :return: 因子分组，nan仍为nan，其余为分组编号 0~(分组数-1)
     """
     res = None
@@ -44,9 +45,12 @@ def get_long_short_group(df: pd.DataFrame, ngroups: int) -> pd.DataFrame:
         # res = rnk * 0  # 一般
         # res[rnk.apply(lambda s: s >= hg, axis=0)] = 1  # 多头
     elif ngroups == 1:
-        return df
+        res = df
     else:
         res = df.rank(axis=1, pct=True).applymap(lambda x: x // (1 / ngroups))
+
+    if save_path is not None:
+        res.to_csv(save_path)
 
     return res
 
@@ -332,14 +336,20 @@ def cal_ic_decay(fval_neutralized, ret, maxlag=20, ishow=False, save_path=None) 
     return res
 
 
-def cal_result_stat(df: pd.DataFrame, save_path: str = None) -> pd.DataFrame:
+def cal_result_stat(df: pd.DataFrame, save_path: str = None, kind='cumsum') -> pd.DataFrame:
     """
     对日度收益序列df计算相关结果
     :param df: 值为日收益率小r，列index为日期DateTime
     :param save_path: 存储名（若有）
+    :param kind: 累加/累乘
     :return: 结果面板
     """
-    df1 = df.add(1).cumprod()
+    if kind == 'cumsum':
+        df1 = df.cumsum() + 1
+    elif kind == 'cumprod':
+        df1 = df.add(1).cumprod()
+    else:
+        raise ValueError(f"""Invalid kind={kind}, only support('cumsum', 'cumprod')""")
     data = df.copy()
     data['Date'] = data.index
     data['SemiYear'] = data['Date'].apply(lambda s: f'{s.year}-H{s.month // 7 + 1}')
@@ -431,13 +441,15 @@ def single_test(conf: dict):
 
         if ngroups == 1:
             fval_neutralized = fval.copy()
-            long_short_group = fval.copy()
+            # long_short_group = fval.copy()
         else:
             # Factor Neutralization: fval, neu_mtd, ind_citic_path, marketvalue_path -> fval_neutralized, ret
             signal.neutralize_by(neu_mtd, ind_citic_path, marketvalue_path)
             fval_neutralized = signal.get_fv()
-            # Group Label Panel: fval_neutralized, ngroups -> long_short_group
-            long_short_group = get_long_short_group(fval_neutralized, ngroups)
+
+        # Group Label Panel: fval_neutralized, ngroups -> long_short_group
+        save_path = path_format.format('LSGroup.csv') if save_tables else None
+        long_short_group = get_long_short_group(fval_neutralized, ngroups, save_path=save_path)
 
         # Group Absolute Return: long_short_group, ret, idx_weight, ngroups -> ret_group, GroupRtns.csv
         save_path = path_format.format('GroupRtns.csv') if save_tables else None

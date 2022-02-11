@@ -13,9 +13,9 @@ level2_path2 : '/mnt/g/高频数据-hdf5格式/'
 # hdf temp file
 a_list_tradeable : "/mnt/c/Users/Winst/Documents/data_local/a_list_tradeable.hdf"
         # key: ipo, ipo60, suspend, updown, updown_open
-        # tradeable(ipo_60 & suspend & updown_open)
-        # tradeable_withupdown(ipo & suspend)
-        # tradeable_noupdown(ipo_60 & suspend & updown)
+        # tradeable(ipo_60 & suspend_L1 & updown_open_L1)
+        # tradeable_withupdown(ipo_60 & suspend_L1)
+        # tradeable_noupdown(ipo_60 & suspend_L1 & updown_L1)
 
 # csv data file
 idx_constituent : "/mnt/c/Users/Winst/Documents/data_local/idx_constituent_{}.csv"
@@ -34,45 +34,51 @@ turnover : "/mnt/c/Users/Winst/Documents/data_local/2d_stk_marketdata_turn.csv"
 turnover_free : "/mnt/c/Users/Winst/Documents/data_local/2d_stk_marketdata_freeturn.csv"
 
 # target period
-begin_date : '2017-01-01'
-end_date : '2017-12-31'
+begin_date : '2016-01-01'
+end_date : '2022-12-31'
 
 # backtest (single_test.py)
 with_updown : ''  # '': exclude open  '_withupdown': keep  '_noupdown': exclude all
-save_suffix : '(去开盘涨跌停)'
-stk_pool : 'CSI500'  # NA CSI500 CSI300 [CSI800]
+save_suffix : '(回测中去一字涨跌停)'
+stk_pool : 'NA'  # NA CSI500 CSI300 [CSI800]
 stk_w : 'ew'  # idx, ew
 neu_mtd : 'n'  # n, i, iv
 tc : 2e-3  # 手续费（双边）
-ngroups : 5  # <0: 多/空各(-)ngroup支; 1: 稀疏事件信号
+ngroups : 1  # less than 0: 多/空各(-)ngroup支;    1: 稀疏事件信号
+
 fnames :
   pe_residual : 0
-  pe_residual_ols_1 : 0
+  pe_residual_ols_1: 0
   pe_residual_ols_2: 0
   pe_residual_ols_3: 0
-  first_report_dur1: 0
+  first_report_dur1: 0 
   first_report_dur2: 0
-  first_report_dur3: 0
+  first_report_dur3: 0 
+  first_report_dur3_noupdown: 0
+  first_report_dur3_withupdown: 0 
+  first_report_dur3_updown : 0 
+  first_report_dur3_updown_open : 1 
   first_report_dur4: 0
   first_report_dur5: 0  # 'first_report: 0
   turnover5D: 0
   free_turnover5D: 0
-  amountbuy_exlarge: 1
-  amountsell_exlarge: 1
-  amountbuy_large: 1
-  amountsell_large: 1
-  amountbuy_med: 1
-  amountsell_med: 1
-  amountbuy_small: 1
-  amountsell_small: 1
-  amountdiff_small: 1
-  amountdiff_smallact: 1
-  amountdiff_med: 1
-  amountdiff_medact: 1
-  amountdiff_large: 1
-  amountdiff_largeact: 1
-  amountdiff_exlarge: 1
-  amountdiff_exlargeact: 1
+  amountbuy_exlarge: 0
+  amountsell_exlarge: 0
+  amountbuy_large: 0
+  amountsell_large: 0
+  amountbuy_med: 0
+  amountsell_med: 0
+  amountbuy_small: 0
+  amountsell_small: 0
+  amountdiff_small: 0
+  amountdiff_smallact: 0
+  amountdiff_med: 0
+  amountdiff_medact: 0
+  amountdiff_large: 0
+  amountdiff_largeact: 0
+  amountdiff_exlarge: 0
+  amountdiff_exlargeact: 0
+
 save_tables : True
 save_plots : True
 ishow : False
