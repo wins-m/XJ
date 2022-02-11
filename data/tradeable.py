@@ -81,7 +81,7 @@ def update_tradeable_label(conf):
     stk_maxupordown = pd.read_csv(conf['stk_maxupordown'], index_col=0, parse_dates=True)
     updown = stk_maxupordown.reset_index().pivot(index='tradingdate', columns='stockcode', values='maxupordown')
     updown = updown.reindex_like(df).isna()
-    print('筛去所有涨跌停保存于 %s, key=%s' % (conf['a_list_tradeable'], 'updown'))
+    print('涨跌停为False否则为True 存于 %s, key=%s' % (conf['a_list_tradeable'], 'updown'))
     updown.to_hdf(conf['a_list_tradeable'], key='updown')
     is_maxupordown = ~updown
     # 开盘涨跌停，开盘价=收盘价
@@ -89,13 +89,13 @@ def update_tradeable_label(conf):
     daily_close = pd.read_csv(conf['daily_close'], index_col=0, parse_dates=True)
     eq = (daily_open == daily_close).reindex_like(is_maxupordown)
     updown_open = ~(is_maxupordown & eq)  # 非（涨跌停 且 开=收），即非“开盘即涨跌停”
-    print('筛去开盘涨跌停保存于 %s, key=%s' % (conf['a_list_tradeable'], 'updown_open'))
+    print('开盘一字涨跌停为False其余为True 存于 %s, key=%s' % (conf['a_list_tradeable'], 'updown_open'))
     updown_open.to_hdf(conf['a_list_tradeable'], key='updown_open')
 
     print('ipo%s & suspend & updown_open 保存于 %s, key=%s' % (conf['ipo_delay'], conf['a_list_tradeable'], 'updown_open'))
     tradeable = ipo_delay & suspend.shift(1) & updown_open.shift(1)  # 以收盘加交易，当日不可实现是因为昨日停牌/涨跌停
     tradeable.to_hdf(conf['a_list_tradeable'], key='tradeable')
-    tradeable1 = ipo & suspend.shift(1)
+    tradeable1 = ipo_delay & suspend.shift(1)
     tradeable1.to_hdf(conf['a_list_tradeable'], key='tradeable_withupdown')
     tradeable2 = ipo_delay & suspend.shift(1) & updown.shift(1)
     tradeable2.to_hdf(conf['a_list_tradeable'], key='tradeable_noupdown')
