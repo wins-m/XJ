@@ -94,5 +94,5 @@ if __name__ == '__main__':
     kind = 'updown'
     dur = 3
     # for d in range(1, 6):
-    for kind in [None, 'updown', 'updown_open']:
+    for kind in [None, 'updown', 'updown_open', 'up', 'up_open']:
         adjust_event_first_report(conf, dur=dur, kind=kind)

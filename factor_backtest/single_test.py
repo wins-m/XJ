@@ -34,6 +34,7 @@ def cal_weight_from_long_short_group(long_short_group, ngroups, idx_weight, fbeg
         """hd日交易一次，调整持仓权重"""
         return w.iloc[::hd].reindex_like(w).fillna(method='ffill')
 
+    ngroups = 2 if ngroups == 1 else ngroups  # 分为0或1若是同质信号
     long_position = (long_short_group == ngroups - 1) * idx_weight.loc[fbegin_date:fend_date]
     long_position = long_position.apply(lambda s: s / s.sum(), axis=1)
     short_position = (long_short_group == 0) * idx_weight.loc[fbegin_date:fend_date]
@@ -313,7 +314,7 @@ def cal_turnover_long_short(long_short_group, idx_weight, ngroups, ishow=False, 
 def cal_ic(fv_l1, ret, lag=1, rankIC=False, ishow=False, save_path=None) -> pd.DataFrame:
     """计算IC：昨日因子值与当日收益Pearson相关系数"""
     mtd = 'spearman' if rankIC else 'pearson'
-    ic = fv_l1.shift(lag-1).corrwith(ret, axis=1, drop=False, method=mtd)
+    ic = fv_l1.shift(lag-1).corrwith(ret, axis=1, drop=False, method=mtd)  # lag-1: fv_l1是滞后的因子
     ic = pd.DataFrame(ic)
     ic.columns = ['IC']
 
@@ -494,7 +495,7 @@ def single_test(conf: dict):
     ret_baseline = (all_ret * idx_weight).sum(axis=1)  # Return
 
     # Loop All Factors
-    fname = 'amountbuy_small'
+    fname = all_factornames[0]
     # %%
     for fname in all_factornames:
         print(f'\n({fname})')
