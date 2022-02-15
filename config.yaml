@@ -30,6 +30,7 @@ daily_open : "/mnt/c/Users/Winst/Documents/data_local/stk_marketdata_open.csv"
 closeAdj : "/mnt/c/Users/Winst/Documents/data_local/stk_marketdata_closeAdj.csv"
 openAdj : "/mnt/c/Users/Winst/Documents/data_local/stk_marketdata_openAdj.csv"
 event_first_report : "/mnt/c/Users/Winst/Documents/data_local/2d_event_first_report.csv"
+event_first_report2 : "/mnt/c/Users/Winst/Documents/data_local/event_panel.h5"  # key=event_first_report
 instnum_180 : "/mnt/c/Users/Winst/Documents/data_local/2d_stk_west_instnum_180.csv"
 turnover : "/mnt/c/Users/Winst/Documents/data_local/2d_stk_marketdata_turn.csv"
 turnover_free : "/mnt/c/Users/Winst/Documents/data_local/2d_stk_marketdata_freeturn.csv"
@@ -41,7 +42,12 @@ end_date : '2022-12-31'
 # backtest (single_test.py)
 factors_tested : "/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/factor_backtest/factors_tested.xlsx"
 #with_updown : ''  # '': exclude open  '_withupdown': keep  '_noupdown': exclude all
-save_suffix : 'ipo60&suspend'  # 空字段，则后缀为回测开始的时间
+save_suffix : ''  # 空字段，则后缀为回测开始的时间
+test_mode : '1'
+    # '0': no test;
+    # '1': default;
+    # '2': from `LSGroup.csv`
+    # '${FilePath}': from holding weight
 exclude_tradeable :   # 0: excluded
   ipo60 : 0
   suspend: 0
@@ -53,9 +59,10 @@ exclude_tradeable :   # 0: excluded
   down_open : 1
 neu_mtd : 'n'  # n, i, iv
 stk_pool : 'NA'  # NA CSI500 CSI300 [CSI800]
+return_kind : 'ctc'  # ctc, oto, vtv
+
 stk_w : 'ew'  # idx, ew
 ngroups : 1  # less than 0: 多/空各(-)ngroup支;    1: 稀疏事件信号
-return_kind : 'ctc'  # ctc, oto, vtv
 holddays : 1  # 交易频率，如1天一换仓
 
 tc : 2e-3  # 手续费（双边）

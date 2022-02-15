@@ -44,212 +44,6 @@ class TradeDate(object):
         return self.data.index[l0], abs(l1-l0)
 
 
-def table_ar_adjacent_events(conf: dict, gap=20, drop_dret_over=.20, folder='event_first_report/'):
-    """计算事件超额收益
-        - 机构首次关注event（原instnum<5)前后-gap~gap+1日，大市为等权
-
-
-    """
-    # %%
-    data_path = conf['data_path']
-    res_path = conf['factorsres_path']
-    tradeable_path = conf['a_list_tradeable']
-    save_path = res_path + folder
-    os.makedirs(save_path, exist_ok=True)
-    # 存储地址
-    save_path = save_path + 'event_abnormal_returns.csv'  # 'event_adjacent_returns.csv'
-    # 事件记录：stockcode, tradingdate, fv(==1)
-    event = pd.read_csv(data_path + 'event_first_report.csv')
-    # 机构关注数
-    instnum = pd.read_csv(conf['instnum_180'], index_col=0, parse_dates=True)
-    # 交易日列表
-    tradedates = pd.read_csv(conf['tdays_d'], header=None, index_col=0, parse_dates=True)
-    TD = TradeDate(tradedates)
-    # 可交易：ipo 60 天后
-    ipo60 = pd.DataFrame(pd.read_hdf(conf['a_list_tradeable'], key='ipo60')).replace(False, np.nan)
-    # 复权收盘价
-    adjclose = pd.read_csv(conf['closeAdj'], index_col=0, parse_dates=True)
-    # 复权收盘价收益
-    adjret_raw = adjclose.pct_change()
-    # 去除新上市60日
-    adjret = adjret_raw * ipo60.reindex_like(adjclose)
-    # 去除异常值
-    # adjret_raw = adjret.copy()  # 备份原始值
-    # adjret[adjret.abs() > drop_dret_over] = np.nan
-    # 大市等权收益
-    adjret_mkt = pd.DataFrame(adjret.apply(lambda s: s.mean(), axis=1), columns=['mkt'])
-    # 异常收益（去异常的大市等权）
-    adjret_ab = adjret.apply(lambda s: s - s.mean(), axis=1)  # 异常大，特殊公司，此处保留异常
-
-    # %% eventid为index的面板
-    event_panel = event[['id', 'tradingdate', 'stockcode', 'stockname']].copy().sort_values('id')
-    mask = event_panel.tradingdate <= '2021-12-31'
-    event_panel = event_panel[mask]
-
-    # %% T-120 ~ T+20 R
-    td, stk = '2017-01-03','000001.SZ'
-    shift_, shift = -120, 20
-
-    df = adjret.copy()
-    def visit_2d_ls(df, td, stk, shift_=0, shift=0) -> list:
-        """返回列表，长度为 shift - shift_ + 1"""
-        td_i0 = df.index.get_loc(td)
-        td_i_ = td_i0 + shift_
-        td_i1 = td_i0 + shift
-        td_i_, na_ = (0, - td_i_) if (td_i_ < 0) else (td_i_, 0)
-        td_i1, na1 = (len(df) - 1, td_i1 - len(df) + 1) if (td_i1 >= len(df)) else (td_i1, 0)
-        res = df[stk].iloc[td_i_:td_i1+1].to_list()
-        res = [np.nan for _ in range(na_)] + res + [np.nan for _ in range(na1)]
-        return res
-
-    # absolute return
-    r141: list = visit_2d_ls(adjret, td, stk, shift_, shift); len(r141)
-    # excess return
-    ar141: list = visit_2d_ls(adjret_ab, td, stk, shift_, shift); len(ar141)
-    # market return
-    mr141: list = visit_2d_ls(adjret_mkt, td, 'mkt', shift_, shift); len(mr141)
-    # keep 2 from 3
-    np.array(r141) - np.array(mr141) - np.array(ar141)
-    # cumulative excess return
-
-
-
-
-    # %%
-    def visit_2d_v(td, stk, df, shift=0):
-        td_idx = -1
-        try:
-            td_idx = df.index.get_loc(td) + shift
-        except KeyError:
-            print(f'KeyError: ({td}, {stk})')
-            return np.nan
-        finally:
-            if (td_idx < 0) or (td_idx > len(df)):
-                return np.nan
-            return df.iloc[td_idx, :].loc[stk]
-
-    def column_look_up(tgt, src, delay = -1, kw = 'r_1', msg='(not found in `src`)'):
-        key = tgt[['tradingdate', 'stockcode']]
-        print(f'{kw}...')
-        tgt[kw] = key.apply(lambda s: visit_2d_v(s.iloc[0], s.iloc[1], src, shift=delay), axis=1)
-        print(f"""nan:{tgt[kw].isna().mean() * 100: 6.2f} % {msg}""")
-        return tgt
-    
-    df_key = event_panel[['tradingdate', 'stockcode']]
-    
-    print('instnum...')
-    event_panel['instnum'] = df_key.apply(lambda s: visit_2d_v(s.iloc[0], s.iloc[1], instnum), axis=1)
-    print(f'nan:{event_panel.instnum.isna().mean() * 100: 6.2f} % (instnum未找到)')
-
-    print('r0...')
-    event_panel['r0'] = df_key.apply(lambda s: visit_2d_v(s.iloc[0], s.iloc[1], adjret), axis=1)
-    print(f'nan:{event_panel.r0.isna().mean() * 100: 6.2f} % (新上市60日内或根据marketdata无法计算)')
-
-    print('r1...')
-    event_panel['r1'] = df_key.apply(lambda s: visit_2d_v(s.iloc[0], s.iloc[1], adjret, shift=1), axis=1)
-    print(f'nan:{event_panel.r1.isna().mean() * 100: 6.2f} % (新上市60日内或根据marketdata无法计算)')
-
-    print('r2...')
-    event_panel['r2'] = df_key.apply(lambda s: visit_2d_v(s.iloc[0], s.iloc[1], adjret, shift=2), axis=1)
-    print(f'nan:{event_panel.r2.isna().mean() * 100: 6.2f} % (新上市60日内或根据marketdata无法计算)')
-
-    delay, kw = 3, 'r3'
-    print(f'{kw}...')
-    event_panel[kw] = df_key.apply(lambda s: visit_2d_v(s.iloc[0], s.iloc[1], adjret, shift=delay), axis=1)
-    print(f"""nan:{event_panel[kw].isna().mean() * 100: 6.2f} % (新上市60日内或根据marketdata无法计算)""")
-
-    delay, kw = -1, 'r_1'
-    print(f'{kw}...')
-    event_panel[kw] = df_key.apply(lambda s: visit_2d_v(s.iloc[0], s.iloc[1], adjret, shift=delay), axis=1)
-    print(f"""nan:{event_panel[kw].isna().mean() * 100: 6.2f} % (新上市60日内或根据marketdata无法计算)""")
-
-    event_panel = column_look_up(tgt=event_panel, src=adjret, delay=-2, kw='r_2')
-    event_panel = column_look_up(tgt=event_panel, src=adjret, delay=4, kw='r4')
-    event_panel = column_look_up(tgt=event_panel, src=adjret, delay=5, kw='r5')
-
-    # maxupdown
-    updown = (1 - pd.DataFrame(pd.read_hdf(tradeable_path, key='updown')))  # 1: 当天涨跌停
-    updown_o = (1 - pd.DataFrame(pd.read_hdf(tradeable_path, key='updown_open')))  # 1: 当天一字涨跌停
-
-    event_panel = column_look_up(tgt=event_panel, src=updown, delay=0, kw='maxupdown0')
-    event_panel = column_look_up(tgt=event_panel, src=updown_o, delay=0, kw='open_maxupdown0')
-    event_panel = column_look_up(tgt=event_panel, src=updown, delay=-1, kw='maxupdown_1')
-    event_panel = column_look_up(tgt=event_panel, src=updown_o, delay=-1, kw='open_maxupdown_1')
-    # event_panel.rename(columns={'maxupdown0_1':'maxupdown_1', 'open_maxupdown0_1':'open_maxupdown_1'}, inplace=True)
-
-    # check holding
-    # path_noupdown = '/mnt/c/Users/Winst/Documents/factors_res/first_report_dur3_noupdown_n_NAew_1g(回测中不筛涨跌停)/LSGroup.csv'
-    path_noupdown = '/mnt/c/Users/Winst/Documents/factors_res/first_report_dur3_updown_n_NAew_1g(回测中去新上市和停牌)/LSGroup.csv'
-    # path_withupdown = '/mnt/c/Users/Winst/Documents/factors_res/first_report_dur3_withupdown_n_NAew_1g(回测中不筛涨跌停)/LSGroup.csv'
-    path_withupdown = '/mnt/c/Users/Winst/Documents/factors_res/first_report_dur3_n_NAew_1g(回测中去新上市和停牌)/LSGroup.csv'
-
-    df0 = pd.read_csv(path_noupdown, index_col=0, parse_dates=True)
-    df1 = pd.read_csv(path_withupdown, index_col=0, parse_dates=True)
-    td, td1 = '2021-10-11', '2021-10-08'
-    tmp = pd.concat([df0.loc[td], df1.loc[td]], axis=1); tmp.columns=['no', 'with']
-    difference_of_holding_weight = tmp[df1.loc[td] - df0.loc[td] > 0]
-    sig0 = '/mnt/c/Users/Winst/Documents/factors_csv/first_report_dur3_updown.csv'
-    sig1 = '/mnt/c/Users/Winst/Documents/factors_csv/first_report_dur3.csv'
-    sig = pd.concat([pd.read_csv(sig0,index_col=0,parse_dates=True).loc[td1],
-                     pd.read_csv(sig1,index_col=0,parse_dates=True).loc[td1]],axis=1)
-    sig.columns = ['no', 'with']
-    difference_of_raw_signal = sig[sig['with'] - sig['no'] != 0].dropna(axis=0)
-    assert set(difference_of_raw_signal.index) == set(difference_of_holding_weight.index)
-    print(difference_of_raw_signal.index.to_list())
-    tmp = adjret[['002170.SZ', '300179.SZ', '300472.SZ']]
-    mask = (tmp.index >= '2021-09-27') & (tmp.index <= '2021-10-11')
-    tmp = tmp[mask]
-    tmp = tmp.sum(axis=1) / df1.loc[td].sum()  # 去权重
-
-    mask = (event_panel.tradingdate >= '2021-09-29') & (event_panel.tradingdate < '2021-10-11')
-    # & (event_panel[['MUD0', 'OMUD0']].sum(axis=1) > 0)
-    tmp = event_panel[mask].copy()
-
-    tmp.to_csv('/home/swmao/tmp.csv', encoding='GBK')
-
-
-
-    # %%
-    hdf_file = save_path + 'event_panel.h5'
-    event_panel = pd.DataFrame(pd.read_hdf(hdf_file, key=folder))
-
-    # %%
-    hdf_file = save_path + 'event_panel.h5'
-    try:
-        event_panel.to_hdf(hdf_file, key=folder, append=True, complevel=9, complib='blosc',
-                  data_columns=event_panel.columns)
-    except FileNotFoundError:
-        event_panel.to_hdf(hdf_file, key=folder, mode='w', format='table', complevel=9, complib='blosc',
-                  data_columns=event_panel.columns)
-    finally:
-        print(f'Save current panel in {hdf_file}')
-
-    # %% 表：记录id，事件日+-120日（不够则空），复权收盘价收益率（当日比昨日）
-    event_adjacent_returns = pd.DataFrame(columns=event.id, index=range(-gap, gap+1))
-    for irow in tqdm(range(len(event))):  # 15996个事件，规模极大
-        row = event.iloc[irow, :]
-        # break
-        stk_id = row['stockcode']
-        event_date = row['tradingdate']
-        row_id = row['id']
-        date0, l_gap = TD.tradedate_delta(event_date, -gap)
-        date1, r_gap = TD.tradedate_delta(event_date, gap)
-        if (instnum.loc[event_date, stk_id] > 5) or (date0 is None):
-            # 计入新机构已有超过5加关注，或者事件日超出日期范围
-            continue
-        adjacent_ret = adjret.loc[date0:date1, stk_id:stk_id]
-        adjacent_mret = adjret_mkt.loc[date0:date1]
-        adjacent_ar = adjacent_ret - adjacent_mret.values.reshape(-1, 1)
-        # adjacent_ar = adjret_ab.loc[date0:date1, stk_id:stk_id]  # 为何速度慢很多？？
-        assert adjacent_ar.__len__() == l_gap + r_gap + 1
-        adjacent_ar.index = range(-l_gap, r_gap+1)
-        adjacent_ar.columns = [row_id]
-        # adjacent_ar.reindex_like(event_adjacent_returns.loc[:, row_id:row_id])
-        event_adjacent_returns.loc[-l_gap:r_gap+1, row_id:row_id] = adjacent_ar
-    # 存表
-    event_adjacent_returns.to_csv(save_path)
-
-
 def graph_ar_car(conf, folder='event_first_report/'):
     """绘制时间前后 超额收益、累计超额收益 均值图"""
 
@@ -406,6 +200,224 @@ def table_2d_one_day(conf, folder='event_first_report/'):
         # save
         df2d.to_hdf(save_path + 'one_day_AR_after_event_2d.hdf', key=f'D{di}')
 
+
+# %%
+def table_ar_adjacent_events(conf: dict, gap=20, drop_dret_over=.20, folder='event_first_report/'):
+    """计算事件超额收益
+        - 机构首次关注event（原instnum<5)前后-gap~gap+1日，大市为等权
+
+    """
+    # %%
+    data_path = conf['data_path']
+    res_path = conf['factorsres_path']
+    tradeable_path = conf['a_list_tradeable']
+    save_path = res_path + folder
+    os.makedirs(save_path, exist_ok=True)
+    # 存储地址
+    save_path = save_path + 'event_abnormal_returns.csv'  # 'event_adjacent_returns.csv'
+    # 事件记录：stockcode, tradingdate, fv(==1)
+    event = pd.read_csv(data_path + 'event_first_report.csv')
+    # 机构关注数
+    instnum = pd.read_csv(conf['instnum_180'], index_col=0, parse_dates=True)
+    # 交易日列表
+    tradedates = pd.read_csv(conf['tdays_d'], header=None, index_col=0, parse_dates=True)
+    TD = TradeDate(tradedates)
+    # 可交易：ipo 60 天后
+    ipo60 = pd.DataFrame(pd.read_hdf(conf['a_list_tradeable'], key='ipo60')).replace(False, np.nan)
+    # 复权收盘价
+    adjclose = pd.read_csv(conf['closeAdj'], index_col=0, parse_dates=True)
+    # 复权收盘价收益
+    adjret_raw = adjclose.pct_change()
+    # 去除新上市60日
+    adjret = adjret_raw * ipo60.reindex_like(adjclose)
+    # 去除异常值
+    # adjret_raw = adjret.copy()  # 备份原始值
+    # adjret[adjret.abs() > drop_dret_over] = np.nan
+    # 大市等权收益
+    adjret_mkt = pd.DataFrame(adjret.apply(lambda s: s.mean(), axis=1), columns=['mkt'])
+    # 异常收益（去异常的大市等权）
+    adjret_ab = adjret.apply(lambda s: s - s.mean(), axis=1)  # 异常大，特殊公司，此处保留异常
+
+    """
+    # %% eventid为index的面板
+    event_panel = event[['id', 'tradingdate', 'stockcode', 'stockname']].copy().sort_values('id')
+    mask = event_panel.tradingdate <= '2021-12-31'
+    event_panel = event_panel[mask]
+
+    # %% 按列新增（所有事件）
+    def visit_2d_v(td, stk, df, shift=0):
+        td_idx = -1
+        try:
+            td_idx = df.index.get_loc(td) + shift
+        except KeyError:
+            print(f'KeyError: ({td}, {stk})')
+            return np.nan
+        finally:
+            if (td_idx < 0) or (td_idx > len(df)):
+                return np.nan
+            return df.iloc[td_idx, :].loc[stk]
+
+    def column_look_up(tgt, src, delay=-1, kw='r_1', msg='not found in source table'):
+        key = tgt[['tradingdate', 'stockcode']]
+        print(f'{kw}...')
+        tgt[kw] = key.apply(lambda s: visit_2d_v(s.iloc[0], s.iloc[1], src, shift=delay), axis=1)
+        print(f"nan:{tgt[kw].isna().mean() * 100: 6.2f} % {msg}")
+        return tgt
+
+    # instnum
+    event_panel = column_look_up(tgt=event_panel, src=instnum, delay=0, kw='instnum')
+    # max updown
+    maxUp = (1 - pd.DataFrame(pd.read_hdf(tradeable_path, key='up')))  # 1: 当天涨停
+    maxUpO = (1 - pd.DataFrame(pd.read_hdf(tradeable_path, key='up_open')))  # 1: 当天一字涨停
+    maxDown = (1 - pd.DataFrame(pd.read_hdf(tradeable_path, key='down')))  # 1: 当天跌停
+    maxDownO = (1 - pd.DataFrame(pd.read_hdf(tradeable_path, key='down_open')))  # 1: 当天一字跌停
+
+    event_panel = column_look_up(tgt=event_panel, src=maxUp, delay=0, kw='maxUp')
+    event_panel = column_look_up(tgt=event_panel, src=maxUpO, delay=0, kw='maxUpO')
+    event_panel = column_look_up(tgt=event_panel, src=maxDown, delay=0, kw='maxDown')
+    event_panel = column_look_up(tgt=event_panel, src=maxDownO, delay=0, kw='maxDownO')
+
+    # %% 按行新增（指定时间编号or日期股票，给出所有）
+    # T-120 ~ T+20 R
+    td, stk = '2017-01-03', '000001.SZ'
+    shift_, shift = -120, 20
+
+    def visit_2d_ls(df, td, stk, shift_=0, shift=0) -> np.array:
+        '''返回列表，长度为 shift - shift_ + 1'''
+        td_i0 = df.index.get_loc(td)
+        td_i_ = td_i0 + shift_
+        td_i1 = td_i0 + shift
+        td_i_, na_ = (0, - td_i_) if (td_i_ < 0) else (td_i_, 0)
+        td_i1, na1 = (len(df) - 1, td_i1 - len(df) + 1) if (td_i1 >= len(df)) else (td_i1, 0)
+        res = df[stk].iloc[td_i_:td_i1+1].to_list()
+        res = [np.nan for _ in range(na_)] + res + [np.nan for _ in range(na1)]
+        return np.array(res)
+
+    def event_indices(td, stk):
+        CAR_120 = visit_2d_ls(adjret_ab, td, stk, -120, -1).sum()
+        CAR_60 = visit_2d_ls(adjret_ab, td, stk, -60, -1).sum()
+        CAR_40 = visit_2d_ls(adjret_ab, td, stk, -40, -1).sum()
+        CAR_20 = visit_2d_ls(adjret_ab, td, stk, -20, -1).sum()
+        CAR_10 = visit_2d_ls(adjret_ab, td, stk, -10, -1).sum()
+        CAR_5, CAR_4, CAR_3, CAR_2, AR_1 = visit_2d_ls(adjret_ab, td, stk, -5, -1)[::-1].cumsum()[::-1]
+
+        AR0_5 = visit_2d_ls(adjret_ab, td, stk, 0, 5)
+        AR0 = AR0_5[0]
+        AR1 = AR0_5[1]
+        CAR2 = AR0_5[1:3].sum()
+        CAR3 = AR0_5[1:4].sum()
+        CAR4 = AR0_5[1:5].sum()
+        CAR5 = AR0_5[1:6].sum()
+        return [CAR_120, CAR_60, CAR_40, CAR_20, CAR_10, CAR_5, CAR_4, CAR_3, CAR_2, AR_1, AR0, AR1, CAR2, CAR3, CAR4, CAR5]
+
+    res_tmp = []
+    for i_row in tqdm(event_panel.iterrows()):
+        td = TD.tradedate_delta(i_row[1].tradingdate)[0]
+        stk = i_row[1].stockcode
+        res = event_indices(td, stk)
+        res_tmp.append([i_row[1].id] + res)
+    tmp = pd.DataFrame(res_tmp, columns=['id',
+                                         'CAR_120', 'CAR_60', 'CAR_40', 'CAR_20', 'CAR_10',
+                                         'CAR_5', 'CAR_4', 'CAR_3', 'CAR_2', 'AR_1',
+                                         'AR0', 'AR1', 'CAR2', 'CAR3', 'CAR4', 'CAR5'])
+    event_panel = event_panel[
+        ['id', 'tradingdate', 'stockcode', 'stockname', 'instnum', 'maxUp', 'maxUpO', 'maxDown', 'maxDownO']
+    ].merge(tmp, on='id', how='left')
+
+    event_panel.to_hdf(conf['data_path'] + 'event_panel.h5', key='event_first_report')
+
+    # car_10_2d = event_panel.pivot(index='tradingdate', columns='stockcode', values='CAR_10')
+    # car_10_2d.count(axis=1).rolling(20).mean().plot(); plt.show()
+
+    # %%
+    # absolute return
+    r141 = visit_2d_ls(adjret, td, stk, shift_, shift); len(r141)
+    # excess return
+    ar141 = visit_2d_ls(adjret_ab, td, stk, shift_, shift); len(ar141)
+    # market return
+    mr141 = visit_2d_ls(adjret_mkt, td, 'mkt', shift_, shift); len(mr141)
+    # keep 2 from 3
+    r141 - mr141 - ar141
+    # cumulative absolute return
+    cr140 = np.append(np.cumsum(r141[-shift_:0:-1])[::-1], np.cumsum(r141[-shift_+1:])); len(cr140)
+    # cumulative excess return
+    car140 = np.append(np.cumsum(ar141[-shift_:0:-1])[::-1], np.cumsum(ar141[-shift_+1:])); len(car140)
+
+    pass
+
+
+    # %%
+    # Daily Return (ctc, -120~15)  16报错?
+    for _delay in tqdm(range(-120, 16)):
+        event_panel = column_look_up(tgt=event_panel, src=adjret, delay=_delay, kw=f"r{str(_delay).replace('-','_')}")
+    # %% Daily Excess Return
+    for _delay in tqdm(range(-120, 16)):
+        event_panel = column_look_up(tgt=event_panel, src=adjret_ab, delay=_delay, kw=f"ar{str(_delay).replace('-','_')}")
+
+    # %% check holding
+    # path_noupdown = '/mnt/c/Users/Winst/Documents/factors_res/first_report_dur3_noupdown_n_NAew_1g(回测中不筛涨跌停)/LSGroup.csv'
+    path_noupdown = '/mnt/c/Users/Winst/Documents/factors_res/first_report_dur3_updown_n_NAew_1g(回测中去新上市和停牌)/LSGroup.csv'
+    # path_withupdown = '/mnt/c/Users/Winst/Documents/factors_res/first_report_dur3_withupdown_n_NAew_1g(回测中不筛涨跌停)/LSGroup.csv'
+    path_withupdown = '/mnt/c/Users/Winst/Documents/factors_res/first_report_dur3_n_NAew_1g(回测中去新上市和停牌)/LSGroup.csv'
+
+    df0 = pd.read_csv(path_noupdown, index_col=0, parse_dates=True)
+    df1 = pd.read_csv(path_withupdown, index_col=0, parse_dates=True)
+    td, td1 = '2021-10-11', '2021-10-08'
+    tmp = pd.concat([df0.loc[td], df1.loc[td]], axis=1); tmp.columns=['no', 'with']
+    difference_of_holding_weight = tmp[df1.loc[td] - df0.loc[td] > 0]
+    sig0 = '/mnt/c/Users/Winst/Documents/factors_csv/first_report_dur3_updown.csv'
+    sig1 = '/mnt/c/Users/Winst/Documents/factors_csv/first_report_dur3.csv'
+    sig = pd.concat([pd.read_csv(sig0,index_col=0,parse_dates=True).loc[td1],
+                     pd.read_csv(sig1,index_col=0,parse_dates=True).loc[td1]],axis=1)
+    sig.columns = ['no', 'with']
+    difference_of_raw_signal = sig[sig['with'] - sig['no'] != 0].dropna(axis=0)
+    assert set(difference_of_raw_signal.index) == set(difference_of_holding_weight.index)
+    print(difference_of_raw_signal.index.to_list())
+    tmp = adjret[['002170.SZ', '300179.SZ', '300472.SZ']]
+    mask = (tmp.index >= '2021-09-27') & (tmp.index <= '2021-10-11')
+    tmp = tmp[mask]
+    tmp = tmp.sum(axis=1) / df1.loc[td].sum()  # 去权重
+
+    mask = (event_panel.tradingdate >= '2021-09-29') & (event_panel.tradingdate < '2021-10-11')
+    # & (event_panel[['MUD0', 'OMUD0']].sum(axis=1) > 0)
+    tmp = event_panel[mask].copy()
+
+    tmp.to_csv('/home/swmao/tmp.csv', encoding='GBK')
+
+    # %%
+    hdf_file = '/mnt/c/Users/Winst/Documents/factors_res/event_first_report/' + 'event_panel.h5'
+    event_panel = pd.DataFrame(pd.read_hdf(hdf_file, key='r141ar141'))
+
+    # %%
+    hdf_file = '/mnt/c/Users/Winst/Documents/data_local/' + 'event_panel.h5'
+    event_panel.to_hdf(hdf_file, key='r141ar141')
+    
+    """
+
+    # %% 表：记录id，事件日+-120日（不够则空），复权收盘价收益率（当日比昨日）
+    event_adjacent_returns = pd.DataFrame(columns=event.id, index=range(-gap, gap+1))
+    for irow in tqdm(range(len(event))):  # 15996个事件，规模极大
+        row = event.iloc[irow, :]
+        # break
+        stk_id = row['stockcode']
+        event_date = row['tradingdate']
+        row_id = row['id']
+        date0, l_gap = TD.tradedate_delta(event_date, -gap)
+        date1, r_gap = TD.tradedate_delta(event_date, gap)
+        if (instnum.loc[event_date, stk_id] > 5) or (date0 is None):
+            # 计入新机构已有超过5加关注，或者事件日超出日期范围
+            continue
+        adjacent_ret = adjret.loc[date0:date1, stk_id:stk_id]
+        adjacent_mret = adjret_mkt.loc[date0:date1]
+        adjacent_ar = adjacent_ret - adjacent_mret.values.reshape(-1, 1)
+        # adjacent_ar = adjret_ab.loc[date0:date1, stk_id:stk_id]  # 为何速度慢很多？？
+        assert adjacent_ar.__len__() == l_gap + r_gap + 1
+        adjacent_ar.index = range(-l_gap, r_gap+1)
+        adjacent_ar.columns = [row_id]
+        # adjacent_ar.reindex_like(event_adjacent_returns.loc[:, row_id:row_id])
+        event_adjacent_returns.loc[-l_gap:r_gap+1, row_id:row_id] = adjacent_ar
+    # 存表
+    event_adjacent_returns.to_csv(save_path)
 
 # %%
 if __name__ == '__main__':
