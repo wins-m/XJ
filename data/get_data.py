@@ -7,7 +7,7 @@ xlsx中指定起止日期
 
 """
 import pandas as pd
-import numpy as np
+# import numpy as np
 import sys
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
 from supporter.mysql import conn_mysql, mysql_query

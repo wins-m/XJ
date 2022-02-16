@@ -7,4 +7,6 @@
 *.swp
 /notebook/
 /notebook/*
+*.ipynb
 ~$*
+.ipynb_checkpoints

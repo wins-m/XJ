@@ -87,6 +87,40 @@ def get_long_short_group(df: pd.DataFrame, ngroups: int, save_path=None) -> pd.D
     return res
 
 
+def portfolio_panels_from_weight(w_long, w_short, w_long_short, idx_weight, cost_rate, all_ret, path_format,
+                                 save_tables, fbegin_date, fend_date) -> dict:
+    """根据持仓和收益,得到组合表现面板"""
+
+    def portfolio_statistics_from_weight(weight, cost_rate, all_ret, save_path=None):
+        """对持仓计算结果"""
+        res = pd.DataFrame(index=weight.index)
+        res['NStocks'] = (weight.abs() > 0).sum(axis=1)
+        res['Turnover'] = weight.diff().abs().sum(axis=1)
+        res['Return'] = (all_ret.reindex_like(weight) * weight).sum(axis=1)
+        res['Return_wc'] = res['Return'] - res['Turnover'] * cost_rate
+        res['Wealth(cumsum)'] = res['Return'].cumsum().add(1)
+        res['Wealth_wc(cumsum)'] = res['Return_wc'].cumsum().add(1)
+        res['Wealth(cumprod)'] = res['Return'].add(1).cumprod()
+        res['Wealth_wc(cumprod)'] = res['Return_wc'].add(1).cumprod()
+        if save_path:
+            res.to_csv(save_path)
+        return res
+
+    panel_long = portfolio_statistics_from_weight(w_long, cost_rate, all_ret, save_path=path_format.format(
+        'PanelLong.csv') if save_tables else None)
+    panel_short = portfolio_statistics_from_weight(w_short, cost_rate, all_ret, save_path=path_format.format(
+        'PanelShort.csv') if save_tables else None)
+    panel_long_short = portfolio_statistics_from_weight(w_long_short, cost_rate, all_ret, save_path=path_format.format(
+        'PanelLongShort.csv') if save_tables else None)
+    panel_baseline = portfolio_statistics_from_weight(idx_weight.loc[fbegin_date:fend_date], cost_rate, all_ret)
+    all_panels = {'long_short': panel_long_short,
+                  'long': panel_long,
+                  'short': panel_short,
+                  'baseline': panel_baseline}
+
+    return all_panels
+
+
 def panel_long_short_return(ret_group, ret_baseline, save_path=None) -> pd.DataFrame:
     """
     由各分组收益以及基准收益，准备多空绝对收益的面板
@@ -575,7 +609,7 @@ def single_test(conf: dict):
                     pass
 
             if test_mode == '0':
-                continue
+                continue  # 只计算分组，不进行多空回测
             else:
                 # Long-Short Strategy
                 save_path = path_format.format('positionWeight_{}.csv') if save_tables else None
@@ -583,39 +617,18 @@ def single_test(conf: dict):
                     long_short_group, ngroups, idx_weight, fbegin_date, fend_date, holddays, ic_mean, save_path)
 
                 # Portfolio Turnover, NStocks, Return, Wealth
-                def portfolio_panels_from_weight(w_long, w_short, w_long_short, idx_weight, cost_rate, all_ret, path_format, save_tables, fbegin_date, fend_date):
-                    """根据持仓和收益,得到组合表现面板"""
-
-                    def portfolio_statistics_from_weight(weight, cost_rate, all_ret, save_path=None):
-                        """对持仓计算结果"""
-                        res = pd.DataFrame(index=weight.index)
-                        res['NStocks'] = (weight.abs() > 0).sum(axis=1)
-                        res['Turnover'] = weight.diff().abs().sum(axis=1)
-                        res['Return'] = (all_ret.reindex_like(weight) * weight).sum(axis=1)
-                        # res['Wealth(cumsum)'] = res['Return'].cumsum().add(1)
-                        # res['Wealth(cumprod)'] = res['Return'].add(1).cumprod()
-                        res['Return_wc'] = res['Return'] - res['Turnover'] * cost_rate
-                        # res['Wealth_wc(cumsum)'] = res['Return_wc'].cumsum().add(1)
-                        # res['Wealth_wc(cumprod)'] = res['Return_wc'].add(1).cumprod()
-                        if save_path:
-                            res.to_csv(save_path)
-                        return res
-
-                    panel_long = portfolio_statistics_from_weight(w_long, cost_rate, all_ret, save_path=path_format.format('PanelLong.csv') if save_tables else None)
-                    panel_short = portfolio_statistics_from_weight(w_short, cost_rate, all_ret, save_path=path_format.format('PanelShort.csv') if save_tables else None)
-                    panel_long_short = portfolio_statistics_from_weight(w_long_short, cost_rate, all_ret, save_path=path_format.format('PanelLongShort.csv') if save_tables else None)
-                    panel_baseline = portfolio_statistics_from_weight(idx_weight.loc[fbegin_date:fend_date], cost_rate, all_ret)
-                    all_panels = {'long_short': panel_long_short,
-                                  'long': panel_long,
-                                  'short': panel_short,
-                                  'baseline': panel_baseline}
-
-                    return all_panels
-
                 all_panels = portfolio_panels_from_weight(w_long, w_short, w_long_short, idx_weight, cost_rate, all_ret,
                                                           path_format, save_tables, fbegin_date, fend_date)
                 # # Turnover: long_short_turnover -> LSTurnover.csv
-                # save_path = path_format.format('LSTurnover.csv') if save_tables else None
+                if save_plots:
+                    save_path = path_format.format('LSTurnover.png')
+                    long_short_turnover = pd.concat([df['Turnover'].rename(k) for k, df in all_panels.items()], axis=1)
+                    long_short_turnover[['long', 'short']].plot(figsize=(10, 5), grid=True, title='Turnover')
+                    plt.savefig(save_path)
+                    if ishow:
+                        plt.show()
+                    else:
+                        plt.close()
                 # long_short_turnover = cal_turnover_long_short(long_short_group, idx_weight, ngroups, ishow, save_path)
                 # long_short_turnover = pd.concat([df['Turnover'].rename(k) for k, df in all_panels.items()], axis=1)
 

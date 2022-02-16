@@ -6,6 +6,7 @@ project_path : "/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmPr
 data_path : "/mnt/c/Users/Winst/Documents/data_local/"
 factorscsv_path : "/mnt/c/Users/Winst/Documents/factors_csv/"
 factorsres_path : "/mnt/c/Users/Winst/Documents/factors_res/"
+resanalysis_path : "/mnt/c/Users/Winst/Documents/res_analysis/"
 level2_path : '/mnt/c/Users/Winst/Documents/level2/'
 level2_path2 : '/mnt/g/高频数据-hdf5格式/'
 #level2_path2 : '/mnt/c/Users/Winst/Documents/lvl2/'
@@ -36,8 +37,8 @@ turnover : "/mnt/c/Users/Winst/Documents/data_local/2d_stk_marketdata_turn.csv"
 turnover_free : "/mnt/c/Users/Winst/Documents/data_local/2d_stk_marketdata_freeturn.csv"
 
 # target period
-begin_date : '2016-01-01'
-end_date : '2022-12-31'
+begin_date : '2013-01-01'
+end_date : '2021-12-31'
 
 # backtest (single_test.py)
 factors_tested : "/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/factor_backtest/factors_tested.xlsx"
@@ -83,17 +84,17 @@ feature_end : '201912'
 ipo_delay : 60  # days after ipo
 
 # pe_surprise.py
-pe_ols_group : 'all'
+pe_ols_group : 'loop3'  # all, ols_1, ols_2, ols_3, loop3
 save_panel : False  # 每次回归保存面板
 
 # save_remote.py
 tables :
   pe_tables :
-    - False  # whether to upload
-    - 'pe_residual_20130101_20211231.csv'
+    - True  # whether to upload
     - 'pe_residual_ols_3_20130101_20211231.csv'
     - 'pe_residual_ols_2_20130101_20211231.csv'
     - 'pe_residual_ols_1_20130101_20211231.csv'
+#    - 'pe_residual_20130101_20211231.csv'
   pe_tables(depreciated) :
     - False
     - 'pe_residual_ols_1_2013-01-01_2021-12-31.csv'
