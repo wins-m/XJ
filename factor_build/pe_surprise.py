@@ -93,13 +93,12 @@ def cal_pe_surprise_g(begin_date: str, end_date: str, data_path: str, factorscsv
         return ols_res.predict(sub_df.iloc[:, 1:])
 
     save_filename = f"""pe_residual_{begin_date.replace('-','')}_{end_date.replace('-', '')}.csv"""
-    if group != 'all':
-        save_filename = save_filename.replace('pe_residual', f'pe_residual_{group}')
+    save_filename = save_filename.replace('pe_residual', f'pe_residual_{group}') if group != 'all' else save_filename
     factor_west_pe_180 = pd.read_csv(data_path + 'factor_west_pe_180.csv', index_col=0, parse_dates=True)
     ci_sector_constituent = pd.read_csv(data_path + 'ci_sector_constituent.csv', index_col=0, parse_dates=True)
     ci_sector_constituent = ci_sector_constituent.reindex_like(factor_west_pe_180).fillna(method='backfill')  # 补全20年6月前
     instnum_class = pd.read_csv(data_path + 'instnum_class.csv', index_col=0, parse_dates=True)
-    instnum_class = instnum_class.reindex_like(factor_west_pe_180).fillna(method='backfill')
+    instnum_class = instnum_class.reindex_like(factor_west_pe_180).fillna(method='backfill')  # 此处有问题！应该ffill！
     mv_class = pd.read_csv(data_path + 'mv_class.csv', index_col=0, parse_dates=True)
     mv_class = mv_class.reindex_like(factor_west_pe_180).fillna(method='backfill')
 
