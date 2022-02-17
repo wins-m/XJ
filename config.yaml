@@ -89,12 +89,17 @@ save_panel : False  # 每次回归保存面板
 
 # save_remote.py
 tables :
-  pe_tables :
+  pe_tables:
     - True  # whether to upload
+    - 'pe_residual_ols_3.csv'
+    - 'pe_residual_ols_2.csv'
+    - 'pe_residual_ols_1.csv'
+  pe_tables(depreciated2) :
+    - False  # whether to upload
     - 'pe_residual_ols_3_20130101_20211231.csv'
     - 'pe_residual_ols_2_20130101_20211231.csv'
     - 'pe_residual_ols_1_20130101_20211231.csv'
-#    - 'pe_residual_20130101_20211231.csv'
+    - 'pe_residual_20130101_20211231.csv'
   pe_tables(depreciated) :
     - False
     - 'pe_residual_ols_1_2013-01-01_2021-12-31.csv'

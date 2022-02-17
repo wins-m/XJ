@@ -38,6 +38,7 @@ def upload_all_tables(factorscsv_path: str, tables: dict, engine):
 
     """
 
+    # pe_tables 系列的上传
     if ('pe_tables' in tables) and (tables['pe_tables'][0]):
 
         from supporter.mysql import create_table_pe_residual
@@ -49,7 +50,7 @@ def upload_all_tables(factorscsv_path: str, tables: dict, engine):
             df = pd.read_csv(factorscsv_path + tb, index_col=[0, 1])
             print('LOADED, TRANSFERRING...', end='\t')
             df = transfer_pe_residual_table(df)
-            print('TRANSFER, UPLOADING...', end='\t')
+            print('TRANSFERED, UPLOADING...', end='\t')
             tname = tb.replace('.csv', '')
             dtypedict = create_table_pe_residual(tname, engine)
             print('NEW TABLE CREATED', end='\t')
@@ -67,6 +68,7 @@ def save_remote(conf):
     upload_all_tables(factorscsv_path, tables, engine)
 
 
+# %%
 if __name__ == '__main__':
     # conf
     import yaml
