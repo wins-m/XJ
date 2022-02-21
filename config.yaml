@@ -21,9 +21,11 @@ a_list_tradeable : "/mnt/c/Users/Winst/Documents/data_local/a_list_tradeable.hdf
 # csv data file
 idx_constituent : "/mnt/c/Users/Winst/Documents/data_local/idx_constituent_{}.csv"
 a_list_suspendsymbol : "/mnt/c/Users/Winst/Documents/data_local/a_list_suspendsymbol.csv"
+date_last_suspend_alldays : "/mnt/c/Users/Winst/Documents/data_local/last_suspend_ad2d.csv"
 stk_ipo_date : "/mnt/c/Users/Winst/Documents/data_local/stk_ipo_date.csv"
 stk_maxupordown : "/mnt/c/Users/Winst/Documents/data_local/stk_maxupordown.csv"
 tdays_d : "/mnt/c/Users/Winst/Documents/data_local/tdays_d.csv"
+alldays_d : '/mnt/c/Users/Winst/Documents/data_local/alldays_d.csv'
 ind_citic : "/mnt/c/Users/Winst/Documents/data_local/ind_citic_constituent.csv"
 marketvalue : "/mnt/c/Users/Winst/Documents/data_local/stk_marketvalue.csv"
 daily_close : "/mnt/c/Users/Winst/Documents/data_local/stk_marketdata_close.csv"
@@ -31,7 +33,8 @@ daily_open : "/mnt/c/Users/Winst/Documents/data_local/stk_marketdata_open.csv"
 closeAdj : "/mnt/c/Users/Winst/Documents/data_local/stk_marketdata_closeAdj.csv"
 openAdj : "/mnt/c/Users/Winst/Documents/data_local/stk_marketdata_openAdj.csv"
 event_first_report : "/mnt/c/Users/Winst/Documents/data_local/2d_event_first_report.csv"
-event_first_report2 : "/mnt/c/Users/Winst/Documents/data_local/event_panel.h5"  # key=event_first_report
+event_first_report2 : "/mnt/c/Users/Winst/Documents/data_local/event_panel.h5"  # key = event_first_report
+event_first_report3 : "/mnt/c/Users/Winst/Documents/data_local/event_panel.pkl"
 instnum_180 : "/mnt/c/Users/Winst/Documents/data_local/2d_stk_west_instnum_180.csv"
 turnover : "/mnt/c/Users/Winst/Documents/data_local/2d_stk_marketdata_turn.csv"
 turnover_free : "/mnt/c/Users/Winst/Documents/data_local/2d_stk_marketdata_freeturn.csv"
