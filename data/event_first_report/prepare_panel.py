@@ -384,12 +384,8 @@ def _get_signal(panel, idx, dur):
     return signal
 
 
-def get_signal(idx, panel, csv_path, dur=3, descrip=np.nan):
-    fname = f'first_report_{idx}_dur{dur}'
-    signal = _get_signal(panel, idx, dur)
+def factor_info(csv_path, fname, signal, descrip=None):
     signal.to_csv(csv_path + fname + '.csv')
-    print(fname.replace('.csv', ''), end='\n')
-
     irow = {'IF_TEST': 1,
             'F_NAME': fname,
             'F_BEGIN': str(signal.index[0].date()),
@@ -397,6 +393,13 @@ def get_signal(idx, panel, csv_path, dur=3, descrip=np.nan):
             'UPDATE': datetime.today().strftime('%Y-%m-%d'),
             'DESCRIP': descrip}
     return irow
+
+
+def get_signal(idx, panel, csv_path, dur=3, descrip=None):
+    fname = f'first_report_{idx}_dur{dur}'
+    signal = _get_signal(panel, idx, dur)
+    print(fname.replace('.csv', ''), end='\n')
+    return factor_info(csv_path, fname, signal, descrip)
 
 
 panel = event_panel[event_panel.Tradeable].copy()
@@ -413,8 +416,7 @@ f_info_list = [get_signal('baseline', panel, csv_path, dur), get_signal('L_CAR_6
 def write_f_info(excel_path, info_list):
     df = pd.read_excel(excel_path)
     df['IF_TEST'] = 0
-    for irow in info_list:
-        df = df.append(info_list, ignore_index=True)
+    df = df.append(info_list, ignore_index=True)
     # 同名因子只保留UPDATE日期最新的
     mask = df.sort_values(['UPDATE', 'IF_TEST'], ascending=False)[['F_NAME']].drop_duplicates().index
     df = df.loc[mask].sort_index()

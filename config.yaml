@@ -47,11 +47,11 @@ end_date : '2021-12-31'
 factors_tested : "/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/factor_backtest/factors_tested.xlsx"
 #with_updown : ''  # '': exclude open  '_withupdown': keep  '_noupdown': exclude all
 save_suffix : ''  # 空字段，则后缀为回测开始的时间
-test_mode : '1'
+test_mode : '3'
     # '0': no test;
     # '1': default;
     # '2': from `LSGroup.csv`
-    # '${FilePath}': from holding weight
+    # '3': factor is weight
 exclude_tradeable :   # 0: excluded
   ipo60 : 0
   suspend: 0

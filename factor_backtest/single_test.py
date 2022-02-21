@@ -87,25 +87,25 @@ def get_long_short_group(df: pd.DataFrame, ngroups: int, save_path=None) -> pd.D
     return res
 
 
+def portfolio_statistics_from_weight(weight, cost_rate, all_ret, save_path=None):
+    """对持仓计算结果"""
+    res = pd.DataFrame(index=weight.index)
+    res['NStocks'] = (weight.abs() > 0).sum(axis=1)
+    res['Turnover'] = weight.diff().abs().sum(axis=1)
+    res['Return'] = (all_ret.reindex_like(weight) * weight).sum(axis=1)
+    res['Return_wc'] = res['Return'] - res['Turnover'] * cost_rate
+    res['Wealth(cumsum)'] = res['Return'].cumsum().add(1)
+    res['Wealth_wc(cumsum)'] = res['Return_wc'].cumsum().add(1)
+    res['Wealth(cumprod)'] = res['Return'].add(1).cumprod()
+    res['Wealth_wc(cumprod)'] = res['Return_wc'].add(1).cumprod()
+    if save_path:
+        res.to_csv(save_path)
+    return res
+
+
 def portfolio_panels_from_weight(w_long, w_short, w_long_short, idx_weight, cost_rate, all_ret, path_format,
                                  save_tables, fbegin_date, fend_date) -> dict:
     """根据持仓和收益,得到组合表现面板"""
-
-    def portfolio_statistics_from_weight(weight, cost_rate, all_ret, save_path=None):
-        """对持仓计算结果"""
-        res = pd.DataFrame(index=weight.index)
-        res['NStocks'] = (weight.abs() > 0).sum(axis=1)
-        res['Turnover'] = weight.diff().abs().sum(axis=1)
-        res['Return'] = (all_ret.reindex_like(weight) * weight).sum(axis=1)
-        res['Return_wc'] = res['Return'] - res['Turnover'] * cost_rate
-        res['Wealth(cumsum)'] = res['Return'].cumsum().add(1)
-        res['Wealth_wc(cumsum)'] = res['Return_wc'].cumsum().add(1)
-        res['Wealth(cumprod)'] = res['Return'].add(1).cumprod()
-        res['Wealth_wc(cumprod)'] = res['Return_wc'].add(1).cumprod()
-        if save_path:
-            res.to_csv(save_path)
-        return res
-
     panel_long = portfolio_statistics_from_weight(w_long, cost_rate, all_ret, save_path=path_format.format(
         'PanelLong.csv') if save_tables else None)
     panel_short = portfolio_statistics_from_weight(w_short, cost_rate, all_ret, save_path=path_format.format(
@@ -542,8 +542,15 @@ def single_test(conf: dict):
         os.makedirs(save_path_, exist_ok=True)
         path_format = save_path_ + "/{}"
 
-        if '.csv' in test_mode:
-            pass
+        if test_mode == '3':
+            print('[Backtest from holding weight]')
+            fval = pd.read_csv(f'{csv_path}{fname}.csv', dtype=float, index_col=0, parse_dates=True)
+            fbegin_date, fend_date = max(fval.index[0], begin_date), min(fval.index[-1], end_date)
+            signal = Signal(fval, fbegin_date, fend_date)
+            signal.shift_1d(T=1)  # 滞后一天，以昨日的因子值参与计算
+            signal.keep_tradeable(tradeable_multiplier.loc[fbegin_date:fend_date])
+            holding_weight = signal.get_fv()
+            portfolio_statistics_from_weight(holding_weight, cost_rate, all_ret, path_format.format('PanelLong.csv'))
         elif test_mode in '012':
             if test_mode == '2':  # test from `LSGroup.csv`
                 long_short_group = pd.read_csv(path_format.format('LSGroup.csv'), index_col=0, parse_dates=True)
