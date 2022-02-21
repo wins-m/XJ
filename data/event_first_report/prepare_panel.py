@@ -164,7 +164,8 @@ event_panel[['ipo_date', 'delist_date']] = event_panel.stockcode.apply(
     lambda x: stk_ipo_date.loc[x, 'ipo_date':'delist_date'])
 
 # %% 最后一个停牌期
-# alldays_d = pd.read_csv(conf['alldays_d'], header=None)# a_list_suspendsymbol = pd.read_csv(conf['a_list_suspendsymbol'])
+# alldays_d = pd.read_csv(conf['alldays_d'], header=None)
+# a_list_suspendsymbol = pd.read_csv(conf['a_list_suspendsymbol'])
 # df_template = pd.DataFrame(index=alldays_d.iloc[:, 0], columns=stk_ipo_date.index)
 # tmp = a_list_suspendsymbol.pivot(index='tradingdate', values='tradingdate', columns='stockcode')
 # tmp = tmp.reindex_like(df_template).fillna(method='ffill')
@@ -264,11 +265,16 @@ def mask_efficiency(mask):
 
 mask_ipo90 = (event_panel.tradingdate - event_panel.ipo_date).apply(lambda x: x.days > 90)  # 新上市90天以上
 mask_efficiency(mask_ipo90)
+mask_suspend = (event_panel.tradingdate - event_panel.lastST).apply(lambda x: x.days > 0)  # 停牌后7天以上
+mask_efficiency(mask_suspend)
 mask_maxup = event_panel.maxUp != 1  # 当天不能涨停
 mask_efficiency(mask_maxup)
 mask_isTD = event_panel.isTradeDay  # 事件不在交易日发生（共66个，不予考虑）
 mask_efficiency(mask_isTD)
-mask_sum = mask_ipo90 & mask_maxup & mask_isTD
+mask_special = (event_panel.stockcode != '000792.SZ')
+mask_efficiency(mask_special)
+
+mask_sum = mask_ipo90 & mask_suspend & mask_maxup & mask_isTD & mask_special
 mask_efficiency(mask_sum)
 event_panel['Tradeable'] = mask_sum
 panel = event_panel[mask_sum].copy().reset_index()
@@ -312,24 +318,35 @@ def corr_in_panel(df: pd.DataFrame, tgt: str, src: list, minum=0, method='spearm
     return corr
 
 
-panel = event_panel[mask_sum].copy().reset_index(drop=True)
-template = panel[['id', 'tradingdate', 'stockcode']].copy()
-tmp = panel.groupby('tradingdate')['tradingdate'].count()
-tmp.name = 'event_count'
-tmp = pd.DataFrame(tmp).reset_index()
-event_count = template.merge(tmp, on='tradingdate', how='left')
-event_count['odd'] = (event_count.event_count % 2 == 1)  # 日事件数是奇数
-event_count['oddrand'] = event_count.odd.astype(int)
-event_count['oddadj'] = event_count.event_count // 2 + (event_count.oddrand.cumsum() % 2) * event_count.odd
-event_count['single'] = (event_count.event_count == 1)
-print(event_count.head())
+def cal_col_event_count(panel):
+    dummy_odd = panel['TradeableCount'] % 2 == 1
+    int_odd = dummy_odd.astype(int)
+    panel['odd_adj'] = panel['TradeableCount'] // 2 + (int_odd.cumsum() % 2) * dummy_odd
+    panel['single'] = (panel['TradeableCount'] == 1)
+    return panel
 
 
-def get_group2d(idx, panel, event_count):
+event_panel = cal_col_event_count(event_panel)
+
+
+# panel = event_panel[mask_sum].copy().reset_index(drop=True)
+# template = panel[['id', 'tradingdate', 'stockcode']].copy()
+# tmp = panel.groupby('tradingdate')['tradingdate'].count()
+# tmp.name = 'event_count'
+# tmp = pd.DataFrame(tmp).reset_index()
+# event_count = template.merge(tmp, on='tradingdate', how='left')
+# event_count['odd'] = (event_count.event_count % 2 == 1)  # 日事件数是奇数
+# event_count['oddrand'] = event_count.odd.astype(int)
+# event_count['oddadj'] = event_count.event_count // 2 + (event_count.oddrand.cumsum() % 2) * event_count.odd
+# event_count['single'] = (event_count.event_count == 1)
+# print(event_count.head())
+
+
+def get_group2d(idx, panel):
     idx_rank = panel.groupby('tradingdate')[idx].rank()
-    tmp = (idx_rank > event_count.oddadj).astype(int)  # rank > oddadj, 即 idx(CAR_8) 更高
+    tmp = (idx_rank > panel.odd_adj).astype(int)  # rank > oddadj, 即 idx(CAR_8) 更高
     tmp = pd.concat((1 - tmp, tmp), axis=1)
-    tmp[event_count.single] = 1  # 当天只有1个事件，则H组和L组都持有
+    tmp[panel.single] = 1  # 当天只有1个事件，则H组和L组都持有
 
     group2d = panel[['id', 'tradingdate', 'stockcode']].copy()
     group2d[['L_' + idx, 'H_' + idx]] = tmp
@@ -337,24 +354,39 @@ def get_group2d(idx, panel, event_count):
     return group2d
 
 
+panel = event_panel[mask_sum].copy().reset_index(drop=True)
+
 idx = 'CAR_8'
-group2d = get_group2d(idx=idx, panel=panel, event_count=event_count)
+group2d = get_group2d(idx=idx, panel=panel)
 event_panel = event_panel.merge(group2d[['id', f'L_{idx}', f'H_{idx}']], on='id', how='left')
 
 idx = 'CAR_6'
-group2d = get_group2d(idx=idx, panel=panel, event_count=event_count)
+group2d = get_group2d(idx=idx, panel=panel)
 event_panel = event_panel.merge(group2d[['id', f'L_{idx}', f'H_{idx}']], on='id', how='left')
 
 idx = 'AR0'
-group2d = get_group2d(idx=idx, panel=panel, event_count=event_count)
+group2d = get_group2d(idx=idx, panel=panel)
+event_panel = event_panel.merge(group2d[['id', f'L_{idx}', f'H_{idx}']], on='id', how='left')
+
+idx = 'AR1'
+group2d = get_group2d(idx=idx, panel=panel)
+event_panel = event_panel.merge(group2d[['id', f'L_{idx}', f'H_{idx}']], on='id', how='left')
+
+idx = 'AR2'
+group2d = get_group2d(idx=idx, panel=panel)
 event_panel = event_panel.merge(group2d[['id', f'L_{idx}', f'H_{idx}']], on='id', how='left')
 
 
 # %% 分组信号
-def get_signal(idx, group2d, csv_path, dur=3, descrip=np.nan):
-    signal = group2d.pivot(index='tradingdate', columns='stockcode', values=idx)
+def _get_signal(panel, idx, dur):
+    signal = panel.pivot(index='tradingdate', columns='stockcode', values=idx)
     signal = signal.replace(0, np.nan).fillna(method='ffill', limit=dur - 1).replace(np.nan, 0)
+    return signal
+
+
+def get_signal(idx, panel, csv_path, dur=3, descrip=np.nan):
     fname = f'first_report_{idx}_dur{dur}'
+    signal = _get_signal(panel, idx, dur)
     signal.to_csv(csv_path + fname + '.csv')
     print(fname.replace('.csv', ''), end='\n')
 
@@ -366,6 +398,30 @@ def get_signal(idx, group2d, csv_path, dur=3, descrip=np.nan):
             'DESCRIP': descrip}
     return irow
 
+
+panel = event_panel[event_panel.Tradeable].copy()
+panel['baseline'] = 1
+csv_path = conf['factorscsv_path']
+dur = 3
+f_info_list = [get_signal('baseline', panel, csv_path, dur), get_signal('L_CAR_6', panel, csv_path, dur),
+               get_signal('H_CAR_6', panel, csv_path, dur), get_signal('L_CAR_8', panel, csv_path, dur),
+               get_signal('H_CAR_8', panel, csv_path, dur), get_signal('L_AR0', panel, csv_path, dur),
+               get_signal('H_AR0', panel, csv_path, dur)]
+
+
+# %% 回测信息
+def write_f_info(excel_path, info_list):
+    df = pd.read_excel(excel_path)
+    df['IF_TEST'] = 0
+    for irow in info_list:
+        df = df.append(info_list, ignore_index=True)
+    # 同名因子只保留UPDATE日期最新的
+    mask = df.sort_values(['UPDATE', 'IF_TEST'], ascending=False)[['F_NAME']].drop_duplicates().index
+    df = df.loc[mask].sort_index()
+    df.astype('str').to_excel(excel_path, encoding='gbk', index=None)
+
+
+write_f_info(conf['factors_tested'], f_info_list)
 
 # %%
 event_panel.to_pickle(conf['event_first_report3'])
