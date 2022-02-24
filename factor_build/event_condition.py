@@ -93,3 +93,75 @@ def drop_return_t1t2(excel_path, csv_path, event_panel, idx, threshold, ishow=Fa
                      fname=fname,
                      signal=weight,
                      descrip=f'阈值{threshold}去除{side}_{idx}1, {side}_{idx}2'))
+
+
+def drop_return_t2(excel_path, csv_path, event_panel, idx, threshold, ishow=False, side='low'):
+    fname = f'first_report_{side}{idx}110({threshold})'
+    print(fname)
+
+    panel = event_panel[event_panel.Tradeable].copy()
+    panel['baseline'] = 1
+
+    signal = _get_signal(panel, 'baseline', dur=3)
+    weight = _get_weight(signal=signal)
+
+    if 'low' in side:
+        threshold = -threshold if threshold > 0 else threshold  # 阈值需要<=0
+        panel['negR2'] = panel[f'{idx}2'] <= threshold
+        mask_low_ar2_lag2 = (_get_signal(panel, 'negR2', 1).shift(2) == True)
+        weight[mask_low_ar2_lag2] = 0
+
+    if 'high' in side:
+        threshold = -threshold if threshold < 0 else threshold  # 阈值需要>=0
+        panel['posR2'] = panel[f'{idx}2'] >= threshold
+        mask_low_ar2_lag2 = (_get_signal(panel, 'posR2', 1).shift(2) == True)
+        weight[mask_low_ar2_lag2] = 0
+
+    if ishow:
+        tmp = weight.sum(axis=1)
+        for rlen in [1, 5, 20, 60]:
+            tmp.rolling(rlen).mean().plot(label=f'{rlen}', alpha=.4 + rlen / 100)
+        plt.legend()
+        plt.title('Position')
+        plt.show()
+
+    write_f_info(excel_path=excel_path,
+                 info_list=factor_info(
+                     csv_path=csv_path,
+                     fname=fname,
+                     signal=weight,
+                     descrip=f'阈值{threshold}去除{side}_{idx}2'))
+
+
+def drop_return_t2_g(excel_path, csv_path, event_panel, idx, ishow=False, side='L'):
+    fname = f'first_report_{side}_{idx}110'
+    print(fname)
+
+    panel = event_panel[event_panel.Tradeable].copy()
+    panel['baseline'] = 1
+
+    signal = _get_signal(panel, 'baseline', dur=3)
+    weight = _get_weight(signal=signal)
+
+    if side == 'L':
+        mask_low_ar2_lag2 = (_get_signal(panel, f'L_{idx}2', 1).shift(2) == 1)
+        weight[mask_low_ar2_lag2] = 0
+
+    if side == 'H':
+        mask_low_ar2_lag2 = (_get_signal(panel, f'H_{idx}2', 1).shift(2) ==  1)
+        weight[mask_low_ar2_lag2] = 0
+
+    if ishow:
+        tmp = weight.sum(axis=1)
+        for rlen in [1, 5, 20, 60]:
+            tmp.rolling(rlen).mean().plot(label=f'{rlen}', alpha=.4 + rlen / 100)
+        plt.legend()
+        plt.title('Position')
+        plt.show()
+
+    write_f_info(excel_path=excel_path,
+                 info_list=factor_info(
+                     csv_path=csv_path,
+                     fname=fname,
+                     signal=weight,
+                     descrip=f'日内二分去除{side}_{idx}2==1'))
