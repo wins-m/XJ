@@ -4,6 +4,8 @@
 - 所用表格在[access_target](./data/access_target.xlsx)中指定
 (update Jan. 25th)
 xlsx中指定起止日期
+(update Feb. 24th)
+新加服务器alpha_001
 
 """
 import pandas as pd
@@ -72,7 +74,7 @@ def transfer_data(mysql_engine, data_path, access_target, force_update=False):
     grid = grid if force_update else grid[grid['UPDATE'] == 1]
 
     engine_list = []
-    for e in ['engine0', 'engine1', 'engine2']:
+    for e in ['engine0', 'engine1', 'engine2', 'engine4']:
         engine_info = mysql_engine[e]
         engine_list.append(conn_mysql(engine_info))
 
