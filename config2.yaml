@@ -80,7 +80,7 @@ force_update : False
 
 # feature_extraction_level2.py
 feature_level2 : "./factor_build/feature_level2.xlsx"
-feature_begin : '201807'  # 磁盘内 level2 开始时间
+feature_begin : '201807'
 feature_end : '201912'
 
 # tradeable.py
