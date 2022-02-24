@@ -41,7 +41,7 @@ turnover_free : "/mnt/c/Users/Winst/Documents/data_local/2d_stk_marketdata_freet
 
 # target period
 begin_date : '2013-01-01'
-end_date : '2021-12-31'
+end_date : '2022-12-31'
 
 # backtest (single_test.py)
 factors_tested : "/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/factor_backtest/factors_tested.xlsx"
@@ -136,3 +136,9 @@ mysql_engine :
     host : '192.168.1.104'
     port : '3306'
     dbname : 'intern'
+  engine4:
+    user: "intern01"
+    password: "rh35th"
+    host: '192.168.1.104'
+    port: '3306'
+    dbname: 'alphas101'

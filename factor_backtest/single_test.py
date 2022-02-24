@@ -3,58 +3,21 @@
 (Feb. 11th)
 - move functions to supporter.backtester
 (Feb. 22nd)
--
+- use object method rather than function
 """
 import os
 import sys
 import yaml
-import time
-from datetime import timedelta
 
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
-from supporter.backtester import *
-
-
-# %%
-def clip_backtest_conf(conf: dict):
-    res = {
-        'csv_path': conf['factorscsv_path'],
-        'res_path': conf['factorsres_path'],
-        'idx_constituent': conf['idx_constituent'],
-        'tradeable_path': conf['a_list_tradeable'],
-        'ind_citic_path': conf['ind_citic'],
-        'marketvalue_path': conf['marketvalue'],
-        'close_path': conf['closeAdj'],
-        'open_path': conf['openAdj'],
-        'test_mode': str(conf['test_mode']),
-        'exclude_tradeable': conf['exclude_tradeable'],
-        'neu_mtd': conf['neu_mtd'],
-        'stk_pool': conf['stk_pool'],
-        'stk_w': conf['stk_w'],
-        'return_kind': conf['return_kind'],
-        'ngroups': conf['ngroups'],
-        'holddays': conf['holddays'],
-        'cost_rate': float(conf['tc']),
-        'begin_date': conf['begin_date'],
-        'end_date': conf['end_date'],
-        'save_tables': conf['save_tables'],
-        'save_plots': conf['save_plots'],
-        'ishow': conf['ishow'],
-        'all_factornames': pd.read_excel(conf['factors_tested'], index_col=0).loc[1:1].iloc[:, 0].to_list(),
-        'save_suffix': conf['save_suffix'] if conf['save_suffix'] != '' else time.strftime("%m%d_%H%M%S", time.localtime()),
-        'begin_date_nd60': (pd.to_datetime(conf['begin_date']) - timedelta(60)).strftime('%Y-%m-%d')
-    }
-    # res['fbegin_end'] = df[['F_NAME', 'F_BEGIN', 'F_END']].set_index('F_NAME').apply(lambda s: (s.iloc[0],
-    # s.iloc[1]), axis=1).to_dict()
-
-    return res
+from factor_backtest.backtester import *
 
 
 # %%
 def main():
     # con'f
-    # conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/config.yaml'
-    conf_path = './config2.yaml'
+    conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/config.yaml'
+    # conf_path = './config2.yaml'
     conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
     # conf = clip_backtest_conf(conf)
     # %%
@@ -76,8 +39,6 @@ def single_test(conf: dict):
 
     test_mode = conf['test_mode']
     exclude_tradeable = conf['exclude_tradeable']
-    # all_factornames = [k for k, v in conf['fnames'].items() if v == 1]
-    # with_updown = 'tradeable' + conf['with_updown']
     neu_mtd = conf['neu_mtd']
     stk_pool = conf['stk_pool']
     stk_w = conf['stk_w']
@@ -114,7 +75,7 @@ def single_test(conf: dict):
             print(f'Sift tradeable stocks via `{tradeable_key}`')
             tradeable_multiplier &= read_tradeable(hdf_k=tradeable_key)
     tradeable_multiplier.replace(False, np.nan, inplace=True)  # 股池乘子，不可交易为nan
-    tradeable_multiplier.dropna(axis=1, how='all', inplace=True)  # 去除全空的列（股票）
+    tradeable_multiplier.dropna(axis=1, how='all', inplace=True)  # 去除全空列（股票）
 
     # %% idx_weight: tradeable @ stk_pool @ stk_w
     if stk_pool == 'NA' or stk_pool is None or stk_pool == '':  # 未指定股池
@@ -156,16 +117,26 @@ def single_test(conf: dict):
         path_format = save_path_ + '{}'  # save_path_save_path_ + fname + '.{}'
 
         fval = pd.read_csv(f'{csv_path}{fname}.csv', dtype=float, index_col=0, parse_dates=True)
-        signal = Signal(data=fval, bd=begin_date, ed=end_date, neu=None, ishow=ishow)
+        signal = Signal(data=fval, bd=begin_date, ed=end_date, neu=None)
         signal.shift_1d(d_shifted=1)  # 滞后一天，以昨日的因子值参与计算
         signal.keep_tradeable(tradeable_multiplier.loc[begin_date: end_date])
         fbegin_date = signal.get_fbegin()
         fend_date = signal.get_fend()
 
         if test_mode == '3':  # 由持仓计算持仓组合结果
-            holding_weight = signal.get_fv()
-            # 改为：以weight为基础的Portfolio对象
-            portfolio_statistics_from_weight(holding_weight, cost_rate, all_ret, path_format.format('PanelLong.csv'))
+            portfolio_l = Portfolio(w=signal.get_fv())
+            portfolio_l.cal_panel_result(cr=cost_rate, ret=all_ret)
+            panel_long = portfolio_l.get_panel(path_format.format('PanelLong.csv'))
+            cal_result_stat(panel_long[['Return']], path_format.format('ResLongNC.csv'))
+            cal_result_stat(panel_long[['Return_wc']], path_format.format('ResLongWC.csv'))
+            title = 'Long-Short-Absolute MaxDrawdown No Cost'
+            df = panel_long['Wealth(cumprod)'].copy()
+            df = df - df.iloc[0]
+            cal_sr_max_drawdown(df, ishow, title, path_format.format('LMddNC.png'))
+            title = 'Long-Short-Absolute MaxDrawdown With Cost'
+            df = panel_long['Wealth_wc(cumprod)'].copy()
+            df = df - df.iloc[0]
+            cal_sr_max_drawdown(df, ishow, title, path_format.format('LMddWC.png'))
 
         elif test_mode in '012':  # 进行因子回测，产生策略表现的图表
             conf1 = conf.copy()
@@ -178,6 +149,8 @@ def single_test(conf: dict):
             if test_mode == '2':  # 由多空分组计算多/空组合结果
                 long_short_group = pd.read_csv(path_format.format('LSGroup.csv'), index_col=0, parse_dates=True)
                 ic_mean = pd.read_csv(path_format.format('ICStat.csv'), index_col=0).loc['mean', 'IC']
+                strategy = Strategy(sgn=signal, ng=ngroups)
+                strategy.ls_group = long_short_group
             else:  # 因子处理 & 因子统计（IC） & 多空分组（分组收益）
                 if ngroups != 1:  # 非事件信号（0-1）
                     signal.neutralize_by(neu_mtd, ind_citic_path, marketvalue_path)
@@ -194,42 +167,25 @@ def single_test(conf: dict):
                         signal.plot_ic_decay(ishow, path_format.format('ICDecay.png'))
 
                 # %% Long-Short-Group Strategy
-                strategy = Strategy(sgn=signal, ng=ngroups, ishow=ishow)
+                strategy = Strategy(sgn=signal, ng=ngroups)
                 strategy.cal_long_short_group()
                 strategy.cal_group_returns(all_ret, idx_weight)
                 if save_tables:
                     strategy.get_ls_group(path_format.format('LSGroup.csv'))
                     strategy.get_group_returns(path_format.format('GroupRtns.csv'))
                 if save_plots:
-                    strategy.plot_group_returns(path_format.format('ResGroup.png'))
-                    strategy.plot_group_returns_total(path_format.format('TotalRtnsGroup.png'))
-                long_short_group = strategy.get_ls_group()
+                    strategy.plot_group_returns(ishow, path_format.format('ResGroup.png'))
+                    strategy.plot_group_returns_total(ishow, path_format.format('TotalRtnsGroup.png'))
+                # long_short_group = strategy.get_ls_group()
 
             if test_mode == '0':  # 只计算分组，不进行多空回测
                 continue
 
-            # Long-Short Strategy
-            save_path = path_format.format('positionWeight_{}.csv') if save_tables else None
-            w_long, w_short, w_long_short = cal_weight_from_long_short_group(
-                long_short_group, ngroups, idx_weight, fbegin_date, fend_date, holddays, ic_mean, save_path)
-
-            # Portfolio Turnover, NStocks, Return, Wealth
-            all_panels = portfolio_panels_from_weight(w_long, w_short, w_long_short, idx_weight, cost_rate, all_ret,
-                                                      path_format, save_tables, fbegin_date, fend_date)
-            # # Turnover: long_short_turnover -> LSTurnover.csv
+            rvs = (ic_mean < 0)
+            strategy.cal_long_short_panels(idx_weight, holddays, rvs, cost_rate, all_ret)
+            all_panels = strategy.get_ls_panels(path_format if save_tables else None)
             if save_plots:
-                save_path = path_format.format('LSTurnover.png')
-                long_short_turnover = pd.concat([df['Turnover'].rename(k) for k, df in all_panels.items()], axis=1)
-                long_short_turnover[['long', 'short']].plot(figsize=(10, 5), grid=True, title='Turnover')
-                plt.savefig(save_path)
-                if ishow:
-                    plt.show()
-                else:
-                    plt.close()
-            # long_short_turnover = cal_turnover_long_short(long_short_group, idx_weight, ngroups, ishow, save_path)
-            # long_short_turnover = pd.concat([df['Turnover'].rename(k) for k, df in all_panels.items()], axis=1)
-
-            # Return
+                strategy.plot_turnover(ishow, path_format.format('LSTurnover.png'))
 
             # # Long-Short Absolute Return No Cost: ret_group, ret_baseline -> long_short_return_nc, LSRtnsNC.csv
             # save_path = path_format.format('LSRtnsNC.csv') if save_tables else None
