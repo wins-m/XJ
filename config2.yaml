@@ -1,0 +1,138 @@
+## config files
+core_number : 5
+
+# paths
+project_path : "./"
+data_path : "/Users/winston/Documents/XJ/data_local/"
+factorscsv_path : "/Users/winston/Documents/XJ/factors_csv/"
+factorsres_path : "/Users/winston/Documents/XJ/factors_res/"
+resanalysis_path : "/Users/winston/Documents/XJ/res_analysis/"
+level2_path : '/Users/winston/Documents/XJ/level2/'
+level2_path2 : '/mnt/g/高频数据-hdf5格式/'
+#level2_path2 : '/Users/winston/Documents/XJ/lvl2/'
+
+# hdf temp file
+a_list_tradeable : "/Users/winston/Documents/XJ/data_local/a_list_tradeable.hdf"
+        # key: ipo, ipo60, suspend, updown, up, down, updown_open
+        # tradeable(ipo_60 & suspend_L1 & updown_open_L1)
+        # tradeable_withupdown(ipo_60 & suspend_L1)
+        # tradeable_noupdown(ipo_60 & suspend_L1 & updown_L1)
+
+# csv data file
+idx_constituent : "/Users/winston/Documents/XJ/data_local/idx_constituent_{}.csv"
+a_list_suspendsymbol : "/Users/winston/Documents/XJ/data_local/a_list_suspendsymbol.csv"
+date_last_suspend_alldays : "/Users/winston/Documents/XJ/data_local/last_suspend_ad2d.csv"
+stk_ipo_date : "/Users/winston/Documents/XJ/data_local/stk_ipo_date.csv"
+stk_maxupordown : "/Users/winston/Documents/XJ/data_local/stk_maxupordown.csv"
+tdays_d : "/Users/winston/Documents/XJ/data_local/tdays_d.csv"
+alldays_d : '/Users/winston/Documents/XJ/data_local/alldays_d.csv'
+ind_citic : "/Users/winston/Documents/XJ/data_local/ind_citic_constituent.csv"
+marketvalue : "/Users/winston/Documents/XJ/data_local/stk_marketvalue.csv"
+daily_close : "/Users/winston/Documents/XJ/data_local/stk_marketdata_close.csv"
+daily_open : "/Users/winston/Documents/XJ/data_local/stk_marketdata_open.csv"
+closeAdj : "/Users/winston/Documents/XJ/data_local/stk_marketdata_closeAdj.csv"
+openAdj : "/Users/winston/Documents/XJ/data_local/stk_marketdata_openAdj.csv"
+event_first_report : "/Users/winston/Documents/XJ/data_local/2d_event_first_report.csv"
+event_first_report2 : "/Users/winston/Documents/XJ/data_local/event_panel.h5"  # key = event_first_report
+event_first_report3 : "/Users/winston/Documents/XJ/data_local/event_panel.pkl"
+instnum_180 : "/Users/winston/Documents/XJ/data_local/2d_stk_west_instnum_180.csv"
+turnover : "/Users/winston/Documents/XJ/data_local/2d_stk_marketdata_turn.csv"
+turnover_free : "/Users/winston/Documents/XJ/data_local/2d_stk_marketdata_freeturn.csv"
+
+# target period
+begin_date : '2013-01-01'
+end_date : '2021-12-31'
+
+# backtest (single_test.py)
+factors_tested : "./factor_backtest/factors_tested.xlsx"
+#with_updown : ''  # '': exclude open  '_withupdown': keep  '_noupdown': exclude all
+save_suffix : ''  # 空字段，则后缀为回测开始的时间
+test_mode : '3'
+    # '0': no test;
+    # '1': default;
+    # '2': from `LSGroup.csv`
+    # '3': factor is weight
+exclude_tradeable :   # 0: excluded
+  ipo60 : 0
+  suspend: 0
+  updown : 1
+  up : 1
+  down : 1
+  updown_open : 1
+  up_open : 1
+  down_open : 1
+neu_mtd : 'n'  # n, i, iv
+stk_pool : 'NA'  # NA CSI500 CSI300 [CSI800]
+return_kind : 'ctc'  # ctc, oto, vtv
+
+stk_w : 'ew'  # idx, ew
+ngroups : 1  # less than 0: 多/空各(-)ngroup支;    1: 稀疏事件信号
+holddays : 1  # 交易频率，如1天一换仓
+
+tc : 2e-3  # 手续费（双边）
+save_tables : True
+save_plots : True
+ishow : False
+
+# get_data.py
+access_target : "./data/access_target.xlsx"
+force_update : False
+
+# feature_extraction_level2.py
+feature_level2 : "./factor_build/feature_level2.xlsx"
+feature_begin : '201807'  # 磁盘内 level2 开始时间
+feature_end : '201912'
+
+# tradeable.py
+ipo_delay : 60  # days after ipo
+
+# pe_surprise.py
+pe_ols_group : 'loop3'  # all, ols_1, ols_2, ols_3, loop3
+save_panel : False  # 每次回归保存面板
+
+# save_remote.py
+tables :
+  pe_tables:
+    - True  # whether to upload
+    - 'pe_residual_ols_3.csv'
+    - 'pe_residual_ols_2.csv'
+    - 'pe_residual_ols_1.csv'
+  pe_tables(depreciated2) :
+    - False  # whether to upload
+    - 'pe_residual_ols_3_20130101_20211231.csv'
+    - 'pe_residual_ols_2_20130101_20211231.csv'
+    - 'pe_residual_ols_1_20130101_20211231.csv'
+    - 'pe_residual_20130101_20211231.csv'
+  pe_tables(depreciated) :
+    - False
+    - 'pe_residual_ols_1_2013-01-01_2021-12-31.csv'
+    - 'pe_residual_ols_2_2013-01-01_2021-12-31.csv'
+    - 'pe_residual_ols_3_2013-01-01_2021-12-31.csv'
+    - 'pe_residual_2013-01-01_2021-12-31.csv'
+
+# mysql port engine
+mysql_engine :
+  engine0 :
+    user : "intern01"
+    password : "rh35th"
+    host : '192.168.1.104'
+    port : '3306'
+    dbname : 'jeffdatabase'
+  engine1 :
+    user : "intern01"
+    password : "rh35th"
+    host : '192.168.1.104'
+    port : '3306'
+    dbname : 'factordatabase'
+  engine2 :
+    user : "intern02"
+    password : "fh840t"
+    host : '192.168.1.104'
+    port : '3306'
+    dbname : 'factordatabase'
+  engine3 :  # 上传使用engine3的配置，即存在intern库
+    user : "intern01"
+    password : "rh35th"
+    host : '192.168.1.104'
+    port : '3306'
+    dbname : 'intern'
