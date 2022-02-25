@@ -103,8 +103,10 @@ def single_test(conf: dict):
     save_folders = dict()
     # %%
     for fname in all_factornames:
+        # %%
         save_folders[fname] = f'{fname}_{suffix}'
-        # %% 存储目录管理
+
+        # 存储目录管理
         print(f'\nBacktest `{fname}`...')
         ic_mean = 0  # 默认值，更新后用于判断因子方向
 
@@ -119,6 +121,7 @@ def single_test(conf: dict):
         fbegin_date = signal.get_fbegin()
         fend_date = signal.get_fend()
 
+        # %%
         if test_mode == '3':  # 由持仓计算持仓组合结果
             portfolio_l = Portfolio(w=signal.get_fv())
             portfolio_l.cal_panel_result(cr=cost_rate, ret=all_ret)
@@ -128,103 +131,77 @@ def single_test(conf: dict):
             portfolio_l.get_half_year_stat(wc=True, path=path_format.format('ResLongWC.csv'))
             portfolio_l.plot_max_drawdown(ishow=ishow, path=path_format.format('LMddNC.png'), wc=False, kind='cumsum')
             portfolio_l.plot_max_drawdown(ishow=ishow, path=path_format.format('LMddWC.png'), wc=True, kind='cumsum')
-
-        elif test_mode in '012':  # 进行因子回测，产生策略表现的图表
-
-            # 存回测相关config
-            conf1 = conf.copy()
-            conf1['all_factornames'] = fname
-            conf1['fbegin_date'] = fbegin_date.strftime('%Y-%m-%d')
-            conf1['fend_date'] = fend_date.strftime('%Y-%m-%d')
-            with open(path_format.format('config.yaml'), 'w', encoding='utf-8') as f:
-                f.write(yaml.safe_dump(conf1))
-
-            if test_mode == '2':  # 由多空分组计算多/空组合结果
-                long_short_group = pd.read_csv(path_format.format('LSGroup.csv'), index_col=0, parse_dates=True)
-                ic_mean = pd.read_csv(path_format.format('ICStat.csv'), index_col=0).loc['mean', 'IC']
-                strategy = Strategy(sgn=signal, ng=ngroups)
-                strategy.ls_group = long_short_group
-            else:  # 因子处理 & 因子统计（IC） & 多空分组（分组收益）
-                if ngroups != 1:  # 非事件信号（0-1）
-                    signal.neutralize_by(neu_mtd, ind_citic_path, marketvalue_path)
-                    signal.cal_ic(all_ret)
-                    signal.cal_ic_statistics()
-                    signal.cal_ic_decay(all_ret=all_ret, lag=20)
-
-                    ic_mean = signal.get_ic_mean(ranked=True)
-                    print(signal.get_ic_stat(path_format.format('ICStat.csv') if save_tables else None))
-                    print(signal.get_ic_decay(path_format.format('ICDecay.csv') if save_tables else None).iloc[1:6])
-
-                    if save_plots:
-                        signal.plot_ic(ishow, path_format)
-                        signal.plot_ic_decay(ishow, path_format.format('ICDecay.png'))
-
-                # Long-Short-Group Strategy
-                strategy = Strategy(sgn=signal, ng=ngroups)
-                strategy.cal_long_short_group()
-                strategy.cal_group_returns(all_ret, idx_weight)
-                if save_tables:
-                    strategy.get_ls_group(path_format.format('LSGroup.csv'))
-                    strategy.get_group_returns(path_format.format('GroupRtns.csv'))
-                if save_plots:
-                    strategy.plot_group_returns(ishow, path_format.format('ResGroup.png'))
-                    strategy.plot_group_returns_total(ishow, path_format.format('TotalRtnsGroup.png'))
-                # long_short_group = strategy.get_ls_group()
-
-            # %%
-            if test_mode == '0':  # 只计算分组，不进行多空回测
-                continue
-
-            # %%
-            rvs = (ic_mean < 0)
-            strategy.cal_long_short_panels(idx_weight, holddays, rvs, cost_rate, all_ret)
-            # all_panels = strategy.get_ls_panels(path_format if save_tables else None)
-
-            if save_plots:
-                strategy.plot_long_short_turnover(ishow, path_format.format('LSTurnover.png'))
-                strategy.plot_cumulative_returns(ishow, path_format.format('LSAbsResNC.png'), False, 'cumsum', False)
-                strategy.plot_cumulative_returns(ishow, path_format.format('LSAbsResWC.png'), True, 'cumsum', False)
-                strategy.plot_cumulative_returns(ishow, path_format.format('LSExcResNC.png'), False, 'cumsum', True)
-                strategy.plot_cumulative_returns(ishow, path_format.format('LSExcResWC.png'), True, 'cumsum', True)
-                strategy.portfolio['long'].plot_max_drawdown(ishow, path_format.format('LMddNC.png'), wc=False)
-                strategy.portfolio['long'].plot_max_drawdown(ishow, path_format.format('LMddWC.png'), wc=True)
-                if ngroups != 1:
-                    strategy.portfolio['long_short'].plot_max_drawdown(ishow, path_format.format('LSMddNC.png'), wc=False)
-                    strategy.portfolio['long_short'].plot_max_drawdown(ishow, path_format.format('LSMddWC.png'), wc=True)
-
-            if save_tables:
-                for wc in [False, True]:
-                    strategy.get_portfolio_statistics(kind='long', wc=wc, path_f=path_format)
-                    if ngroups != 1:
-                        strategy.get_portfolio_statistics(kind='short', wc=wc, path_f=path_format)
-                        strategy.get_portfolio_statistics(kind='long_short', wc=wc, path_f=path_format)
-
-            # %% Annual Result
-
-            # # Annual Return No Cost
-            # title = 'Annual Return No Cost'
-            # save_path = path_format.format('LSYRtnsNC.png') if save_plots else None
-            # cal_yearly_return(long_short_return_nc, ishow, title, save_path)
-            #
-            # # Annual Return With Cost
-            # title = 'Annual Return With Cost'
-            # save_path = path_format.format('LSYRtnsWC.png') if save_plots else None
-            # cal_yearly_return(long_short_return_wc, ishow, title, save_path)
-            #
-            # # Annual Yearly Sharpe No Cost
-            # title = 'Annual Yearly Sharpe No Cost'
-            # save_path = path_format.format('LSYSharpNC.png') if save_plots else None
-            # cal_yearly_sharpe(long_short_return_nc, ishow, title, save_path)
-            #
-            # # Annual Yearly Sharpe With Cost
-            # title = 'Annual Yearly Sharpe With Cost'
-            # save_path = path_format.format('LSYSharpWC.png') if save_plots else None
-            # cal_yearly_sharpe(long_short_return_wc, ishow, title, save_path)
-
-            # %%
             print(f'Graphs & Tables Saved in {path_format}')
-        else:
-            raise ValueError(f'Invalid test_mode {test_mode}')
+            continue
+
+        # 存回测相关config
+        conf1 = conf.copy()
+        conf1['all_factornames'] = fname
+        conf1['fbegin_date'] = fbegin_date.strftime('%Y-%m-%d')
+        conf1['fend_date'] = fend_date.strftime('%Y-%m-%d')
+        with open(path_format.format('config.yaml'), 'w', encoding='utf-8') as f:
+            f.write(yaml.safe_dump(conf1))
+
+        if test_mode == '2':  # 由多空分组计算多/空组合结果
+            long_short_group = pd.read_csv(path_format.format('LSGroup.csv'), index_col=0, parse_dates=True)
+            ic_mean = pd.read_csv(path_format.format('ICStat.csv'), index_col=0).loc['mean', 'IC']
+            strategy = Strategy(sgn=signal, ng=ngroups)
+            strategy.ls_group = long_short_group
+        else:  # 因子处理 & 因子统计（IC） & 多空分组（分组收益）
+            if ngroups != 1:  # 非事件信号（0-1）
+                signal.neutralize_by(neu_mtd, ind_citic_path, marketvalue_path)
+                signal.cal_ic(all_ret)
+                signal.cal_ic_statistics()
+                signal.cal_ic_decay(all_ret=all_ret, lag=20)
+
+                ic_mean = signal.get_ic_mean(ranked=True)
+                print(signal.get_ic_stat(path_format.format('ICStat.csv') if save_tables else None))
+                print(signal.get_ic_decay(path_format.format('ICDecay.csv') if save_tables else None).iloc[1:6])
+
+                if save_plots:
+                    signal.plot_ic(ishow, path_format)
+                    signal.plot_ic_decay(ishow, path_format.format('ICDecay.png'))
+
+            # Long-Short-Group Strategy
+            strategy = Strategy(sgn=signal, ng=ngroups)
+            strategy.cal_long_short_group()
+            strategy.cal_group_returns(all_ret, idx_weight)
+            if save_tables:
+                strategy.get_ls_group(path_format.format('LSGroup.csv'))
+                strategy.get_group_returns(path_format.format('GroupRtns.csv'))
+            if save_plots:
+                strategy.plot_group_returns(ishow, path_format.format('ResGroup.png'))
+                strategy.plot_group_returns_total(ishow, path_format.format('TotalRtnsGroup.png'))
+            # long_short_group = strategy.get_ls_group()
+
+        if test_mode == '0':  # 只计算分组，不进行多空回测
+            print(f'Graphs & Tables Saved in {path_format}')
+            continue
+
+        rvs = (ic_mean < 0)
+        strategy.cal_long_short_panels(idx_weight, holddays, rvs, cost_rate, all_ret)
+        # all_panels = strategy.get_ls_panels(path_format if save_tables else None)
+
+        if save_plots:
+            strategy.plot_long_short_turnover(ishow, path_format.format('LSTurnover.png'))
+            strategy.plot_cumulative_returns(ishow, path_format.format('LSAbsResNC.png'), False, 'cumsum', False)
+            strategy.plot_cumulative_returns(ishow, path_format.format('LSAbsResWC.png'), True, 'cumsum', False)
+            strategy.plot_cumulative_returns(ishow, path_format.format('LSExcResNC.png'), False, 'cumsum', True)
+            strategy.plot_cumulative_returns(ishow, path_format.format('LSExcResWC.png'), True, 'cumsum', True)
+            strategy.portfolio['long'].plot_max_drawdown(ishow, path_format.format('LMddNC.png'), wc=False)
+            strategy.portfolio['long'].plot_max_drawdown(ishow, path_format.format('LMddWC.png'), wc=True)
+            if ngroups != 1:
+                strategy.portfolio['long_short'].plot_max_drawdown(ishow, path_format.format('LSMddNC.png'), wc=False)
+                strategy.portfolio['long_short'].plot_max_drawdown(ishow, path_format.format('LSMddWC.png'), wc=True)
+
+        if save_tables:
+            for wc in [False, True]:
+                strategy.get_portfolio_statistics(kind='long', wc=wc, path_f=path_format)
+                if ngroups != 1:
+                    strategy.get_portfolio_statistics(kind='short', wc=wc, path_f=path_format)
+                    strategy.get_portfolio_statistics(kind='long_short', wc=wc, path_f=path_format)
+
+        print(f'Graphs & Tables Saved in {path_format}')
     # %%
     print(save_folders)
 
