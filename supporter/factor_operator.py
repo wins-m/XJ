@@ -320,11 +320,11 @@ def cal_total_ret_group(ret_group, ishow=False, save_path=None) -> pd.DataFrame:
     return ret_group_total
 
 
-def cal_sr_max_drawdown(df: pd.Series, ishow=False, title=None, save_path=None) -> pd.DataFrame:
+def cal_sr_max_drawdown(df: pd.Series, ishow=False, title=None, save_path=None, kind='cumprod') -> pd.DataFrame:
     """计算序列回撤"""
     cm = df.cummax()
     mdd = pd.DataFrame(index=df.index)
-    mdd[f'{df.name}_maxdd'] = df / cm - 1
+    mdd[f'{df.name}_maxdd'] = (df / cm - 1) if kind == 'cumprod' else (df - cm)
 
     if save_path is not None:
         try:
@@ -497,13 +497,16 @@ def cal_result_stat(df: pd.DataFrame, save_path: str = None, kind='cumsum') -> p
     res['PeriodRetOnBookSize'] = res['UnitValue'].pct_change()
     res.iloc[0, -1] = res['UnitValue'].iloc[0] - 1
     res['PeriodSharpe'] = df.groupby(data.SemiYear).apply(lambda s: s.mean() / s.std() * np.sqrt(240)).values
-    mdd = df1 / df1.cummax() - 1
+    mdd = df1 / df1.cummax() - 1 if kind == 'cumprod' else df1 - df1.cummax()
     res['PeriodMaxDD'] = mdd.groupby(data.SemiYear).min().values
     res['PeriodCalmar'] = res['PeriodRetOnBookSize'] / res['PeriodMaxDD'].abs()
     res['TotalMaxDD'] = mdd.min().values[0]
     res['TotalSharpe'] = (df.mean() / df.std() * np.sqrt(240)).values[0]
     res['AverageCalmar'] = res['TotalSharpe'] / res['TotalMaxDD'].abs()
     res['TotalAnnualRet'] = (df1.iloc[-1] ** (240 / len(df1)) - 1).values[0]
+
+    res['Date'] = res['Date'].apply(lambda x: x.strftime('%Y-%m-%d'))
+    res = res.set_index('SemiYear')
     if save_path is not None:
         res.to_excel(save_path.replace('.csv', '.xlsx'))
     return res

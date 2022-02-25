@@ -47,7 +47,7 @@ end_date : '2022-12-31'
 factors_tested : "/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/factor_backtest/factors_tested.xlsx"
 #with_updown : ''  # '': exclude open  '_withupdown': keep  '_noupdown': exclude all
 save_suffix : ''  # 空字段，则后缀为回测开始的时间
-test_mode : '3'
+test_mode : '1'
     # '0': no test;
     # '1': default;
     # '2': from `LSGroup.csv`

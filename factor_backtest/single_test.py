@@ -126,23 +126,28 @@ def single_test(conf: dict):
         if test_mode == '3':  # 由持仓计算持仓组合结果
             portfolio_l = Portfolio(w=signal.get_fv())
             portfolio_l.cal_panel_result(cr=cost_rate, ret=all_ret)
-            panel_long = portfolio_l.get_panel(path_format.format('PanelLong.csv'))
-            cal_result_stat(panel_long[['Return']], path_format.format('ResLongNC.csv'))
-            cal_result_stat(panel_long[['Return_wc']], path_format.format('ResLongWC.csv'))
-            title = 'Long-Short-Absolute MaxDrawdown No Cost'
-            df = panel_long['Wealth(cumprod)'].copy()
-            df = df - df.iloc[0]
-            cal_sr_max_drawdown(df, ishow, title, path_format.format('LMddNC.png'))
-            title = 'Long-Short-Absolute MaxDrawdown With Cost'
-            df = panel_long['Wealth_wc(cumprod)'].copy()
-            df = df - df.iloc[0]
-            cal_sr_max_drawdown(df, ishow, title, path_format.format('LMddWC.png'))
+            portfolio_l.get_panel(path_format.format('PanelLong.csv'))
+            portfolio_l.plot_cumulative_returns(ishow=ishow, path=path_format.format('LAbsRes.png'), kind='cumsum')
+            portfolio_l.get_half_year_stat(wc=False, path=path_format.format('ResLongNC.csv'))
+            portfolio_l.get_half_year_stat(wc=True, path=path_format.format('ResLongWC.csv'))
+            portfolio_l.plot_max_drawdown(ishow=ishow, path=path_format.format('LMddNC.png'), wc=False, kind='cumsum')
+            portfolio_l.plot_max_drawdown(ishow=ishow, path=path_format.format('LMddWC.png'), wc=True, kind='cumsum')
+            # title = 'Long-Short-Absolute MaxDrawdown No Cost'
+            # df = panel_long['Wealth(cumprod)'].copy()
+            # df = df - df.iloc[0]
+            # cal_sr_max_drawdown(df, ishow, title, path_format.format('LMddNC.png'))
+            # title = 'Long-Short-Absolute MaxDrawdown With Cost'
+            # df = panel_long['Wealth_wc(cumprod)'].copy()
+            # df = df - df.iloc[0]
+            # cal_sr_max_drawdown(df, ishow, title, path_format.format('LMddWC.png'))
 
         elif test_mode in '012':  # 进行因子回测，产生策略表现的图表
+
+            # 存回测相关config
             conf1 = conf.copy()
             conf1['all_factornames'] = fname
             conf1['fbegin_date'] = fbegin_date.strftime('%Y-%m-%d')
-            conf1['fend_date'] = fend_date.ed.strftime('%Y-%m-%d')
+            conf1['fend_date'] = fend_date.strftime('%Y-%m-%d')
             with open(path_format.format('config.yaml'), 'w', encoding='utf-8') as f:
                 f.write(yaml.safe_dump(conf1))
 
@@ -178,123 +183,144 @@ def single_test(conf: dict):
                     strategy.plot_group_returns_total(ishow, path_format.format('TotalRtnsGroup.png'))
                 # long_short_group = strategy.get_ls_group()
 
+            # %%
             if test_mode == '0':  # 只计算分组，不进行多空回测
                 continue
 
+            # %%
             rvs = (ic_mean < 0)
             strategy.cal_long_short_panels(idx_weight, holddays, rvs, cost_rate, all_ret)
-            all_panels = strategy.get_ls_panels(path_format if save_tables else None)
-            if save_plots:
-                strategy.plot_turnover(ishow, path_format.format('LSTurnover.png'))
+            # all_panels = strategy.get_ls_panels(path_format if save_tables else None)
+            # if save_plots:
+            strategy.plot_turnover(ishow, path_format.format('LSTurnover.png'))
 
-            # # Long-Short Absolute Return No Cost: ret_group, ret_baseline -> long_short_return_nc, LSRtnsNC.csv
-            # save_path = path_format.format('LSRtnsNC.csv') if save_tables else None
-            # long_short_return_nc = panel_long_short_return(ret_group, ret_baseline, save_path)
-            long_short_return_nc = pd.concat([df['Return'].rename(k) for k, df in all_panels.items()], axis=1)
+            # %% Returns (Absolute & Excess)
+            strategy.plot_cumulative_returns(ishow, path_format.format('LSAbsResNC.png'), False, 'cumsum', False)
+            strategy.plot_cumulative_returns(ishow, path_format.format('LSAbsResWC.png'), True, 'cumsum', False)
+            strategy.plot_cumulative_returns(ishow, path_format.format('LSExcResNC.png'), False, 'cumsum', True)
+            strategy.plot_cumulative_returns(ishow, path_format.format('LSExcResWC.png'), True, 'cumsum', True)
 
-            # # Long-Short Absolute Return With Cost
-            # long_short_return_wc = long_short_return_nc - long_short_turnover * cost_rate
-            # if save_tables:
-            #     long_short_return_wc.to_csv(path_format.format('LSRtnsWC.csv'))
-            long_short_return_wc = pd.concat([df['Return_wc'].rename(k) for k, df in all_panels.items()], axis=1)
-
-            # Long-Short Absolute Result No Cost: long_short_return_nc -> long_short_absolute_nc, LSAbsResNC.png
-            title = 'Long-Short Absolute Result No Cost'
-            save_path = path_format.format('LSAbsResNC.png') if save_plots else None
-            long_short_absolute_nc = panel_long_short_absolute(long_short_return_nc, ishow, title, save_path)
-
-            # Long-Short Absolute Result With Cost
-            title = 'Long-Short Absolute Result With Cost'
-            save_path = path_format.format('LSAbsResWC.png') if save_plots else None
-            long_short_absolute_wc = panel_long_short_absolute(long_short_return_wc, ishow, title, save_path)
-
-            # Long-Short Excess Result No Cost
-            title = 'Long-Short Excess Result No Cost'
-            save_path = path_format.format('LSExcResNC.png') if save_plots else None
-            panel_long_short_excess(long_short_absolute_nc, ishow, title, save_path)
-            # long_short_excess_nc = long_short_return_nc.iloc[:, :3] - long_short_return_nc.iloc[:,
-            # 3].values.reshape(-1, 1)
-
-            # Long-Short Excess Result With Cost
-            title = 'Long-Short Excess Result With Cost'
-            save_path = path_format.format('LSExcResWC') if save_tables else None
-            panel_long_short_excess(long_short_absolute_wc, ishow, title, save_path)
-            # long_short_excess_wc = long_short_return_wc.iloc[:, :3] - long_short_return_wc.iloc[:,
-            # 3].values.reshape(-1, 1)
-
-            # max drawdown
-            # Long-Absolute MaxDrawdown No Cost
-            title = 'Long-Absolute MaxDrawdown No Cost'
-            save_path = path_format.format('LMddNC.png') if save_plots else None
-            cal_sr_max_drawdown(long_short_absolute_nc['long'], ishow, title, save_path)
-
-            if ngroups != 1:
-                # Long-Short-Absolute MaxDrawdown No Cost
-                title = 'Long-Short-Absolute MaxDrawdown No Cost'
-                save_path = path_format.format('LSMddNC.png') if save_plots else None
-                cal_sr_max_drawdown(long_short_absolute_nc['long_short'], ishow, title, save_path)
-
-            # Long-Absolute MaxDrawdown With Cost
-            title = 'Long-Absolute MaxDrawdown With Cost'
-            save_path = path_format.format('LMddWC.png') if save_plots else None
-            cal_sr_max_drawdown(long_short_absolute_wc['long'], ishow, title, save_path)
-
-            if ngroups != 1:
-                # Long-Short-Absolute MaxDrawdown With Cost
-                title = 'Long-Short-Absolute MaxDrawdown With Cost'
-                save_path = path_format.format('LSMddWC.png') if save_plots else None
-                cal_sr_max_drawdown(long_short_absolute_wc['long_short'], ishow, title, save_path)
-
-            # Portfolio Statistics
-            # Long Only Statistics No Cost: long_short_return_nc -> ResLongNC.csv
-            save_path = path_format.format('ResLongNC.csv') if save_tables else None
-            cal_result_stat(long_short_return_nc[['long']], save_path)
-
-            if ngroups != 1:
-                # Short Only Statistics No Cost: long_short_return_nc -> ResShortNC.csv
-                save_path = path_format.format('ResShortNC.csv') if save_tables else None
-                cal_result_stat(long_short_return_nc[['short']], save_path)
-
-                # Long-Short Statistics No Cost: long_short_return_nc -> ResLongShortNC.csv
-                save_path = path_format.format('ResLongShortNC.csv') if save_tables else None
-                cal_result_stat(long_short_return_nc[['long_short']], save_path)
-
-            # Long Only Statistics With Cost
-            save_path = path_format.format('ResLongWC.csv') if save_tables else None
-            cal_result_stat(long_short_return_wc[['long']], save_path)
-
-            if ngroups != 1:
-                # Short Only Statistics With Cost
-                save_path = path_format.format('ResShortWC.csv') if save_tables else None
-                cal_result_stat(long_short_return_wc[['short']], save_path)
-
-                # Long-Short Statistics With Cost
-                save_path = path_format.format('ResLongShortWC.csv') if save_tables else None
-                cal_result_stat(long_short_return_wc[['long_short']], save_path)
-
-            # Annual Result
-
-            # Annual Return No Cost
-            title = 'Annual Return No Cost'
-            save_path = path_format.format('LSYRtnsNC.png') if save_plots else None
-            cal_yearly_return(long_short_return_nc, ishow, title, save_path)
-
-            # Annual Return With Cost
-            title = 'Annual Return With Cost'
-            save_path = path_format.format('LSYRtnsWC.png') if save_plots else None
-            cal_yearly_return(long_short_return_wc, ishow, title, save_path)
-
-            # Annual Yearly Sharpe No Cost
-            title = 'Annual Yearly Sharpe No Cost'
-            save_path = path_format.format('LSYSharpNC.png') if save_plots else None
-            cal_yearly_sharpe(long_short_return_nc, ishow, title, save_path)
-
-            # Annual Yearly Sharpe With Cost
-            title = 'Annual Yearly Sharpe With Cost'
-            save_path = path_format.format('LSYSharpWC.png') if save_plots else None
-            cal_yearly_sharpe(long_short_return_wc, ishow, title, save_path)
-
+            # # # Long-Short Absolute Return No Cost: ret_group, ret_baseline -> long_short_return_nc, LSRtnsNC.csv
+            # # save_path = path_format.format('LSRtnsNC.csv') if save_tables else None
+            # # long_short_return_nc = panel_long_short_return(ret_group, ret_baseline, save_path)
+            # long_short_return_nc = pd.concat([df['Return'].rename(k) for k, df in all_panels.items()], axis=1)
             #
+            # # # Long-Short Absolute Return With Cost
+            # # long_short_return_wc = long_short_return_nc - long_short_turnover * cost_rate
+            # # if save_tables:
+            # #     long_short_return_wc.to_csv(path_format.format('LSRtnsWC.csv'))
+            # long_short_return_wc = pd.concat([df['Return_wc'].rename(k) for k, df in all_panels.items()], axis=1)
+            #
+            # # Long-Short Absolute Result No Cost: long_short_return_nc -> long_short_absolute_nc, LSAbsResNC.png
+            # title = 'Long-Short Absolute Result No Cost'
+            # save_path = path_format.format('LSAbsResNC.png') if save_plots else None
+            # long_short_absolute_nc = panel_long_short_absolute(long_short_return_nc, ishow, title, save_path)
+            #
+            # # Long-Short Absolute Result With Cost
+            # title = 'Long-Short Absolute Result With Cost'
+            # save_path = path_format.format('LSAbsResWC.png') if save_plots else None
+            # long_short_absolute_wc = panel_long_short_absolute(long_short_return_wc, ishow, title, save_path)
+            #
+            # # Long-Short Excess Result No Cost
+            # title = 'Long-Short Excess Result No Cost'
+            # save_path = path_format.format('LSExcResNC.png') if save_plots else None
+            # panel_long_short_excess(long_short_absolute_nc, ishow, title, save_path)
+            # # long_short_excess_nc = long_short_return_nc.iloc[:, :3] - long_short_return_nc.iloc[:,
+            # # 3].values.reshape(-1, 1)
+            #
+            # # Long-Short Excess Result With Cost
+            # title = 'Long-Short Excess Result With Cost'
+            # save_path = path_format.format('LSExcResWC') if save_tables else None
+            # panel_long_short_excess(long_short_absolute_wc, ishow, title, save_path)
+            # # long_short_excess_wc = long_short_return_wc.iloc[:, :3] - long_short_return_wc.iloc[:,
+            # # 3].values.reshape(-1, 1)
+
+            # %% max drawdown
+            strategy.portfolio['long'].plot_max_drawdown(ishow, path_format.format('LMddNC.png'), wc=False)
+            strategy.portfolio['long'].plot_max_drawdown(ishow, path_format.format('LMddWC.png'), wc=True)
+            if ngroups != 1:
+                strategy.portfolio['long_short'].plot_max_drawdown(ishow, path_format.format('LSMddNC.png'), wc=False)
+                strategy.portfolio['long_short'].plot_max_drawdown(ishow, path_format.format('LSMddWC.png'), wc=True)
+
+            # # Long-Absolute MaxDrawdown No Cost
+            # title = 'Long-Absolute MaxDrawdown No Cost'
+            # save_path = path_format.format('LMddNC.png') if save_plots else None
+            # cal_sr_max_drawdown(long_short_absolute_nc['long'], ishow, title, save_path)
+            #
+            # if ngroups != 1:
+            #     # Long-Short-Absolute MaxDrawdown No Cost
+            #     title = 'Long-Short-Absolute MaxDrawdown No Cost'
+            #     save_path = path_format.format('LSMddNC.png') if save_plots else None
+            #     cal_sr_max_drawdown(long_short_absolute_nc['long_short'], ishow, title, save_path)
+            #
+            # # Long-Absolute MaxDrawdown With Cost
+            # title = 'Long-Absolute MaxDrawdown With Cost'
+            # save_path = path_format.format('LMddWC.png') if save_plots else None
+            # cal_sr_max_drawdown(long_short_absolute_wc['long'], ishow, title, save_path)
+            #
+            # if ngroups != 1:
+            #     # Long-Short-Absolute MaxDrawdown With Cost
+            #     title = 'Long-Short-Absolute MaxDrawdown With Cost'
+            #     save_path = path_format.format('LSMddWC.png') if save_plots else None
+            #     cal_sr_max_drawdown(long_short_absolute_wc['long_short'], ishow, title, save_path)
+
+            # %% Portfolio Statistics
+
+            for wc in [False, True]:
+                strategy.get_portfolio_statistics(kind='long', wc=wc, path_f=path_format)
+                if ngroups != 1:
+                    strategy.get_portfolio_statistics(kind='short', wc=wc, path_f=path_format)
+                    strategy.get_portfolio_statistics(kind='long_short', wc=wc, path_f=path_format)
+
+            # # Long Only Statistics No Cost: long_short_return_nc -> ResLongNC.csv
+            # save_path = path_format.format('ResLongNC.csv') if save_tables else None
+            # cal_result_stat(long_short_return_nc[['long']], save_path)
+            #
+            # if ngroups != 1:
+            #     # Short Only Statistics No Cost: long_short_return_nc -> ResShortNC.csv
+            #     save_path = path_format.format('ResShortNC.csv') if save_tables else None
+            #     cal_result_stat(long_short_return_nc[['short']], save_path)
+            #
+            #     # Long-Short Statistics No Cost: long_short_return_nc -> ResLongShortNC.csv
+            #     save_path = path_format.format('ResLongShortNC.csv') if save_tables else None
+            #     cal_result_stat(long_short_return_nc[['long_short']], save_path)
+            #
+            # # Long Only Statistics With Cost
+            # save_path = path_format.format('ResLongWC.csv') if save_tables else None
+            # cal_result_stat(long_short_return_wc[['long']], save_path)
+            #
+            # if ngroups != 1:
+            #     # Short Only Statistics With Cost
+            #     save_path = path_format.format('ResShortWC.csv') if save_tables else None
+            #     cal_result_stat(long_short_return_wc[['short']], save_path)
+            #
+            #     # Long-Short Statistics With Cost
+            #     save_path = path_format.format('ResLongShortWC.csv') if save_tables else None
+            #     cal_result_stat(long_short_return_wc[['long_short']], save_path)
+
+            # %% Annual Result
+
+            # # Annual Return No Cost
+            # title = 'Annual Return No Cost'
+            # save_path = path_format.format('LSYRtnsNC.png') if save_plots else None
+            # cal_yearly_return(long_short_return_nc, ishow, title, save_path)
+            #
+            # # Annual Return With Cost
+            # title = 'Annual Return With Cost'
+            # save_path = path_format.format('LSYRtnsWC.png') if save_plots else None
+            # cal_yearly_return(long_short_return_wc, ishow, title, save_path)
+            #
+            # # Annual Yearly Sharpe No Cost
+            # title = 'Annual Yearly Sharpe No Cost'
+            # save_path = path_format.format('LSYSharpNC.png') if save_plots else None
+            # cal_yearly_sharpe(long_short_return_nc, ishow, title, save_path)
+            #
+            # # Annual Yearly Sharpe With Cost
+            # title = 'Annual Yearly Sharpe With Cost'
+            # save_path = path_format.format('LSYSharpWC.png') if save_plots else None
+            # cal_yearly_sharpe(long_short_return_wc, ishow, title, save_path)
+
+            # %%
             print(f'Graphs & Tables Saved in {path_format}')
         else:
             raise ValueError(f'Invalid test_mode {test_mode}')

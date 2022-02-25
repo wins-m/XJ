@@ -1,6 +1,7 @@
 import sys
 import time
 from datetime import timedelta
+from typing import Dict
 
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
 from supporter.factor_operator import *
@@ -52,12 +53,20 @@ class Portfolio(object):
 
     def __init__(self, w: pd.DataFrame = None):
         self.w_2d = w
-        self.panel = None
+        self.panel: pd.DataFrame = pd.DataFrame(
+            index=w.index, columns=['NStocks', 'Turnover', 'Return', 'Return_wc',
+                                    'Wealth(cumsum)', 'Wealth_wc(cumsum)', 'Wealth(cumprod)', 'Wealth_wc(cumprod)'])
         self.cost_rate = None
+        self.stat = {}
+        self.mdd = {}
 
     def cal_panel_result(self, cr, ret):
         self.cost_rate = cr
         self.panel = portfolio_statistics_from_weight(weight=self.w_2d, cost_rate=cr, all_ret=ret)
+
+    def cal_half_year_stat(self, wc=False):
+        col = 'Return_wc' if wc else 'Return'
+        self.stat[wc] = cal_result_stat(self.panel[[col]])
 
     def plot_turnover(self, ishow, path):
         if self.panel is None:
@@ -69,6 +78,22 @@ class Portfolio(object):
         else:
             plt.close()
 
+    def plot_cumulative_returns(self, ishow, path, kind='cumsum', title=None):
+        title = f'Portfolio Absolute Result ({kind})' if title is None else title
+        self.panel[[f'Wealth({kind})', f'Wealth_wc({kind})']].plot(figsize=(10, 5), grid=True, title=title)
+        plt.savefig(path)
+        if ishow:
+            plt.plot()
+        else:
+            plt.close()
+
+    def plot_max_drawdown(self, ishow, path, wc=False, kind='cumsum', title=None):
+        col = f'Wealth_wc({kind})' if wc else f'Wealth({kind})'
+        title = f'MaxDrawdown {col}' if title is None else title
+        df = self.panel[col].copy()
+        df = df + 1 if df.iloc[0] < .6 else df
+        cal_sr_max_drawdown(df=df, ishow=ishow, title=title, save_path=path, kind=kind)
+
     def get_position_weight(self, path=None) -> pd.DataFrame:
         if path is not None:
             self.w_2d.to_csv(path)
@@ -78,6 +103,26 @@ class Portfolio(object):
         if path is not None:
             self.panel.to_csv(path)
         return self.panel.copy()
+
+    def get_stock_number(self) -> pd.Series:
+        return self.panel['NStocks'].copy()
+
+    def get_turnover(self) -> pd.Series:
+        return self.panel['Turnover'].copy()
+
+    def get_daily_ret(self, wc=False) -> pd.Series:
+        return self.panel['Return_wc' if wc else 'Return'].copy()
+
+    def get_wealth(self, wc=False, kind='cumprod') -> pd.Series:
+        return self.panel[f'Wealth_wc({kind})' if wc else f'Wealth({kind})'].copy()
+
+    def get_half_year_stat(self, wc=False, path=None) -> pd.DataFrame:
+        if wc not in self.stat.keys():
+            print('Calculate half-year statistics before get_stat...')
+            self.cal_half_year_stat(wc=wc)
+        if path is not None:
+            self.stat[wc].to_csv(path)
+        return self.stat[wc]
 
 
 class Signal(object):
@@ -191,11 +236,8 @@ class Strategy(object):
         self.ls_group = None
         self.ls_g_rtns = None
         self.holddays = None
-        self.portfolio_l: Portfolio = Portfolio()
-        self.portfolio_s: Portfolio = Portfolio()
-        self.portfolio_ls: Portfolio = Portfolio()
-        self.portfolio_baseline: Portfolio = Portfolio()
-        self.all_panels = {}
+        self.portfolio: Dict[str, Portfolio] = {}
+        # self.all_panels: Dict[str, pd.DataFrame] = {}
 
     def cal_long_short_group(self):
         self.ls_group = get_long_short_group(df=self.sgn.fv, ngroups=self.ng)
@@ -206,14 +248,11 @@ class Strategy(object):
             long_short_group=self.ls_group, ret=ret, idx_weight=idx_w, ngroups=self.ng)
 
     def cal_long_short_panels(self, idx_w, hd, rvs, cr, ret):
-        self.portfolio_l = self.get_holding_position(idx_w=idx_w, hd=hd, rvs=rvs, kind='long')
-        self.portfolio_s = self.get_holding_position(idx_w=idx_w, hd=hd, rvs=rvs, kind='short')
-        self.portfolio_ls = self.get_holding_position(idx_w=idx_w, hd=hd, rvs=rvs, kind='long_short')
-        self.portfolio_baseline = self.get_holding_position(idx_w=idx_w, hd=hd, rvs=rvs, kind='baseline')
-        self.portfolio_l.cal_panel_result(cr=cr, ret=ret)
-        self.portfolio_s.cal_panel_result(cr=cr, ret=ret)
-        self.portfolio_ls.cal_panel_result(cr=cr, ret=ret)
-        self.portfolio_baseline.cal_panel_result(cr=cr, ret=ret)
+        """由self.ls_group获得long, short, long_short, baseline的Portfolio，并计算序列面板"""
+        for kind in ['long_short', 'long', 'short', 'baseline']:
+            self.portfolio[kind] = self.get_holding_position(idx_w=idx_w, hd=hd, rvs=rvs, kind=kind)
+            self.portfolio[kind].cal_panel_result(cr=cr, ret=ret)
+            # self.all_panels[kind] = self.portfolio[kind].get_panel()
 
     def plot_group_returns(self, ishow, path):
         plot_rtns_group(self.ls_g_rtns, ishow, path)
@@ -222,13 +261,32 @@ class Strategy(object):
         cal_total_ret_group(self.ls_g_rtns, ishow, path)
 
     def plot_turnover(self, ishow, path):
-        long_short_turnover = pd.concat([df['Turnover'].rename(k) for k, df in self.all_panels.items()], axis=1)
-        long_short_turnover[['long', 'short']].plot(figsize=(10, 5), grid=True, title='Turnover')
+        long_short_turnover = pd.concat([self.portfolio[k].get_turnover().rename(k) for k in ['long', 'short']], axis=1)
+        long_short_turnover.plot(figsize=(10, 5), grid=True, title='Turnover')
         plt.savefig(path)
         if ishow:
             plt.show()
         else:
             plt.close()
+
+    def plot_cumulative_returns(self, ishow, path, wc=False, kind='cumsum', excess=False):
+        df = pd.concat([self.portfolio[k].get_wealth(wc, kind).rename(k) for k in ['baseline', 'long_short', 'long', 'short']], axis=1)
+        if excess:
+            df[['long_short', 'long', 'short']] -= df['baseline'].values.reshape(-1, 1)
+            df = df[['long_short', 'long', 'short']]
+        title = f'Long-Short {["Absolute", "Excess"][excess]} Result({kind}) {["No Cost", "With Cost"][wc]}'
+        df.plot(figsize=(10, 5), grid=True, title=title)
+        plt.savefig(path)
+        if ishow:
+            plt.show()
+        else:
+            plt.close()
+
+    def plot_annual_return_bars(self, ishow, path, wc=False):
+        pass
+
+    def plot_annual_sharpe(self, ishow, path, wc=False):
+        pass
 
     def get_ls_group(self, path=None) -> pd.DataFrame:
         if path is not None:
@@ -241,18 +299,30 @@ class Strategy(object):
         return self.ls_g_rtns
 
     def get_holding_position(self, idx_w, hd=1, rvs=False, kind='long') -> Portfolio:
+        """
+        由2d分组序号self.ls_group获得持仓组合
+        :param idx_w: 2d权重，日截面上各股权重配比，不要求行和为一
+        :param hd: 持仓长度（日），调仓周期
+        :param rvs: 是否取反(分组依据因子值越大表现越好)。若False，组序号最大long，组序号最小short
+        :param kind: 支持long, short, long_short
+        :return: Portfolio(weight)
+        """
         if (kind == 'long' and not rvs) or (kind == 'short' and rvs):
-            _position = (self.ls_group == self.ng if self.ng == 1 else self.ng - 1)
+            _position = (self.ls_group == self.ng if self.ng == 1 else self.ng - 1).astype(int)
+            _position *= idx_w.loc[self.sgn.bd: self.sgn.ed]
         elif (kind == 'short' and not rvs) or (kind == 'long' and rvs):
-            _position = (self.ls_group == 0)
+            _position = (self.ls_group == 0).astype(int)
+            _position *= idx_w.loc[self.sgn.bd: self.sgn.ed]
         elif kind == 'long_short':
-            _position = (self.ls_group == self.ng if self.ng == 1 else self.ng - 1) - (self.ls_group == 0)
+            _position = (self.ls_group == self.ng if self.ng == 1 else self.ng - 1).astype(int) - \
+                        (self.ls_group == 0).astype(int)
+            _position = -_position if rvs else _position
+            _position *= idx_w.loc[self.sgn.bd: self.sgn.ed]
         elif kind == 'baseline':
-            return Portfolio(w=idx_w)
+            _position = idx_w.loc[self.sgn.bd: self.sgn.ed].copy()
         else:
             raise ValueError(f'Invalid portfolio kind: `{kind}`')
 
-        _position *= idx_w.loc[self.sgn.bd: self.sgn.ed]
         _position = _position.apply(lambda s: s / s.abs().sum(), axis=1)
         self.holddays = hd
         _position = _position.iloc[::hd].reindex_like(_position).fillna(method='ffill')  # 连续持仓
@@ -262,11 +332,13 @@ class Strategy(object):
 
     def get_ls_panels(self, path_f: str = None) -> dict:
         if path_f is not None:
-            self.portfolio_ls.get_panel(path_f.format('PanelLongShort.csv'))
-            self.portfolio_l.get_panel(path_f.format('PanelLong.csv'))
-            self.portfolio_s.get_panel(path_f.format('PanelShort.csv'))
-        self.all_panels = {'long_short': self.portfolio_ls.get_panel(),
-                           'long': self.portfolio_l.get_panel(),
-                           'short': self.portfolio_s.get_panel(),
-                           'baseline': self.portfolio_baseline.get_panel()}
-        return self.all_panels
+            self.portfolio['long_short'].get_panel(path_f.format('PanelLongShort.csv'))
+            self.portfolio['long'].get_panel(path_f.format('PanelLong.csv'))
+            self.portfolio['short'].get_panel(path_f.format('PanelShort.csv'))
+        return {k: self.portfolio[k].get_panel() for k in self.portfolio.keys()}
+
+    def get_portfolio_statistics(self, kind='long', wc=False, path_f=None):
+        """获取半年表现面板"""
+        _kind = kind.replace('long', 'Long').replace('short', 'Short') + ['NC', 'WC'][wc]
+        path = None if path_f is None else path_f.format(f'Res{_kind}.csv')
+        return self.portfolio[kind].get_half_year_stat(wc=wc, path=path)
