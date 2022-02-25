@@ -98,7 +98,7 @@ def update_tradeable_label(conf):
     max_down = pd.DataFrame(~(stk_maxupordown == -1))
     updown = stk_maxupordown.isna()
     print('涨跌停为False否则为True 存于 %s, key=%s' % (conf['a_list_tradeable'], 'updown & up & down'))
-    updown.to_hdf(conf['a_list_tradeable'], key='updown')
+    (~updown).to_hdf(conf['a_list_tradeable'], key='updown')
     max_up.to_hdf(conf['a_list_tradeable'], key='up')
     max_down.to_hdf(conf['a_list_tradeable'], key='down')
 
