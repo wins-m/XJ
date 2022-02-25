@@ -260,7 +260,7 @@ class Strategy(object):
     def plot_group_returns_total(self, ishow, path):
         cal_total_ret_group(self.ls_g_rtns, ishow, path)
 
-    def plot_turnover(self, ishow, path):
+    def plot_long_short_turnover(self, ishow, path):
         long_short_turnover = pd.concat([self.portfolio[k].get_turnover().rename(k) for k in ['long', 'short']], axis=1)
         long_short_turnover.plot(figsize=(10, 5), grid=True, title='Turnover')
         plt.savefig(path)
