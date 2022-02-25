@@ -15,7 +15,7 @@ from factor_backtest.backtester import *
 
 # %%
 def main():
-    # con'f
+    # %%
     conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/config.yaml'
     # conf_path = './config2.yaml'
     conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
