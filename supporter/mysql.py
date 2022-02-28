@@ -49,3 +49,23 @@ def create_table_pe_residual(tname='test', engine=None) -> dict:
         'tradingdate': DATE()
     }
     return dtypedict
+
+
+def create_table_efr(tname='test', engine=None) -> dict:
+    """Create event first report holding weight table, named `tname`"""
+    metadata = MetaData(engine)
+    new_table = Table(tname, metadata,
+                      Column('调整日期', DATE(), nullable=False),
+                      Column('证券代码', VARCHAR(20), nullable=False),
+                      Column('持仓权重', DOUBLE()),
+                      Column('成本价格', DOUBLE()),
+                      Column('是否融资融券', VARCHAR(5)), )
+    metadata.create_all(engine)
+    dtypedict = {
+        '调整日期': DATE(),
+        '证券代码': VARCHAR(20),
+        '持仓权重': DOUBLE(),
+        '成本价格': DOUBLE(),
+        '是否融资融券': VARCHAR(5),
+    }
+    return dtypedict

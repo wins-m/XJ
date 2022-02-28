@@ -91,8 +91,12 @@ save_panel : False  # 每次回归保存面板
 
 # save_remote.py
 tables :
+  efr_tables:
+    - False
+    - 'EFR_first_report_baseline1.csv'
+    - 'EFR_first_report_H_AR0_L_CAR_8_dur3.csv'
   pe_tables:
-    - True  # whether to upload
+    - False  # whether to upload
     - 'pe_residual_ols_3.csv'
     - 'pe_residual_ols_2.csv'
     - 'pe_residual_ols_1.csv'
