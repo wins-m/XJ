@@ -17,6 +17,33 @@ plt.rcParams["date.autoformatter.hour"] = "%H:%M:%S"
 
 
 # %%
+def max_drawdown_compare():
+    pass
+
+
+def half_year_stat_compare(idx: str, res_path: str, filenames: dict):
+    panel = pd.DataFrame()
+    for k, v in filenames.items():
+        df = pd.read_csv(res_path + v + '/ResLongNC.csv', index_col=0)
+        panel = pd.concat([panel, df[idx].rename(k)], axis=1)
+    panel.plot.bar(title=f'Half Year {idx}')
+    plt.show()
+
+
+def plot_holding_status(csv_path, filenames):
+    for k, v in filenames.items():
+        if 'baseline' in k:
+            continue
+        df = pd.read_csv(csv_path + k + '.csv', index_col=0, parse_dates=True)
+        df = df.sum(axis=1)
+
+        for wlen in [1, 5, 20, 60]:
+            df.rolling(wlen).mean().plot(alpha=.4 + wlen / 100, label=wlen)
+        plt.legend()
+        plt.title(f'{k}, mean: {df.mean():.3f}')
+        plt.show()
+
+
 def net_value_compare(conf, filenames=None):
     if filenames is None:
         filenames: dict = {

@@ -26,8 +26,8 @@ def main():
 
 def single_test(conf: dict):
     """单因子回测, conf is a sub one"""
-    conf = clip_backtest_conf(conf)
     # %% config for backtest
+    conf = clip_backtest_conf(conf)
     csv_path = conf['csv_path']
     res_path = conf['res_path']
     idx_constituent = conf['idx_constituent']
@@ -74,6 +74,8 @@ def single_test(conf: dict):
         if status == 0:
             print(f'Sift tradeable stocks via `{tradeable_key}`')
             tradeable_multiplier &= read_tradeable(hdf_k=tradeable_key)
+
+    read_tradeable(hdf_k='ipo')
     tradeable_multiplier.replace(False, np.nan, inplace=True)  # 股池乘子，不可交易为nan
     tradeable_multiplier.dropna(axis=1, how='all', inplace=True)  # 去除全空列（股票）
 
@@ -87,7 +89,7 @@ def single_test(conf: dict):
     idx_weight = idx_weight.fillna(0).apply(lambda s: s / s.abs().sum(), axis=1).astype(float)  # 权重之和为1
     # idx_weight = idx_weight.loc[begin_date: end_date]  # 限制回测期时间范围
     tradeable_multiplier = tradeable_multiplier.reindex_like(idx_weight)  # 缩小 tradeable_multiplier 到 idx_weight
-    assert round(idx_weight.abs().sum(axis=1).prod(), 4) == 1  # 大盘/指数全股仓位权重绝对值之和为1
+    assert round(idx_weight.dropna(how='all').abs().sum(axis=1).prod(), 4) == 1  # 大盘/指数全股仓位权重绝对值之和为1
 
     # %% Stock Returns: 可行日度收益
     if return_kind == 'ctc':  # 今日收益率：昨日信号，昨日收盘买入，今日收盘卖出

@@ -308,13 +308,13 @@ class Strategy(object):
         :return: Portfolio(weight)
         """
         if (kind == 'long' and not rvs) or (kind == 'short' and rvs):
-            _position = (self.ls_group == self.ng if self.ng == 1 else self.ng - 1).astype(int)
+            _position = (self.ls_group == (self.ng if self.ng == 1 else self.ng - 1)).astype(int)
             _position *= idx_w.loc[self.sgn.bd: self.sgn.ed]
         elif (kind == 'short' and not rvs) or (kind == 'long' and rvs):
             _position = (self.ls_group == 0).astype(int)
             _position *= idx_w.loc[self.sgn.bd: self.sgn.ed]
         elif kind == 'long_short':
-            _position = (self.ls_group == self.ng if self.ng == 1 else self.ng - 1).astype(int) - \
+            _position = (self.ls_group == (self.ng if self.ng == 1 else self.ng - 1)).astype(int) - \
                         (self.ls_group == 0).astype(int)
             _position = -_position if rvs else _position
             _position *= idx_w.loc[self.sgn.bd: self.sgn.ed]

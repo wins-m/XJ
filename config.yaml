@@ -41,12 +41,12 @@ turnover_free : "/mnt/c/Users/Winst/Documents/data_local/2d_stk_marketdata_freet
 
 # target period
 begin_date : '2013-01-01'
-end_date : '2022-12-31'
+end_date : '2022-2-14'
 
 # backtest (single_test.py)
 factors_tested : "/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/factor_backtest/factors_tested.xlsx"
 #with_updown : ''  # '': exclude open  '_withupdown': keep  '_noupdown': exclude all
-save_suffix : '第一个alpha101因子'  # 空字段，则后缀为回测开始的时间
+save_suffix : 'alpha101'  # 空字段，则后缀为回测开始的时间
 test_mode : '1'
     # '0': no test;
     # '1': default;
@@ -62,12 +62,11 @@ exclude_tradeable :   # 0: excluded
   up_open : 1
   down_open : 1
 neu_mtd : 'iv'  # n, i, iv
-stk_pool : 'NA'  # NA CSI500 CSI300 [CSI800]
 return_kind : 'ctc'  # ctc, oto, vtv
-
+stk_pool : 'NA'  # NA CSI500 CSI300 [CSI800]
 stk_w : 'ew'  # idx, ew
-ngroups : 5  # less than 0: 多/空各(-)ngroup支;    1: 稀疏事件信号
-holddays : 2  # 交易频率，如1天一换仓
+ngroups : 10  # less than 0: 多/空各(-)ngroup支;    1: 稀疏事件信号
+holddays : 5  # 交易频率，如1天一换仓
 
 tc : 2e-3  # 手续费（双边）
 save_tables : True

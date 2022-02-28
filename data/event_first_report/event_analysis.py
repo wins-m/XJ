@@ -419,6 +419,7 @@ def table_ar_adjacent_events(conf: dict, gap=20, drop_dret_over=.20, folder='eve
     # 存表
     event_adjacent_returns.to_csv(save_path)
 
+
 # %%
 if __name__ == '__main__':
     # %%
