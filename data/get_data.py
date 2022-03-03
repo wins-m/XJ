@@ -44,7 +44,11 @@ def save_factor_panel(grid: pd.DataFrame, engine_list, data_path):
         print(query)  # query sentence
         engine = engine_list[tb['SERVER']]
         # request for 2D data
-        df = mysql_query(query, engine)
+        try:
+            df = mysql_query(query, engine)
+        except:
+            print('FAIL ACCESS', query)
+            continue
         # reshape and save 2D data
         find_duplicated = False
         panel = pd.DataFrame()
