@@ -1,10 +1,9 @@
 """
 (created by swmao on Feb. 28th)
-参考Wind-组合管理-调整持仓（EFR基准）-持仓文件导入-持仓权重模板
+参考Wind-组合管理-调整持仓（EFR基准）-持仓文件导入-持仓权重模板 上传数据库 由数据库获取
 0. 数据库中，由event_first_report维护event_first_report_selected，多溯2天(duration=3)
 1. tradingdate, stockcode, fv, price, AR0, CAR_8, instnum, suspend, new_ipo, up, isTradeday
 2. isTradeday = False (?) [by default, drop it]
-3.
 
 """
 import pandas as pd
@@ -27,6 +26,7 @@ def main():
 
 
 def transfer_holding_weights(conf: dict):
+    """(deprecated) Transfer 2D src_files to daily positions"""
     csv_path = conf['factorscsv_path']
     data_path = conf['data_path']
     close_path = conf['daily_close']
@@ -36,7 +36,6 @@ def transfer_holding_weights(conf: dict):
     close_price = pd.read_csv(close_path, index_col=0, parse_dates=True)
 
     # src_file = 'first_report_baseline1.csv'
-    # 
     for src_file in ['first_report_baseline1.csv', 'first_report_H_AR0_L_CAR_8_dur3.csv']:
         src_path = csv_path + src_file
         src = pd.read_csv(src_path, index_col=0, parse_dates=True)
@@ -58,6 +57,13 @@ def transfer_holding_weights(conf: dict):
 
 
 def weight_to_efr(src: pd.DataFrame, close_price: pd.DataFrame, initial=False) -> pd.DataFrame:
+    """
+    Transform 2D holding weight to stacked daily positions
+    :param src: a 2D data frame of holding weight, row sum equals 1
+    :param close_price: a 2D data frame of daily close weight (unadjusted) for purchase price
+    :param initial: a bool adding first row as cash account if true
+    :return: a stacked frame of daily positions infomation
+    """
     src = src.unstack().reset_index()
     src.columns = ['stockcode', 'tradingdate', 'weight']
     src = src[src.weight.abs() > 0]
@@ -81,7 +87,7 @@ def weight_to_efr(src: pd.DataFrame, close_price: pd.DataFrame, initial=False) -
 
 
 def update_efr_weight(conf):
-
+    """Compare last date between event_first_report and efr_first_report* and update latter."""
     efr_tables = conf['tables']['efr_tables']
     update_target = [file.replace('.csv', '') for file in efr_tables[1:]]
     mysql_engine = conf['mysql_engine']
@@ -253,6 +259,7 @@ def update_efr_weight(conf):
 
 
 def get_recent_efr_weight(conf):
+    """Parse dates and tables to access daily PMS information"""
     mysql_engine = conf['mysql_engine']
     engine_list = {engine_id: conn_mysql(engine_info) for engine_id, engine_info in mysql_engine.items()}
     save_dir = conf['data_path']
@@ -268,7 +275,14 @@ def get_recent_efr_weight(conf):
 
 
 def _get_recent_efr_weight(tname, engine_list, save_dir, date_last=None):
-
+    """
+    From updated MySQL database acquire PMS holding weights
+    :param tname: a MySQL table name as source
+    :param engine_list: a list of MySQL engines connected
+    :param save_dir: a string of local save folder (mother)
+    :param date_last: a list (or None) of tradedates to access
+    :return:
+    """
     if date_last is None:
         query = f'SELECT 调整日期 FROM intern.{tname} ORDER BY 调整日期 DESC LIMIT 1;'
         date_local = mysql_query(query, engine_list['engine2']).loc[0, '调整日期']
