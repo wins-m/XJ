@@ -96,9 +96,9 @@ def update_tradeable_label(conf):
     stk_maxupordown = stk_maxupordown.reindex_like(df_template)
     max_up = pd.DataFrame(~(stk_maxupordown == 1))
     max_down = pd.DataFrame(~(stk_maxupordown == -1))
-    updown = stk_maxupordown.isna()
+    updown = ~stk_maxupordown.isna()
     print('涨跌停为False否则为True 存于 %s, key=%s' % (conf['a_list_tradeable'], 'updown & up & down'))
-    (~updown).to_hdf(conf['a_list_tradeable'], key='updown')
+    updown.to_hdf(conf['a_list_tradeable'], key='updown')
     max_up.to_hdf(conf['a_list_tradeable'], key='up')
     max_down.to_hdf(conf['a_list_tradeable'], key='down')
 
@@ -107,7 +107,7 @@ def update_tradeable_label(conf):
     daily_close = pd.read_csv(conf['daily_close'], index_col=0, parse_dates=True)
     eq = (daily_open == daily_close).reindex_like(df_template)
 
-    updown_open = ~(~updown & eq)  # 非（涨跌停 且 开=收），即非“一字涨跌停”
+    updown_open = ~(updown & eq)  # 非（涨跌停 且 开=收），即非“一字涨跌停”
     up_open = ~(~max_up & eq)  # 非 (涨停 且 开=收)，即一字涨停
     down_open = ~(~max_down & eq)  # 非 (跌停 且 开=收)，即一字跌停
     print('开盘一字涨跌停为False其余为True 存于 %s, key=%s' % (conf['a_list_tradeable'], 'updown_open & up_open & down_open'))
