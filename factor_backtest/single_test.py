@@ -157,6 +157,9 @@ def single_test(conf: dict):
                 signal.cal_ic_decay(all_ret=all_ret, lag=20)
 
                 ic_mean = signal.get_ic_mean(ranked=True)
+                if save_tables:
+                    signal.get_ic(ranked=False, path=path_format.format('SrIC.csv'))
+                    signal.get_ic(ranked=True, path=path_format.format('SrICRank.csv'))
                 print(signal.get_ic_stat(path_format.format('ICStat.csv') if save_tables else None))
                 print(signal.get_ic_decay(path_format.format('ICDecay.csv') if save_tables else None).iloc[1:6])
 

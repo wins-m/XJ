@@ -3,6 +3,8 @@ import time
 from datetime import timedelta
 from typing import Dict
 
+import pandas as pd
+
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
 from supporter.factor_operator import *
 
@@ -134,7 +136,7 @@ class Signal(object):
         self.__update_bd_ed__()
         self.neu_status = neu  # 中性化情况
         self.ic = None
-        self.rank_ic = None
+        self.ic_rank = None
         self.ic_stat = None
         self.ic_decay = None
         self.ic_ir_cum = None
@@ -158,18 +160,18 @@ class Signal(object):
 
     def cal_ic(self, all_ret):
         if self.neu_status is None:
-            print('Neutralize fval before IC calculation!')
+            raise AssertionError('Neutralize fval before IC calculation!')
         else:
             ret = all_ret.loc[self.bd: self.ed]
             self.ic = cal_ic(fv_l1=self.fv, ret=ret, ranked=False)
-            self.rank_ic = cal_ic(fv_l1=self.fv, ret=ret, ranked=True)
+            self.ic_rank = cal_ic(fv_l1=self.fv, ret=ret, ranked=True)
 
     def cal_ic_statistics(self):
         if self.ic is None:
             raise AssertionError('Calculate IC before IC statistics!')
         ic_stat = pd.DataFrame()
         ic_stat['IC'] = cal_ic_stat(data=self.ic)
-        ic_stat['Rank IC'] = cal_ic_stat(data=self.rank_ic)
+        ic_stat['Rank IC'] = cal_ic_stat(data=self.ic_rank)
         self.ic_stat = ic_stat.astype('float16')
 
     def cal_ic_decay(self, all_ret, lag):
@@ -186,7 +188,7 @@ class Signal(object):
             plt.show()
         else:
             plt.close()
-        self.rank_ic.plot.hist(figsize=(10, 5), bins=50, title='IC distribution')
+        self.ic_rank.plot.hist(figsize=(10, 5), bins=50, title='IC distribution')
         plt.savefig(path_f.format('ICRank.png'))
         if ishow:
             plt.show()
@@ -212,6 +214,14 @@ class Signal(object):
     def get_fend(self):
         return self.ed
 
+    def get_ic(self, ranked=True, path=None) -> pd.DataFrame:
+        tgt = self.ic_rank if ranked else self.ic
+        if tgt is None:
+            raise AssertionError('Calculate IC first!')
+        if path is not None:
+            tgt.to_csv(path)
+        return tgt.copy()
+
     def get_ic_stat(self, path=None) -> pd.DataFrame:
         if path is not None:
             self.ic_stat.to_csv(path)
@@ -222,10 +232,10 @@ class Signal(object):
             raise AssertionError('Calculate IC statistics before `get_ic_mean`')
         return self.ic_stat.loc['mean', ['IC', 'Rank IC'][ranked]]
 
-    def get_ic_decay(self, path=None):
+    def get_ic_decay(self, path=None) -> pd.DataFrame:
         if path is not None:
             self.ic_decay.to_csv(path)
-        return self.ic
+        return self.ic_decay
 
 
 class Strategy(object):
