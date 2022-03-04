@@ -82,20 +82,21 @@ def single_test(conf: dict):
     # %% idx_weight: tradeable @ stk_pool @ stk_w
     if stk_pool == 'NA' or stk_pool is None or stk_pool == '':  # 未指定股池
         idx_weight = tradeable_multiplier.astype(float)  # 全市场可交易股`tradeable_multiplier`等权重
+        tradeable_multiplier = tradeable_multiplier.reindex_like(idx_weight).replace(True, 1)  # 缩小 tradeable_multiplier 到 idx_weight
     else:  # 声明了特殊的股池
         # stk_pool = 'CSI500'
         idx_weight = get_idx_weight(idx_constituent.format(stk_pool), begin_date_nd60, end_date, stk_w)  # 股池内权重
         idx_weight = idx_weight * tradeable_multiplier.reindex_like(idx_weight)
+        tradeable_multiplier = ((idx_weight / idx_weight) * tradeable_multiplier.reindex_like(idx_weight)).replace(True, 1)
     idx_weight = idx_weight.fillna(0).apply(lambda s: s / s.abs().sum(), axis=1).astype(float)  # 权重之和为1
     # idx_weight = idx_weight.loc[begin_date: end_date]  # 限制回测期时间范围
-    tradeable_multiplier = tradeable_multiplier.reindex_like(idx_weight)  # 缩小 tradeable_multiplier 到 idx_weight
     assert round(idx_weight.dropna(how='all').abs().sum(axis=1).prod(), 4) == 1  # 大盘/指数全股仓位权重绝对值之和为1
 
     # %% Stock Returns: 可行日度收益
     if return_kind == 'ctc':  # 今日收益率：昨日信号，昨日收盘买入，今日收盘卖出
-        sell_price = pd.read_csv(close_path, index_col=0, parse_dates=True)
+        sell_price = pd.read_csv(close_path, index_col=0, parse_dates=True, dtype=float)
     elif return_kind == 'oto':  # 今日收益率：昨日信号，今日开盘买入，明日开盘卖出
-        sell_price = pd.read_csv(open_path, index_col=0, parse_dates=True).shift(-1)
+        sell_price = pd.read_csv(open_path, index_col=0, parse_dates=True, dtype=float).shift(-1)
     else:
         raise ValueError(f"""Invalid config.return_kind {return_kind}""")
     all_ret: pd.DataFrame = sell_price.pct_change().reindex_like(idx_weight) * tradeable_multiplier
