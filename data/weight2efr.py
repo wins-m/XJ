@@ -88,18 +88,19 @@ def weight_to_efr(src: pd.DataFrame, close_price: pd.DataFrame, initial=False) -
 
 def update_efr_weight(conf):
     """Compare last date between event_first_report and efr_first_report* and update latter."""
-    efr_tables = conf['tables']['efr_tables']
-    update_target = [file.replace('.csv', '') for file in efr_tables[1:]]
+    # efr_tables = conf['tables']['efr_tables']
+    # update_target = [file.replace('.csv', '') for file in efr_tables[1:]]
     mysql_engine = conf['mysql_engine']
     engine_list = {engine_id: conn_mysql(engine_info) for engine_id, engine_info in mysql_engine.items()}
 
-    target_table = update_target[-1]
+    target_table = 'efr_baseline_dur3'  # update_target[-1]
     query = f'SELECT 调整日期 FROM intern.{target_table} ORDER BY 调整日期 DESC LIMIT 1;'
     date_local = mysql_query(query, engine_list['engine2'])
     if len(date_local) > 0:
         date_local = date_local.loc[0, '调整日期']
     else:
-        date_local = pd.to_datetime('2016-01-01')
+        import datetime
+        date_local = datetime.date(2016,1,1)
 
     query = f"""SELECT tradingdate,stockcode,fv FROM factordatabase.event_first_report WHERE tradingdate>'{date_local}' ORDER BY tradingdate;"""
     event_first_report = mysql_query(query, engine_list['engine2'])
@@ -195,9 +196,6 @@ def update_efr_weight(conf):
     event_panel['isTradeday'] = event_panel.tradingdate.apply(lambda x: x in tdays_d.tradingdate.values).astype(bool)
 
     #
-    event_panel.to_pickle(conf['data_path'] + 'event_panel(update_tmp).pkl')
-
-    #
     def mask_efficiency(mask):
         _len = len(mask)
         l1 = mask.sum()
@@ -222,23 +220,44 @@ def update_efr_weight(conf):
     tmp = event_panel.groupby('tradingdate')['tradeable'].sum().rename('td_cnt')
     tmp = tmp.reset_index()
     tmp['ex_cnt'] = tmp.td_cnt // 2
-
-    # 2d signal -> dur3 -> efr_weight
     panel = event_panel[event_panel.tradeable].merge(tmp, on='tradingdate', how='left')
+
+    #
+    event_panel.to_pickle(conf['data_path'] + f'event_panel(update_tmp)[{begin_date},{end_date}].pkl')
+
+    # event_first_all_efr
     event_first_all = panel.pivot(index='tradingdate', columns='stockcode', values='fv')
     event_first_all = event_first_all.fillna(method='ffill', limit=2)
     event_first_all = event_first_all.fillna(0).apply(lambda s: s / s.abs().sum(), axis=1)
     event_first_all_efr = weight_to_efr(event_first_all, close_2d)
 
+    # event_first_selected_efr
     mask_l_car_8 = panel.groupby('tradingdate').CAR_8.rank(ascending=False) > panel.ex_cnt
-    mask_efficiency(mask_l_car_8)
     mask_h_ar0 = panel.groupby('tradingdate').AR0.rank(ascending=True) > panel.ex_cnt
-    mask_efficiency(mask_h_ar0)
     mask_efficiency(mask_l_car_8 & mask_h_ar0)
     event_first_selected = panel[mask_l_car_8 & mask_h_ar0].pivot(index='tradingdate', columns='stockcode', values='fv')
     event_first_selected = event_first_selected.fillna(method='ffill', limit=2)
     event_first_selected = event_first_selected.fillna(0).apply(lambda s: s/s.abs().sum(), axis=1)
+    # event_first_selected.to_csv(conf['factorscsv_path'] + 'efr_har0_lcar8_v1.csv')
     event_first_selected_efr = weight_to_efr(event_first_selected, close_2d)
+
+    # event_first_hAR0_efr
+    mask_h_ar0 = panel.groupby('tradingdate').AR0.rank(ascending=True) > panel.ex_cnt
+    mask_efficiency(mask_h_ar0)
+    event_first_selected = panel[mask_h_ar0].pivot(index='tradingdate', columns='stockcode', values='fv')
+    event_first_selected = event_first_selected.fillna(method='ffill', limit=2)
+    event_first_selected = event_first_selected.fillna(0).apply(lambda s: s/s.abs().sum(), axis=1)
+    # event_first_selected.to_csv(conf['factorscsv_path'] + 'efr_har0_v2.csv')
+    event_first_hAR0_efr = weight_to_efr(event_first_selected, close_2d)
+
+    # event_first_lCAR8_efr
+    mask_l_car_8 = panel.groupby('tradingdate').CAR_8.rank(ascending=False) > panel.ex_cnt
+    mask_efficiency(mask_l_car_8)
+    event_first_selected = panel[mask_l_car_8].pivot(index='tradingdate', columns='stockcode', values='fv')
+    event_first_selected = event_first_selected.fillna(method='ffill', limit=2)
+    event_first_selected = event_first_selected.fillna(0).apply(lambda s: s/s.abs().sum(), axis=1)
+    # event_first_selected.to_csv(conf['factorscsv_path'] + 'efr_lcar8_v2.csv')
+    event_first_lCAR8_efr = weight_to_efr(event_first_selected, close_2d)
 
     # 2d weight -> EFR
     dtypedict = {
@@ -249,12 +268,20 @@ def update_efr_weight(conf):
         '是否融资融券': VARCHAR(5),
     }
 
-    tname = 'efr_first_report_baseline1'
+    tname = 'efr_baseline_dur3'
     event_first_all_efr.to_sql(tname, con=engine_list['engine3'], if_exists='append', index=False, dtype=dtypedict)
     print(tname, begin_date, end_date, 'Uploaded.')
 
-    tname = 'efr_first_report_h_ar0_l_car_8_dur3'
+    tname = 'efr_har0_lcar8_dur3'
     event_first_selected_efr.to_sql(tname, con=engine_list['engine3'], if_exists='append', index=False, dtype=dtypedict)
+    print(tname, begin_date, end_date, 'Uploaded.')
+
+    tname = 'efr_har0_dur3'
+    event_first_hAR0_efr.to_sql(tname, con=engine_list['engine3'], if_exists='append', index=False, dtype=dtypedict)
+    print(tname, begin_date, end_date, 'Uploaded.')
+
+    tname = 'efr_lcar8_dur3'
+    event_first_lCAR8_efr.to_sql(tname, con=engine_list['engine3'], if_exists='append', index=False, dtype=dtypedict)
     print(tname, begin_date, end_date, 'Uploaded.')
 
 
@@ -268,10 +295,10 @@ def get_recent_efr_weight(conf):
     # end_date = '2022-12-31'
     # query = f"""SELECT tradingdate FROM jeffdatabase.tdays_d WHERE tradingdate>='{begin_date}' AND tradingdate<='{end_date}' ORDER BY tradingdate;"""
     # tdays_d = mysql_query(query, engine_list['engine0'])
-    # date_list = tdays_d['tradingdate'].apply(lambda x: x.strftime('%Y-%m-%d')).to_list()
-    date_list = None
-    for tname in ['efr_first_report_baseline1', 'efr_first_report_h_ar0_l_car_8_dur3']:
-        _get_recent_efr_weight(tname, engine_list, save_dir, date_last=date_list)
+    # date_last = tdays_d['tradingdate'].apply(lambda x: x.strftime('%Y-%m-%d')).to_list()
+    date_last = None
+    for tname in ['efr_baseline_dur3', 'efr_har0_lcar8_dur3', 'efr_har0_dur3', 'efr_lcar8_dur3']:  # ['efr_first_report_baseline1', 'efr_first_report_h_ar0_l_car_8_dur3']:
+        _get_recent_efr_weight(tname, engine_list, save_dir, date_last=date_last)
 
 
 def _get_recent_efr_weight(tname, engine_list, save_dir, date_last=None):

@@ -40,14 +40,14 @@ turnover : "/mnt/c/Users/Winst/Documents/data_local/2d_stk_marketdata_turn.csv"
 turnover_free : "/mnt/c/Users/Winst/Documents/data_local/2d_stk_marketdata_freeturn.csv"
 
 # target period
-begin_date : '2013-01-01'
-end_date : '2022-2-14'
+begin_date : '2016-01-01'
+end_date : '2022-3-3'
 
 # backtest (single_test.py)
 factors_tested : "/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/factor_backtest/factors_tested.xlsx"
 #with_updown : ''  # '': exclude open  '_withupdown': keep  '_noupdown': exclude all
-save_suffix : 'alpha101'  # 空字段，则后缀为回测开始的时间
-test_mode : '1'
+save_suffix : ''  # 空字段，则后缀为回测开始的时间
+test_mode : '3'
     # '0': no test;
     # '1': default;
     # '2': from `LSGroup.csv`
@@ -55,18 +55,18 @@ test_mode : '1'
 exclude_tradeable :   # 0: excluded
   ipo60 : 0
   suspend: 0
-  updown : 0
+  updown : 1
   up : 1
   down : 1
   updown_open : 1
   up_open : 1
   down_open : 1
-neu_mtd : 'iv'  # n, i, iv
+neu_mtd : 'n'  # n, i, iv
 return_kind : 'ctc'  # ctc, oto, vtv
 stk_pool : 'NA'  # NA CSI500 CSI300 [CSI800]
 stk_w : 'ew'  # idx, ew
-ngroups : 10  # less than 0: 多/空各(-)ngroup支;    1: 稀疏事件信号
-holddays : 5  # 交易频率，如1天一换仓
+ngroups : 1  # less than 0: 多/空各(-)ngroup支;    1: 稀疏事件信号
+holddays : 1  # 交易频率，如1天一换仓
 
 tc : 2e-3  # 手续费（双边）
 save_tables : True
