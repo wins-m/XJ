@@ -8,6 +8,46 @@ from tqdm import tqdm
 from statsmodels.regression.linear_model import OLS
 
 
+def visit_2d_v(td, stk, df, shift=0):
+    """
+    按行、列标访问2D面板，行为stockcode，列为tradingdate，支持shift
+    :param td: 日期
+    :param stk: 股票
+    :param df: 2D因子面板
+    :param shift: 滞后若干交易日
+    :return: 表值
+    """
+    td_idx = -1
+    try:
+        td_idx = df.index.get_loc(td) + shift
+    except KeyError:
+        print(f'KeyError: ({td}, {stk})')
+        return np.nan
+    finally:
+        if (td_idx < 0) or (td_idx > len(df)):
+            return np.nan
+        return df.iloc[td_idx, :].loc[stk]
+
+
+def column_look_up(tgt, src, delay=0, kw='r_1', msg=None):
+    """
+    从2D面板src获取stacked表tgt关键字kw的列值，根据tradingdate和stockcode
+    :param tgt: 目标表，包含列tradingdate和stockcode
+    :param src: 来源表，2D，列为tradingdate，行为stockcode
+    :param delay: 滞后日
+    :param kw: 新增到src的列名
+    :param msg: 缺失百分比的提示
+    :return: 新加列的表
+    """
+    key = tgt[['tradingdate', 'stockcode']]
+    print(f'{kw}...')
+    tgt[kw] = key.apply(lambda s: visit_2d_v(s.iloc[0], s.iloc[1], src, shift=delay), axis=1)
+    if msg is None:
+        msg = 'not found in source table'
+    print(f'nan:{tgt[kw].isna().mean() * 100: 6.2f} % {msg}')
+    return tgt
+
+
 def get_winsorize_sr(sr: pd.Series, nsigma=3) -> pd.Series:
     """对series缩尾"""
     df = sr.copy()
