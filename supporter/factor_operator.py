@@ -51,6 +51,7 @@ def factor_neutralization(fv: pd.DataFrame, neu_mtd='n', ind_path=None, mv_path=
     - n/i/iv: 去极值（缩尾）｜标准化
     - i/iv: 行业中性化
     - iv: 市值中性化
+    (2022.3.7后,行业和市值也滞后1日,同因子对齐)
 
     :param neu_mtd: 中性化方式，仅标准化(n)，按行业(i)，行业+市值(iv)
     :param ind_path: 行业分类2D面板，由get_data.py获取，tradingdate,stockcode,<str>
@@ -66,13 +67,13 @@ def factor_neutralization(fv: pd.DataFrame, neu_mtd='n', ind_path=None, mv_path=
         return fv0
     elif 'i' in neu_mtd:
         indus = pd.read_csv(ind_path, index_col=0, parse_dates=True, dtype=str)
-        indus = indus.reindex_like(fv).fillna(method='ffill')  # 新交易日未知行业，沿用上一交易日
+        indus = indus.shift(1).reindex_like(fv).fillna(method='ffill').fillna(method='bfill')  # 月调整,延用昨日(首月不准)
         if neu_mtd == 'i':  # 行业中性化
             print('NEU INDUS...')
             fv1 = get_neutralize_sector(fval=fv0, indus=indus)
         elif neu_mtd == 'iv':  # 行业&市值中性化
             size = pd.read_csv(mv_path, index_col=0, parse_dates=True, dtype=float)
-            size = size.reindex_like(fv)
+            size = size.shift(1).reindex_like(fv)
             size_ln = size.apply(np.log)
             size_ln_std = size_ln  # size_ln_std = get_standardize(get_winsorize(size_ln))
             print('NEU INDUS & MKT_SIZE...')

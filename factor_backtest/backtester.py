@@ -3,8 +3,6 @@ import time
 from datetime import timedelta
 from typing import Dict
 
-import pandas as pd
-
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
 from supporter.factor_operator import *
 
