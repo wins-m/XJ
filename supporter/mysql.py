@@ -14,6 +14,22 @@ from sqlalchemy.dialects.mysql import \
 import pandas as pd
 
 
+def sql_delete(sql: str, eg: dict):
+    """执行删除语句"""
+    import pymysql
+    db = pymysql.connect(user=eg['user'], password=eg['password'], host=eg['host'], database=eg['dbname'],
+                         port=int(eg['port']))
+    cursor = db.cursor()
+    # try:
+    cursor.execute(sql)
+    db.commit()
+    print("delete OK")
+    # except:
+    #     print('fail')
+    #     db.rollback()
+    db.close()
+
+
 def conn_mysql(eng: dict):
     """根据dict中的服务器信息，连接mysql"""
     user = eng['user']

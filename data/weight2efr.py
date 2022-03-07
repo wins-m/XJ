@@ -9,9 +9,8 @@
 import pandas as pd
 import sys
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
-from supporter.mysql import conn_mysql, mysql_query
+from supporter.mysql import conn_mysql, mysql_query, sql_delete
 from datetime import timedelta
-import numpy as np
 from sqlalchemy.dialects.mysql import DATE, VARCHAR, DOUBLE
 
 
@@ -22,7 +21,7 @@ def main():
 
     # transfer_holding_weights(conf)
     update_efr_weight(conf)
-    get_recent_efr_weight(conf)
+    # get_recent_efr_weight(conf)
 
 
 def transfer_holding_weights(conf: dict):
@@ -93,74 +92,58 @@ def update_efr_weight(conf):
     mysql_engine = conf['mysql_engine']
     engine_list = {engine_id: conn_mysql(engine_info) for engine_id, engine_info in mysql_engine.items()}
 
+    # 确定需要更新的EFR范围：efr_baseline_dur3最后一个日期
     target_table = 'efr_baseline_dur3'  # update_target[-1]
     query = f'SELECT 调整日期 FROM intern.{target_table} ORDER BY 调整日期 DESC LIMIT 1;'
-    date_local = mysql_query(query, engine_list['engine2'])
+    date_local = mysql_query(query, engine_list['engine3'])
     if len(date_local) > 0:
         date_local = date_local.loc[0, '调整日期']
     else:
         import datetime
-        date_local = datetime.date(2016,1,1)
+        date_local = datetime.date(2016, 1, 1)
 
-    query = f"""SELECT tradingdate,stockcode,fv FROM factordatabase.event_first_report WHERE tradingdate>'{date_local}' ORDER BY tradingdate;"""
+    date_former = date_local - timedelta(5)
+    query = f"""SELECT tradingdate,stockcode,fv FROM factordatabase.event_first_report WHERE tradingdate>'{date_former}' ORDER BY tradingdate;"""
     event_first_report = mysql_query(query, engine_list['engine2'])
-    if len(event_first_report) == 0:
-        print(f'数据库{target_table}最新日期与event_first_report一致，无需更新')
-        return
+    # if len(event_first_report) == 0:
+    #     print(f'数据库{target_table}最新日期与event_first_report一致，无需更新')
+    #     return
     begin_date = event_first_report.tradingdate.min()
     end_date = event_first_report.tradingdate.max()
-    print(date_local, begin_date, end_date)
-    try:
-        assert end_date > date_local  # 继续条件
-    except AssertionError:
-        raise AssertionError(f'数据库{target_table}最新日期与event_first_report一致，无需更新')
+    print(f'{target_table}已有最后日期:\t{date_local}')
+    print(f'强制更新范围:\t{begin_date} ~ {end_date}')
+    # try:
+    #     assert end_date > date_local  # 继续条件
+    # except AssertionError:
+    #     raise AssertionError(f'数据库{target_table}最新日期与event_first_report一致，无需更新')
 
     # 准备所需数据
-    prior_date = date_local - timedelta(30)
+    prior_date = date_former - timedelta(30)
     query = f"""SELECT tradingdate,stockcode,close,close*adjfactor AS closeAdj FROM jeffdatabase.stk_marketdata WHERE tradingdate>'{prior_date}' ORDER BY tradingdate;"""
     close_adj = mysql_query(query, engine_list['engine0'])
 
-    prior_date = date_local
+    prior_date = date_former
     query = f"""SELECT tradingdate,stockcode,west_instnum FROM jeffdatabase.stk_west_instnum_180 WHERE tradingdate>'{prior_date}' ORDER BY tradingdate;"""
     instnum = mysql_query(query, engine_list['engine0'])
 
-    prior_date = date_local - timedelta(95)
+    prior_date = date_former - timedelta(95)
     query = f"""SELECT stockcode,ipo_date FROM jeffdatabase.stk_ipo_date WHERE ipo_date>'{prior_date}' ORDER BY ipo_date;"""
     ipo_date = mysql_query(query, engine_list['engine0'])
 
-    prior_date = date_local
+    prior_date = date_former
     query = f"""SELECT stockcode,tradingdate FROM jeffdatabase.a_list_suspendsymbol WHERE tradingdate>'{prior_date}' ORDER BY tradingdate;"""
     a_list_suspend = mysql_query(query, engine_list['engine0'])
 
-    prior_date = date_local
+    prior_date = date_former
     query = f"""SELECT tradingdate,stockcode,maxupordown FROM jeffdatabase.stk_maxupordown WHERE tradingdate>'{prior_date}' ORDER BY tradingdate;"""
     maxupordown = mysql_query(query, engine_list['engine0'])
 
-    prior_date = date_local - timedelta(30)
+    prior_date = date_former - timedelta(30)
     query = f"""SELECT tradingdate FROM jeffdatabase.tdays_d WHERE tradingdate>'{prior_date}' ORDER BY tradingdate;"""
     tdays_d = mysql_query(query, engine_list['engine0'])
 
     # 数据入库
-    def visit_2d_v(td, stk, df, shift=0):
-        td_idx = -1
-        try:
-            td_idx = df.index.get_loc(td) + shift
-        except KeyError:
-            print(f'KeyError: ({td}, {stk})')
-            return np.nan
-        finally:
-            if (td_idx < 0) or (td_idx > len(df)):
-                return np.nan
-            return df.iloc[td_idx, :].loc[stk]
-
-    def column_look_up(tgt, src, delay=-1, kw='r_1', msg=None):
-        key = tgt[['tradingdate', 'stockcode']]
-        print(f'{kw}...')
-        tgt[kw] = key.apply(lambda s: visit_2d_v(s.iloc[0], s.iloc[1], src, shift=delay), axis=1)
-        if msg is None:
-            msg = 'not found in source table'
-        print(f'nan:{tgt[kw].isna().mean() * 100: 6.2f} % {msg}')
-        return tgt
+    from supporter.transformer import column_look_up
 
     event_panel = event_first_report.copy()
 
@@ -260,6 +243,7 @@ def update_efr_weight(conf):
     event_first_lCAR8_efr = weight_to_efr(event_first_selected, close_2d)
 
     # 2d weight -> EFR
+
     dtypedict = {
         '调整日期': DATE(),
         '证券代码': VARCHAR(20),
@@ -267,22 +251,21 @@ def update_efr_weight(conf):
         '成本价格': DOUBLE(),
         '是否融资融券': VARCHAR(5),
     }
+    engine_info = conf['mysql_engine']['engine3']
 
-    tname = 'efr_baseline_dur3'
-    event_first_all_efr.to_sql(tname, con=engine_list['engine3'], if_exists='append', index=False, dtype=dtypedict)
-    print(tname, begin_date, end_date, 'Uploaded.')
+    def delete_and_upload(tname, efr_df, data_path, begin_date=begin_date, end_date=end_date):
+        sql = f"DELETE FROM intern.{tname} WHERE 调整日期 >= '{begin_date}'"
+        sql_delete(sql=sql, eg=engine_info)
+        efr_df.to_sql(tname, con=engine_list['engine3'], if_exists='append', index=False, dtype=dtypedict)
+        print(tname, begin_date, end_date, 'Uploaded.')
+        filename = f'{tname}[{begin_date},{end_date}].xlsx'
+        efr_df.to_excel(data_path + filename)
+        print(f'{filename} Saved.')
 
-    tname = 'efr_har0_lcar8_dur3'
-    event_first_selected_efr.to_sql(tname, con=engine_list['engine3'], if_exists='append', index=False, dtype=dtypedict)
-    print(tname, begin_date, end_date, 'Uploaded.')
-
-    tname = 'efr_har0_dur3'
-    event_first_hAR0_efr.to_sql(tname, con=engine_list['engine3'], if_exists='append', index=False, dtype=dtypedict)
-    print(tname, begin_date, end_date, 'Uploaded.')
-
-    tname = 'efr_lcar8_dur3'
-    event_first_lCAR8_efr.to_sql(tname, con=engine_list['engine3'], if_exists='append', index=False, dtype=dtypedict)
-    print(tname, begin_date, end_date, 'Uploaded.')
+    delete_and_upload('efr_baseline_dur3', event_first_all_efr, conf['data_path'])
+    delete_and_upload('efr_har0_lcar8_dur3', event_first_selected_efr, conf['data_path'])
+    delete_and_upload('efr_har0_dur3', event_first_hAR0_efr, conf['data_path'])
+    delete_and_upload('efr_lcar8_dur3', event_first_lCAR8_efr, conf['data_path'])
 
 
 def get_recent_efr_weight(conf):
@@ -327,5 +310,6 @@ def _get_recent_efr_weight(tname, engine_list, save_dir, date_last=None):
     df_efr.to_excel(save_name, index=None)
 
 
+# %%
 if __name__ == '__main__':
     main()
