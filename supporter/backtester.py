@@ -318,20 +318,26 @@ class Strategy(object):
         if (kind == 'long' and not rvs) or (kind == 'short' and rvs):
             _position = (self.ls_group == (self.ng if self.ng == 1 else self.ng - 1)).astype(int)
             _position *= idx_w.loc[self.sgn.bd: self.sgn.ed]
+            _position = _position.apply(lambda s: s / s.abs().sum(), axis=1)
         elif (kind == 'short' and not rvs) or (kind == 'long' and rvs):
             _position = (self.ls_group == 0).astype(int)
             _position *= idx_w.loc[self.sgn.bd: self.sgn.ed]
+            _position = _position.apply(lambda s: s / s.abs().sum(), axis=1)
         elif kind == 'long_short':
-            _position = (self.ls_group == (self.ng if self.ng == 1 else self.ng - 1)).astype(int) - \
-                        (self.ls_group == 0).astype(int)
-            _position = -_position if rvs else _position
-            _position *= idx_w.loc[self.sgn.bd: self.sgn.ed]
+            _position_l = (self.ls_group == (self.ng if self.ng == 1 else self.ng - 1)).astype(int)
+            _position_s = (self.ls_group == 0).astype(int)
+            _position_l, _position_s = (_position_s, _position_l) if rvs else (_position_l, _position_s)
+            _position_l *= idx_w.loc[self.sgn.bd: self.sgn.ed]
+            _position_s *= idx_w.loc[self.sgn.bd: self.sgn.ed]
+            _position_l = _position_l.apply(lambda s: s / s.abs().sum(), axis=1)
+            _position_s = _position_s.apply(lambda s: s / s.abs().sum(), axis=1)
+            _position = (_position_l - _position_s).apply(lambda s: s / s.abs().sum(), axis=1)
         elif kind == 'baseline':
             _position = idx_w.loc[self.sgn.bd: self.sgn.ed].copy()
+            _position = _position.apply(lambda s: s / s.abs().sum(), axis=1)
         else:
             raise ValueError(f'Invalid portfolio kind: `{kind}`')
 
-        _position = _position.apply(lambda s: s / s.abs().sum(), axis=1)
         self.holddays = hd
         _position = _position.iloc[::hd].reindex_like(_position).fillna(method='ffill')  # 连续持仓
         assert round(_position.dropna(how='all').abs().sum(axis=1).prod(), 4) == 1
