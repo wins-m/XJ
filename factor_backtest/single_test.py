@@ -10,7 +10,7 @@ import sys
 import yaml
 
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
-from factor_backtest.backtester import *
+from supporter.backtester import *
 
 
 # %%
@@ -96,7 +96,8 @@ def single_test(conf: dict):
     if return_kind == 'ctc':  # 今日收益率：昨日信号，昨日收盘买入，今日收盘卖出
         sell_price = pd.read_csv(close_path, index_col=0, parse_dates=True, dtype=float)
     elif return_kind == 'oto':  # 今日收益率：昨日信号，今日开盘买入，明日开盘卖出
-        sell_price = pd.read_csv(open_path, index_col=0, parse_dates=True, dtype=float).shift(-1)
+        sell_price = pd.read_csv(open_path, index_col=0, parse_dates=True, dtype=float)
+        sell_price = sell_price.shift(-1)  # Return: long T+1 Open short T+2 Open for T0 Signal
     else:
         raise ValueError(f"""Invalid config.return_kind {return_kind}""")
     all_ret: pd.DataFrame = sell_price.pct_change().reindex_like(idx_weight) * tradeable_multiplier
@@ -196,11 +197,12 @@ def single_test(conf: dict):
             strategy.plot_cumulative_returns(ishow, path_format.format('LSExcResWC.png'), True, 'cumsum', True)
             strategy.portfolio['long'].plot_max_drawdown(ishow, path_format.format('LMddNC.png'), wc=False)
             strategy.portfolio['long'].plot_max_drawdown(ishow, path_format.format('LMddWC.png'), wc=True)
-            if ngroups != 1:
-                strategy.portfolio['long_short'].plot_max_drawdown(ishow, path_format.format('LSMddNC.png'), wc=False)
-                strategy.portfolio['long_short'].plot_max_drawdown(ishow, path_format.format('LSMddWC.png'), wc=True)
+            # if ngroups != 1:
+            strategy.portfolio['long_short'].plot_max_drawdown(ishow, path_format.format('LSMddNC.png'), wc=False)
+            strategy.portfolio['long_short'].plot_max_drawdown(ishow, path_format.format('LSMddWC.png'), wc=True)
 
         if save_tables:
+            strategy.get_ls_panels(path_f=path_format)
             for wc in [False, True]:
                 strategy.get_portfolio_statistics(kind='long', wc=wc, path_f=path_format)
                 if ngroups != 1:
