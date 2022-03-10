@@ -5,6 +5,7 @@ from typing import Dict
 
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
 from supporter.factor_operator import *
+from supporter import suffix
 
 
 def clip_backtest_conf(conf: dict):
@@ -32,8 +33,7 @@ def clip_backtest_conf(conf: dict):
         'save_plots': conf['save_plots'],
         'ishow': conf['ishow'],
         'all_factornames': pd.read_excel(conf['factors_tested'], index_col=0).loc[1:1].iloc[:, 0].to_list(),
-        'save_suffix': conf['save_suffix'] if conf['save_suffix'] != '' else time.strftime("%m%d_%H%M%S",
-                                                                                           time.localtime()),
+        'save_suffix': suffix.get_time_suffix(conf['save_suffix']),
         'begin_date_nd60': (pd.to_datetime(conf['begin_date']) - timedelta(60)).strftime('%Y-%m-%d')
     }
     # res['fbegin_end'] = df[['F_NAME', 'F_BEGIN', 'F_END']].set_index('F_NAME').apply(lambda s: (s.iloc[0],
