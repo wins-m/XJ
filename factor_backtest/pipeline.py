@@ -2,7 +2,8 @@
 (created by swmao on March 7th)
 - 因子原始值
 - (depreciated)计算原始值在全A的Rank IC,CSI500内分别经过winso&std,neu_i,neu_iv的IC及IC Decay
-- 仅保留CSI500, rescale into (0, 1] and save
+- 仅保留CSI500, rescale into (0, 1] and save TODO: 0-1 factors
+TODO: diff btw. Factor & Signal?
 
 """
 import os

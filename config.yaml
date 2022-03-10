@@ -19,7 +19,7 @@ a_list_tradeable : "/mnt/c/Users/Winst/Documents/data_local/a_list_tradeable.hdf
         # tradeable_noupdown(ipo_60 & suspend_L1 & updown_L1)
 
 # csv data file
-idx_constituent : "/mnt/c/Users/Winst/Documents/data_local/idx_constituent_{}.csv"
+idx_constituent : "/mnt/c/Users/Winst/Documents/data_local/idx_constituent_{}.csv"  # CSI100, CSI400, CSI500, CSI800, SSE50
 a_list_suspendsymbol : "/mnt/c/Users/Winst/Documents/data_local/a_list_suspendsymbol.csv"
 date_last_suspend_alldays : "/mnt/c/Users/Winst/Documents/data_local/last_suspend_ad2d.csv"
 stk_ipo_date : "/mnt/c/Users/Winst/Documents/data_local/stk_ipo_date.csv"
@@ -39,15 +39,19 @@ instnum_180 : "/mnt/c/Users/Winst/Documents/data_local/2d_stk_west_instnum_180.c
 turnover : "/mnt/c/Users/Winst/Documents/data_local/2d_stk_marketdata_turn.csv"
 turnover_free : "/mnt/c/Users/Winst/Documents/data_local/2d_stk_marketdata_freeturn.csv"
 
+# pickle tmp file
+alpha_y012 : "/mnt/c/Users/Winst/Documents/data_local/Y012_TmrRtnC2C_Pct10_TopMidBott.pkl"
+alpha_yx : "/mnt/c/Users/Winst/Documents/data_local/Y012_X79.pkl"
+
 # target period
-begin_date : '2016-01-01'
-end_date : '2022-3-3'
+begin_date : '2013-01-01'
+end_date : '2021-12-31'
 
 # backtest (single_test.py)
 factors_tested : "/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/factor_backtest/factors_tested.xlsx"
 #with_updown : ''  # '': exclude open  '_withupdown': keep  '_noupdown': exclude all
 save_suffix : ''  # 空字段，则后缀为回测开始的时间
-test_mode : '3'
+test_mode : '!'
     # '0': no test;
     # '1': default;
     # '2': from `LSGroup.csv`
