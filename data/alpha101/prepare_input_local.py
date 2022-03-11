@@ -8,20 +8,26 @@
 - ./factor_backtest/pipeline.py: format features before merge
 - merge alpha features aligned with tradeable Y (ipo60 & noUpDown & noST)
     - date range: 201301~202202(recently) except for alpha_045
-- TODO: split training set, validation set, blackout set
+
+TODO
+- check recent 1000, exclude
+- fill (adding indus group label)
+- split training set, validation set, blackout set
+
 """
-import pandas as pd
-import os
-from tqdm import tqdm
-import sys
+from typing import Tuple
+import sys, os
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
-from supporter.request import get_hold_return
+from supporter.alpha import *
 
 
+# %%
 def main():
+    # %%
     import yaml
     conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/config.yaml'
     conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
+    # %%
 
     # prepare_t1_prediction_y012(conf, ret_kind='ot5c', stk_pool='CSI500')
     # prepare_t1_prediction_y012(conf, ret_kind='ctc', stk_pool='CSI500')
@@ -29,87 +35,108 @@ def main():
     # prepare_t1_prediction_y012(conf, ret_kind='ct5o', stk_pool='CSI500')
 
     # tgt_file = 'Y012_TmrRtnOT5C_CSI500pct10_TopMidBott.pkl'
-    feature_files = sorted([x for x in os.listdir(conf['factorscsv_path']) if '[CSI500ranked]alpha_' in x])
-    print(feature_files[:5])
+    # import os
+    # feature_files = sorted([x for x in os.listdir(conf['factorscsv_path']) if x[:6] == 'alpha_'])
+    # # feature_files = sorted([x for x in os.listdir(conf['factorscsv_path']) if '[CSI500ranked]alpha_' in x])
+    # print(feature_files[:5])
     # merge_all_alpha(conf, tgt_file, feature_files)
 
-
-def prepare_t1_prediction_y012(conf, ret_kind, stk_pool):
-    """
-    用3维的向量表示3种不同的输出类别。
-    𝒚=[100]𝑇表示上涨样本（每个时间截面上，将全体股票按照未来1个交易日收益率排序，收益率最高的前10%的股票样本标记为“上涨样本”），
-    𝒚=[010]𝑇表示平盘样本（收益率居中的10%的股票样本），
-    𝒚=[001]𝑇表示下跌样本（收益率最低的10%的股票样本）
-    Accessible: 60 trade days since ipo, yesterday close not max_up_or_down, yesterday close not suspend
-    Output: Y012_TmrRtnC2C_Pct10_TopMidBott.pkl
-
-    """
-
-    def get_predict_target(_hold_ret, _ret_kind):
-        _hold_ret_tmr = _hold_ret.shift(-1).stack().reset_index()  # Attention: shift -1 for Day+1 prediction
-        col = f'rtn_{_ret_kind}'
-        _hold_ret_tmr.columns = ['tradingdate', 'stockcode', col]
-        _hold_ret_tmr[f'rnk_{col}'] = _hold_ret_tmr.groupby('tradingdate')[col].rank(pct=True, ascending=True)
-        _hold_ret_tmr['y0'] = _hold_ret_tmr[f'rnk_{col}'] > 0.9
-        _hold_ret_tmr['y1'] = (_hold_ret_tmr[f'rnk_{col}'] > 0.55) & (_hold_ret_tmr[f'rnk_{col}'] <= 0.65)
-        _hold_ret_tmr['y2'] = _hold_ret_tmr[f'rnk_{col}'] <= 0.1
-        _hold_ret_tmr[['y0', 'y1', 'y2']] = _hold_ret_tmr[['y0', 'y1', 'y2']].astype(int)
-        return _hold_ret_tmr
-
-    hold_ret = get_hold_return(conf=conf, ret_kind=ret_kind, bd=conf['begin_date'], ed=conf['end_date'], stk_pool=stk_pool)
-
-    # print('Load tradeable status from local...')
-    # tradeable_path = conf['a_list_tradeable']
-    # tradeable = pd.DataFrame(pd.read_hdf(tradeable_path, key='tradeable_noupdown', parse_dates=True))  # 60 trade days since ipo, yesterday close not max_up_or_down, yesterday close not suspend
-    # tradeable = tradeable.reindex_like(hold_ret)
-    # tradeable = tradeable.replace(False, np.nan).replace(True, 1)
-    # hold_ret *= tradeable
-
-    print('Cal future status(000, 001, 010, 100)...')
-    hold_ret_tmr = get_predict_target(hold_ret, ret_kind)
-
-    save_file_name = conf['data_path'] + f'Y012_TmrRtn{ret_kind.upper()}_{stk_pool}pct10_TopMidBott.pkl'
-    hold_ret_tmr.to_pickle(save_file_name)
-    print(f'Saved in {save_file_name}\n')
-
-    def get_y_compos(df, save_path=None):
-        res = (df.y0 * 100 + df.y1 * 10 + df.y2).value_counts()
-        res.rename(index={0: '000', 1: '001', 10: '010', 100: '100'}, inplace=True)
-        res /= res.sum()
-        res = res.apply(lambda x: f'{x*100:.2f} %')
-        if save_path is not None:
-            res.to_csv(save_path)
-        return res
-
-    print(get_y_compos(hold_ret_tmr).to_dict())
+    src_file = 'X79Y012_TmrRtnOT5C_CSI500pct10_TopMidBott.pkl'
+    # add_group_labels(conf, src_file, replace=True)
+    # exclude_historical_low_coverage_features(conf, src_file)
+    train_bundle(conf, src_file)
 
 
-def merge_all_alpha(conf, tgt_file, feature_files):
-    """准备feature，添加alpha101与收盘价对齐"""
+# %%
+def train_bundle(conf, src_file):
+    """"""
     data_path = conf['data_path']
-    csv_path = conf['factorscsv_path']
-    data = pd.read_pickle(data_path + tgt_file)
+    _path = data_path + src_file.replace('.pkl', '/{}')
+    os.makedirs(_path.format(''), exist_ok=True)
+    data = pd.read_pickle(data_path + src_file)
+    data_desc = pd.read_excel(data_path + src_file.replace('.pkl', '.xlsx'), index_col=0)
+    feature_cols = data_desc.index[1:].to_list()
 
-    feature_name_dict = pd.DataFrame()
-    feature_name_dict['data_y'] = [tgt_file]
-    cnt = 0
-    # file = feature_files[0]
-    for file in tqdm(feature_files):
-        # print(file, '...')
-        feature = pd.read_csv(csv_path + file, parse_dates=True, index_col=0)
-        feature = feature.stack().reset_index()
+    dat_iter = iter_data_td1k(data)
+    for dat_train, dat_test in dat_iter:  # 后续数据处理都模拟每5日增量更新，1000 for training, 5 for evaluation
+        assert len(dat_train.tradingdate.unique()) == 1000
+        assert len(dat_test.tradingdate.unique()) == 5
+        bd0 = dat_train.tradingdate.min().strftime('%Y%m%d')
+        # ed0 = dat_train.tradingdate.max()
+        bd1 = dat_test.tradingdate.min().strftime('%Y%m%d')
+        # ed1 = dat_test.tradingdate.max()
+        print(bd1, '...')
 
-        feature.columns = ['tradingdate', 'stockcode', f'x{cnt}']
-        feature_name_dict[f'x{cnt}'] = [file]
-        cnt += 1
+        dat_train, dat_test, fea2ex = drop_low_coverage_features(dat_train, dat_test, bar=.667)
+        fea_cols = [x for x in feature_cols if x not in fea2ex]
+        dat_train = drop_na_after_sector_mean_fill(dat=dat_train, fea_cols=fea_cols, c0='tradingdate', c1='sector_ci')
+        dat_test = drop_na_after_sector_mean_fill(dat=dat_test, fea_cols=fea_cols, c0='tradingdate', c1='sector_ci')
 
-        data = data.merge(feature, on=['tradingdate', 'stockcode'], how='left')
+        dat_train.to_pickle(_path.format(f'TRAIN_{bd0}_{bd1}.pkl'))  # TODO: 控制周末更新
+        dat_test.to_pickle(_path.format(f'TEST_{bd0}_{bd1}.pkl'))
 
-    save_path = data_path + f'X{len(feature_files)}{tgt_file}'
-    data.to_pickle(save_path)
-    feature_name_dict.T.to_excel(save_path.replace('.pkl', '.xlsx'))
-    print(f'Saved in {save_path}')
+        _desc = data_desc.loc[[idx for idx in data_desc.index if idx not in fea2ex]]
+        _desc.to_excel(_path.format(f'DESC_{bd0}_{bd1}.xlsx'))
 
 
+def drop_na_after_sector_mean_fill(dat: pd.DataFrame, fea_cols: list, c0, c1) -> pd.DataFrame:
+    train_feature_filled = feature_group_mean(dat[fea_cols], dat[c0], dat[c1])
+    dat[fea_cols] = train_feature_filled
+    shape0 = dat.shape
+    dat_ = dat.dropna()
+    shape1 = dat_.shape
+    print(f'Fill NA feature value cross {c0} with {c1}-mean, panel shape from {shape0} to {shape1}')
+    return dat_
+
+
+def feature_group_mean(features: pd.DataFrame, td: pd.Series, gr: pd.Series) -> pd.DataFrame:
+    res = pd.DataFrame().reindex_like(features)
+    # col = features.columns[0]
+    print('Filling NA fval with sector-daily-mean...')
+    for col in tqdm(features.columns):
+        fea = features[col].copy().rename('fv')
+        tmp = pd.concat([td, gr, fea], axis=1)
+        m = fea.groupby([td, gr]).mean().rename('sm').reset_index()
+        tmp = tmp.merge(m, on=[td.name, gr.name], how='left')
+        mask_no_fv = tmp.fv.isna()
+        mask_no_sector = tmp.sm.isna()
+        tmp['fv'] = tmp.fv.fillna(0)
+        tmp['sm'][~mask_no_fv] = 0
+        tmp['fv_1'] = tmp.fv + tmp.sm
+        assert tmp.fv_1.isna().mean() == (mask_no_fv & mask_no_sector).mean()
+        res[col] = tmp.fv_1
+    return res
+
+
+def drop_low_coverage_features(dat_train: pd.DataFrame, dat_test: pd.DataFrame, bar: float) -> Tuple[pd.DataFrame, pd.DataFrame, list]:
+    """
+
+    :param dat_train:
+    :param dat_test:
+    :param bar:
+    :return:
+    """
+    col2ex = col2ex_cvt_lt_667(dat_train, bar=bar)
+    _train = dat_train[[col for col in dat_train if col not in col2ex]]
+    _test = dat_test[[col for col in dat_test if col not in col2ex]]
+    return _train, _test, col2ex
+
+
+def col2ex_cvt_lt_667(dat_: pd.DataFrame, bar) -> list:
+    """
+
+    :param dat_:
+    :param bar:
+    :return:
+    """
+    cnt_all = dat_.groupby(['tradingdate']).stockcode.count()
+    fea_cvg: pd.DataFrame = dat_.loc[:, 'x0':].groupby(dat_.tradingdate).count() / cnt_all.values.reshape(-1, 1)
+    mask_l_cvg = (fea_cvg.min() < bar)
+    fea2ex = [col for col in fea_cvg.columns if mask_l_cvg[col]]
+
+    return fea2ex
+    
+
+# %%
 if __name__ == '__main__':
     main()

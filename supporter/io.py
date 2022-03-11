@@ -40,3 +40,10 @@ def table_save_safe(df, tgt, kind='csv', notify=False):
                 print(f'{df.shape} saved in `{tgt}`.')
     else:
         raise ValueError(f'kind `{kind}` not supported.')
+
+
+def get_time_suffix(suffix: str = None):
+    """Return a string '%m%d_%H%M%S'"""
+    if suffix is None or suffix == '':
+        return time.strftime("%m%d_%H%M%S", time.localtime())
+    return suffix

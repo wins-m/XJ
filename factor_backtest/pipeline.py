@@ -4,6 +4,7 @@
 - (depreciated)计算原始值在全A的Rank IC,CSI500内分别经过winso&std,neu_i,neu_iv的IC及IC Decay
 - 仅保留CSI500, rescale into (0, 1] and save TODO: 0-1 factors
 TODO: diff btw. Factor & Signal?
+TODO: not final feature rank! This script is aimless.
 
 """
 import os
@@ -171,25 +172,12 @@ def main():
     conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/config.yaml'
     conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
 
-    # %%
-    csv_file, kind = 'alpha_101.csv', 'ctc'
-
-    def func(csv_file, conf):
-        print(csv_file)
-        fct = Factor(conf=conf, csv_file=csv_file, kind='ctc')
-        fct.get_fval_ranked(save_table=True)
-        # fct.evaluate_signal_ic()
-
-    # p = Pool(6)
+    csv_file, kind = 'alpha_086.csv', 'ctc'
     for csv_file in os.listdir(conf['factorscsv_path']):
         if csv_file[:6] == 'alpha_':
-            fct = Factor(conf=conf, csv_file=csv_file, kind='ctc')
+            fct = self = Factor(conf=conf, csv_file=csv_file, kind='ctc')
             fct.get_fval_ranked(save_table=True)
             # fct.evaluate_signal_ic()
-
-    #         p.apply_async(func=func, args=(csv_file, conf))
-    # p.close()
-    # p.join()
 
 
 # %%

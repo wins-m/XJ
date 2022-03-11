@@ -29,7 +29,7 @@ def visit_2d_v(td, stk, df, shift=0):
         return df.iloc[td_idx, :].loc[stk]
 
 
-def column_look_up(tgt, src, delay=0, kw='r_1', msg=None):
+def column_look_up(tgt, src, delay=0, kw='r_1', msg=None, c0='tradingdate', c1='stockcode'):
     """
     从2D面板src获取stacked表tgt关键字kw的列值，根据tradingdate和stockcode
     :param tgt: 目标表，包含列tradingdate和stockcode
@@ -37,14 +37,26 @@ def column_look_up(tgt, src, delay=0, kw='r_1', msg=None):
     :param delay: 滞后日
     :param kw: 新增到src的列名
     :param msg: 缺失百分比的提示
+    :param c0: 2D中列名(tradingdate)
+    :param c1: 2D中行名(stockcode)
     :return: 新加列的表
     """
-    key = tgt[['tradingdate', 'stockcode']]
     print(f'{kw}...')
-    tgt[kw] = key.apply(lambda s: visit_2d_v(s.iloc[0], s.iloc[1], src, shift=delay), axis=1)
-    if msg is None:
-        msg = 'not found in source table'
-    print(f'nan:{tgt[kw].isna().mean() * 100: 6.2f} % {msg}')
+
+    # # Method 1
+    # tgt[kw] = np.nan
+    # for ri in tqdm(tgt.index):
+    #     tgt.loc[ri, kw] = visit_2d_v(tgt.loc[ri, c0], tgt.loc[ri, c1], src, shift=delay)
+
+    # # Method 2
+    tgt[kw] = tgt[[c0, c1]].apply(lambda s: visit_2d_v(s.iloc[0], s.iloc[1], src, shift=delay), axis=1)
+
+    # # Method 3
+    # tmp = src.shift(delay).unstack().reset_index()
+    # tmp.columns = [c0, c1, kw]
+    # tgt = tgt.merge(tmp, on=[c0, c1], how='left')
+
+    print(f'nan:{tgt[kw].isna().mean() * 100: 6.2f} % {"not found in source table" if msg is None else msg}')
     return tgt
 
 

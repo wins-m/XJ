@@ -19,6 +19,7 @@ a_list_tradeable : "/mnt/c/Users/Winst/Documents/data_local/a_list_tradeable.hdf
         # tradeable_noupdown(ipo_60 & suspend_L1 & updown_L1)
 
 # csv data file
+sector_constituent : "/mnt/c/Users/Winst/Documents/data_local/ci_sector_constituent.csv"
 idx_constituent : "/mnt/c/Users/Winst/Documents/data_local/idx_constituent_{}.csv"  # CSI100, CSI400, CSI500, CSI800, SSE50
 a_list_suspendsymbol : "/mnt/c/Users/Winst/Documents/data_local/a_list_suspendsymbol.csv"
 date_last_suspend_alldays : "/mnt/c/Users/Winst/Documents/data_local/last_suspend_ad2d.csv"

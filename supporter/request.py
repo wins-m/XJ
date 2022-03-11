@@ -7,6 +7,7 @@ From config file request calculated frame from local or remote.
 """
 import pandas as pd
 import numpy as np
+from datetime import timedelta
 
 
 def get_hold_return(conf: dict, ret_kind='ctc', bd=None, ed=None, stk_pool='NA') -> pd.DataFrame:
@@ -63,3 +64,32 @@ def get_hold_return(conf: dict, ret_kind='ctc', bd=None, ed=None, stk_pool='NA')
 
     rtn_log = p1.applymap(np.log) - p0.applymap(np.log)
     return rtn_log
+
+
+def get_ind_citic_all_tradingdate(conf: dict, begin_date, end_date) -> pd.DataFrame:
+    """Get citic industry label, index is all tradingdate from begine_date to end_date"""
+    bd, begin_date, ed = pd.to_datetime(begin_date) - timedelta(60), pd.to_datetime(begin_date), pd.to_datetime(end_date)
+    ind_citic = pd.read_csv(conf['ind_citic'], index_col=0, parse_dates=True, dtype=object).loc[bd:ed]
+    tdays_d = pd.read_csv(conf['tdays_d'], header=None, index_col=0, parse_dates=True).loc[bd:ed]
+    tdays_d = tdays_d.reset_index().rename(columns={0:'tradingdate'})
+    ind_citic = ind_citic.reset_index().merge(tdays_d, on='tradingdate', how='right')
+    ind_citic = ind_citic.set_index('tradingdate').fillna(method='ffill').loc[begin_date:]
+
+    return ind_citic
+
+
+def get_sector_ci_all_tradingdate(conf: dict, begin_date, end_date) -> pd.DataFrame:
+    """
+    Request a frame of 2d-ci-sector-label, all tradingdate within range, domain: {1, 2, 3, 4}, ffill and then backfill
+    :param conf:
+    :param begin_date:
+    :param end_date:
+    :return:
+    """
+    bd, begin_date, ed = pd.to_datetime(begin_date) - timedelta(60), pd.to_datetime(begin_date), pd.to_datetime(end_date)
+    sector_ci = pd.read_csv(conf['sector_constituent'], index_col=0, parse_dates=True, dtype=object).loc[bd:ed]
+    tdays_d = pd.read_csv(conf['tdays_d'], header=None, index_col=0, parse_dates=True).loc[bd:ed]
+    tdays_d = tdays_d.reset_index().rename(columns={0:'tradingdate'})
+    sector_ci = sector_ci.reset_index().merge(tdays_d, on='tradingdate', how='right')
+    sector_ci = sector_ci.set_index('tradingdate').fillna(method='ffill').fillna(method='bfill').loc[begin_date:]
+    return sector_ci
