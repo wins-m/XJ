@@ -11,3 +11,6 @@
 ~$*
 .ipynb_checkpoints
 *.xlsx
+./AllSample/d2l-zh/
+./AllSample/d2l-zh/*
+
