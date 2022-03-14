@@ -7,6 +7,8 @@
 """
 import os
 import sys
+
+import pandas as pd
 import yaml
 
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
@@ -95,13 +97,18 @@ def single_test(conf: dict):
     # %% Stock Returns: 可行日度收益
     if return_kind == 'ctc':  # 今日收益率：昨日信号，昨日收盘买入，今日收盘卖出
         sell_price = pd.read_csv(close_path, index_col=0, parse_dates=True, dtype=float)
+        all_ret: pd.DataFrame = sell_price.pct_change()
     elif return_kind == 'oto':  # 今日收益率：昨日信号，今日开盘买入，明日开盘卖出
         sell_price = pd.read_csv(open_path, index_col=0, parse_dates=True, dtype=float)
         sell_price = sell_price.shift(-1)  # Return: long T+1 Open short T+2 Open for T0 Signal
+        all_ret: pd.DataFrame = sell_price.pct_change()
+    elif return_kind == 'otc':  # 今日收益率：昨日信号，今日开盘买入，今日收盘卖出
+        buy_price = pd.read_csv(open_path, index_col=0, parse_dates=True, dtype=float)
+        sell_price = pd.read_csv(close_path, index_col=0, parse_dates=True, dtype=float)
+        all_ret: pd.DataFrame = (sell_price / buy_price) - 1
     else:
         raise ValueError(f"""Invalid config.return_kind {return_kind}""")
-    all_ret: pd.DataFrame = sell_price.pct_change().reindex_like(idx_weight) * tradeable_multiplier
-
+    all_ret = all_ret.reindex_like(idx_weight) * tradeable_multiplier
     # %% Loop All Factors
     fname = all_factornames[0]
     save_folders = dict()

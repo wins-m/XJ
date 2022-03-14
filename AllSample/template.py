@@ -8,7 +8,6 @@ from matplotlib import pyplot as plt
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
 
 import warnings
-
 warnings.simplefilter("ignore")
 
 # %matplotlib inline
