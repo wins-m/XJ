@@ -11,6 +11,9 @@ level2_path : '/mnt/c/Users/Winst/Documents/level2/'
 level2_path2 : '/mnt/g/高频数据-hdf5格式/'
 #level2_path2 : '/mnt/c/Users/Winst/Documents/lvl2/'
 
+# alpha 101
+train_bundle: '/mnt/c/Users/Winst/Documents/data_local/X79Y012_TmrRtnOT5C_CSI500pct10_TopMidBott/'
+
 # hdf temp file
 a_list_tradeable : "/mnt/c/Users/Winst/Documents/data_local/a_list_tradeable.hdf"
         # key: ipo, ipo60, suspend, updown, up, down, updown_open

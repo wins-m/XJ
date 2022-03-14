@@ -21,35 +21,32 @@ sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmP
 from supporter.alpha import *
 
 
-# %%
 def main():
-    # %%
     import yaml
     conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/config.yaml'
     conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
-    # %%
 
+    # Y012: next period return
     # prepare_t1_prediction_y012(conf, ret_kind='ot5c', stk_pool='CSI500')
     # prepare_t1_prediction_y012(conf, ret_kind='ctc', stk_pool='CSI500')
     # prepare_t1_prediction_y012(conf, ret_kind='oto', stk_pool='CSI500')
     # prepare_t1_prediction_y012(conf, ret_kind='ct5o', stk_pool='CSI500')
 
+    # X: alpha 101 raw value from Wind
     # tgt_file = 'Y012_TmrRtnOT5C_CSI500pct10_TopMidBott.pkl'
-    # import os
     # feature_files = sorted([x for x in os.listdir(conf['factorscsv_path']) if x[:6] == 'alpha_'])
-    # # feature_files = sorted([x for x in os.listdir(conf['factorscsv_path']) if '[CSI500ranked]alpha_' in x])
     # print(feature_files[:5])
     # merge_all_alpha(conf, tgt_file, feature_files)
 
+    #
     src_file = 'X79Y012_TmrRtnOT5C_CSI500pct10_TopMidBott.pkl'
     # add_group_labels(conf, src_file, replace=True)
     # exclude_historical_low_coverage_features(conf, src_file)
     train_bundle(conf, src_file)
 
 
-# %%
-def train_bundle(conf, src_file):
-    """"""
+def train_bundle(conf, src_file, cvg_bar=.667):
+    """(1000+5)每5天，去除在训练集内覆盖率低于cvg_bar的因子，剩余缺失因子填充以日截面风格大类均值，存储每次训练的结果"""
     data_path = conf['data_path']
     _path = data_path + src_file.replace('.pkl', '/{}')
     os.makedirs(_path.format(''), exist_ok=True)
@@ -67,7 +64,7 @@ def train_bundle(conf, src_file):
         # ed1 = dat_test.tradingdate.max()
         print(bd1, '...')
 
-        dat_train, dat_test, fea2ex = drop_low_coverage_features(dat_train, dat_test, bar=.667)
+        dat_train, dat_test, fea2ex = drop_low_coverage_features(dat_train, dat_test, bar=cvg_bar)
         fea_cols = [x for x in feature_cols if x not in fea2ex]
         dat_train = drop_na_after_sector_mean_fill(dat=dat_train, fea_cols=fea_cols, c0='tradingdate', c1='sector_ci')
         dat_test = drop_na_after_sector_mean_fill(dat=dat_test, fea_cols=fea_cols, c0='tradingdate', c1='sector_ci')
@@ -83,7 +80,7 @@ def drop_na_after_sector_mean_fill(dat: pd.DataFrame, fea_cols: list, c0, c1) ->
     train_feature_filled = feature_group_mean(dat[fea_cols], dat[c0], dat[c1])
     dat[fea_cols] = train_feature_filled
     shape0 = dat.shape
-    dat_ = dat.dropna()
+    dat_ = dat.dropna()  # 缺失features且缺失风格大类，无法填充，则去除
     shape1 = dat_.shape
     print(f'Fill NA feature value cross {c0} with {c1}-mean, panel shape from {shape0} to {shape1}')
     return dat_
@@ -137,6 +134,5 @@ def col2ex_cvt_lt_667(dat_: pd.DataFrame, bar) -> list:
     return fea2ex
     
 
-# %%
 if __name__ == '__main__':
     main()
