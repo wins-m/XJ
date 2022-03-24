@@ -6,6 +6,7 @@
 4. 新的因子值，append到服务器。
 
 """
+# import datetime
 import pandas as pd
 import numpy as np
 import time, os
@@ -43,8 +44,10 @@ def get_winsorize_sr(sr: pd.Series, nsigma=3) -> pd.Series:
     mad = 1.483 * df.sub(md).abs().median()
     up = df.apply(lambda k: k > md + mad * nsigma)
     down = df.apply(lambda k: k < md - mad * nsigma)
-    df[up] = df[up].rank(pct=True).multiply(mad * 0.5).add(md + mad * (0.5 + nsigma))
-    df[down] = df[down].rank(pct=True).multiply(mad * 0.5).add(md - mad * (0.5 + nsigma))
+    df[up] = df[up].rank(pct=True).multiply(mad * 0.5).add(md + mad * (0 + nsigma))
+    df[down] = df[down].rank(pct=True).multiply(mad * 0.5).add(md - mad * (0 + nsigma))
+    # df[up] = df[up].rank(pct=True).multiply(mad * 0.5).add(md + mad * (0.5 + nsigma))
+    # df[down] = df[down].rank(pct=True).multiply(mad * 0.5).add(md - mad * (0.5 + nsigma))
     return df
 
 
@@ -56,10 +59,18 @@ def add_id_column(df: pd.DataFrame, col0: str = 'tradingdate', col1: str = 'stoc
 
 def transfer_pe_residual_table(df: pd.DataFrame) -> pd.DataFrame:
     """处理pe_residual*.csv"""
-    df1 = df.T.unstack().reset_index().rename(columns={'level_0': 'industry', 'level_1': 'stockcode',
-                                                       'level_2': 'tradingdate', 0: 'fv'})
+    df0 = df.copy()
+    df0.index = df.index.to_series()
+    df1 = df0.T.unstack().reset_index()
+    assert df1.shape[1] == 3
+    df1 = df1.rename(columns={'level_0': 'idx', 'level_1': 'tradingdate', 0: 'fv'})
+    df1['industry'] = df1['idx'].apply(lambda x: int(x[0]))
+    df1['stockcode'] = df1['idx'].apply(lambda x: x[1])
+    # df1 = df.T.unstack().reset_index().rename(columns={'level_0': 'industry', 'level_1': 'stockcode',
+    #                                                    'level_2': 'tradingdate', 0: 'fv'})
     df1 = df1.dropna()
-    df1['industry'] = df1['industry'].astype(int)
+    # df1['industry'] = df1['industry'].apply(int)
+    # df1['industry'] = df1['industry'].astype(int)
     df1 = add_id_column(df1)
     return df1[['tradingdate', 'stockcode', 'industry', 'fv', 'id']]
 
@@ -149,11 +160,11 @@ def pe_surprise_regress(trade_dates, begin_date, end_date,
             panel_winso = pd.concat([panel_winso, df1.rename(col_name)], axis=1)
         # instnum_class
         lhs = pd.get_dummies(instnum_class_2d.loc[td]).rename(columns={1: 'instnum1', 2: 'instnum2', 3: 'instnum3'})
-        panel = pd.concat([panel, lhs], axis=1)
+        panel = pd.concat([panel, lhs.iloc[:, :-1]], axis=1)
         panel_winso = pd.concat([panel_winso, lhs], axis=1)
         # mv_class
         lhs = pd.get_dummies(mv_class_2d.loc[td]).rename(columns={1: 'mv1', 2: 'mv2', 3: 'mv3'})
-        panel = pd.concat([panel, lhs], axis=1)
+        panel = pd.concat([panel, lhs.iloc[:, :-1]], axis=1)
         panel_winso = pd.concat([panel_winso, lhs], axis=1)
         # ci_sector_constituent
         lhs = sector.rename('sector')
@@ -252,7 +263,10 @@ if __name__ == '__main__':
     # fval_local = pd.read_csv(csv_path + file, index_col=0, parse_dates=True)
 
     query = f'SELECT tradingdate FROM intern.{target_table} ORDER BY tradingdate DESC LIMIT 1;'
+    # try:
     date_local = mysql_query(query, engine_list['engine2']).loc[0, 'tradingdate']
+    # except:
+    #     date_local = datetime.date(2012, 12, 31)  # pd.to_datetime('2012-12-31')
     prior_date = date_local - timedelta(120)  # stk_west_surprise 一季度一次需要填充空值！
 
     query = f"""SELECT tradingdate,stockcode,fv FROM factordatabase.factor_west_pe_180 WHERE tradingdate>'{prior_date}' ORDER BY tradingdate;"""
@@ -298,8 +312,7 @@ if __name__ == '__main__':
     factor_west_netprofit_chg_lid_2d = factor_west_netprofit_chg_lid_2d.reindex_like(factor_west_pe_180_2d).loc[begin_date:]
 
     query = f"""SELECT update_date,stockcode,surprise FROM factordatabase.stk_west_surprise WHERE update_date>'{prior_date - timedelta(120)}' ORDER BY update_date;"""
-    stk_west_surprise = mysql_query(query, engine_list['engine2']).groupby(['update_date', 'stockcode'])[
-        'surprise'].mean().reset_index()
+    stk_west_surprise = mysql_query(query, engine_list['engine2']).groupby(['update_date', 'stockcode'])['surprise'].mean().reset_index()
     stk_west_surprise_2d = stk_west_surprise.pivot(index='update_date', columns='stockcode', values='surprise')
     stk_west_surprise_2d = stk_west_surprise_2d.reindex_like(factor_west_pe_180_2d).fillna(method='ffill', limit=120).loc[begin_date:]
 
@@ -325,7 +338,7 @@ if __name__ == '__main__':
         'tradingdate': DATE()
     }
 
-    # if group == 'loop3':
+    _group = 'loop3'
     for _group in ['ols_1', 'ols_2', 'ols_3']:
         factor_val, save_filename = pe_surprise_regress(trade_dates, begin_date.__str__(), end_date.__str__(),
                                                         factor_west_pe_180_2d, ci_sector_constituent_2d,
@@ -342,5 +355,6 @@ if __name__ == '__main__':
         tname = save_filename.rsplit('_', 2)[0]
         print(tname, begin_date, end_date, 'Calculated.')
         df = transfer_pe_residual_table(factor_val)
+        # print(df)
         df.to_sql(tname, con=engine_list['engine3'], if_exists='append', index=False, dtype=dtypedict)
         print(tname, begin_date, end_date, 'Uploaded.')
