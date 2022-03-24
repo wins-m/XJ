@@ -67,8 +67,10 @@ def get_winsorize_sr(sr: pd.Series, nsigma=3) -> pd.Series:
     mad = 1.483 * df.sub(md).abs().median()
     up = df.apply(lambda k: k > md + mad * nsigma)
     down = df.apply(lambda k: k < md - mad * nsigma)
-    df[up] = df[up].rank(pct=True).multiply(mad * 0.5).add(md + mad * (0.5 + nsigma))
-    df[down] = df[down].rank(pct=True).multiply(mad * 0.5).add(md - mad * (0.5 + nsigma))
+    df[up] = df[up].rank(pct=True).multiply(mad * 0.5).add(md + mad * (0 + nsigma))
+    df[down] = df[down].rank(pct=True).multiply(mad * 0.5).add(md - mad * (0 + nsigma))
+    # df[up] = df[up].rank(pct=True).multiply(mad * 0.5).add(md + mad * (0.5 + nsigma))
+    # df[down] = df[down].rank(pct=True).multiply(mad * 0.5).add(md - mad * (0.5 + nsigma))
     return df
 
 
