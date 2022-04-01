@@ -20,6 +20,7 @@ def clip_backtest_conf(conf: dict):
         'marketvalue_path': conf['marketvalue'],
         'close_path': conf['closeAdj'],
         'open_path': conf['openAdj'],
+        'rtn_format' : conf['rtnFormat'],
         'test_mode': str(conf['test_mode']),
         'exclude_tradeable': conf['exclude_tradeable'],
         'neu_mtd': conf['neu_mtd'],

@@ -234,7 +234,8 @@ def plot_rtns_group(ret_group: pd.DataFrame, ishow=False, save_path=None, cumsum
         ret_group_cumulative = ret_group.add(1).cumprod()
 
     if save_path is not None:
-        ret_group_cumulative.plot(grid=True, figsize=(16, 8), linewidth=3, title="Group Test Result")
+        # ret_group_cumulative.plot(grid=True, figsize=(16, 8), linewidth=3, title="Group Test Result")
+        ret_group_cumulative.plot(grid=True, figsize=(10, 5), linewidth=3, title="Group Test Result")
         plt.savefig(save_path)
         if ishow:
             plt.show()
@@ -308,7 +309,7 @@ def cal_long_short_group_rtns(long_short_group, ret, idx_weight, ngroups, save_p
 
 def cal_total_ret_group(ret_group, ishow=False, save_path=None) -> pd.DataFrame:
     """由分组收益面板，计算分组总收益"""
-    ret_group_total = ret_group.add(1).prod().add(-1)
+    ret_group_total = ret_group.sum()  # add(1).prod().add(-1)  改成累加
 
     if save_path is not None:
         ret_group_total.plot(figsize=(10, 5), title="Total Return of Group")

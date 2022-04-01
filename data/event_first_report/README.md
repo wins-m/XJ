@@ -1,7 +1,10 @@
 # 首次研报 Event First Report
 
-> created by swmao on Feb. 9th
-
+1. `event_analysis.py`: 生成平均AR-CAR、相关性矩阵（后改为再ipynb中分析）等图像
+2. `prepare_panel.py`: 准备事件面板，市场情况（涨跌停、上市/停牌日期、是否交易日）；计算前后若干日超额收益、累计超额收益；添加分组标签
+3. `event_condition.py`: 配合ipynotebook的几个module
+4. `*explore_panel.ipynb`: 分析比较不同筛选条件下回测结果
+5. `weight2efr.py`: 维护数据库`efr_*_dur3` (`* := baseline, lcar8, har0, lcar8_har0`)，下载最近的EFR持仓到本地
 
 ### 目标
 

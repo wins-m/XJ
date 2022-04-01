@@ -5,6 +5,8 @@
 - __main__中folder指定所有结果的目录名(在factors_res下)
 - 添加注释
 
+TODO: 整合 增加胜率计算！
+
 """
 
 import pandas as pd

@@ -11,7 +11,7 @@ from datetime import timedelta
 
 
 def get_hold_return(conf: dict, ret_kind='ctc', bd=None, ed=None, stk_pool='NA') -> pd.DataFrame:
-    """Return a frame of nominal holding returns."""
+    """Return a frame of nominal holding returns: log(sell) - log(buy). Decide before yesterday's 14:45"""
     from supporter.stk_pool import get_stk_pool, keep_in_stk_pool
 
     # TODO: probably not attainable when selling for reasons like suspend or max_down

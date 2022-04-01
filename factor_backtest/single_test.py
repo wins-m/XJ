@@ -7,8 +7,6 @@
 """
 import os
 import sys
-
-import pandas as pd
 import yaml
 
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
@@ -38,6 +36,7 @@ def single_test(conf: dict):
     marketvalue_path = conf['marketvalue_path']
     close_path = conf['close_path']
     open_path = conf['open_path']
+    rtn_format = conf['rtn_format']
 
     test_mode = conf['test_mode']
     exclude_tradeable = conf['exclude_tradeable']
@@ -95,22 +94,32 @@ def single_test(conf: dict):
     assert round(idx_weight.dropna(how='all').abs().sum(axis=1).prod(), 4) == 1  # 大盘/指数全股仓位权重绝对值之和为1
 
     # %% Stock Returns: 可行日度收益
-    if return_kind == 'ctc':  # 今日收益率：昨日信号，昨日收盘买入，今日收盘卖出
-        sell_price = pd.read_csv(close_path, index_col=0, parse_dates=True, dtype=float)
-        all_ret: pd.DataFrame = sell_price.pct_change()
-    elif return_kind == 'oto':  # 今日收益率：昨日信号，今日开盘买入，明日开盘卖出
-        sell_price = pd.read_csv(open_path, index_col=0, parse_dates=True, dtype=float)
-        sell_price = sell_price.shift(-1)  # Return: long T+1 Open short T+2 Open for T0 Signal
-        all_ret: pd.DataFrame = sell_price.pct_change()
-    elif return_kind == 'otc':  # 今日收益率：昨日信号，今日开盘买入，今日收盘卖出
-        buy_price = pd.read_csv(open_path, index_col=0, parse_dates=True, dtype=float)
-        sell_price = pd.read_csv(close_path, index_col=0, parse_dates=True, dtype=float)
-        all_ret: pd.DataFrame = (sell_price / buy_price) - 1
-    else:
-        raise ValueError(f"""Invalid config.return_kind {return_kind}""")
+    def get_daily_return(rtn_kind, c_path_, o_path_, rtn_):
+        if rtn_kind == 'ctc':  # 今日收益率：昨日信号，昨日收盘买入，今日收盘卖出
+            sell_price = pd.read_csv(c_path_, index_col=0, parse_dates=True, dtype=float)
+            a_ret: pd.DataFrame = sell_price.pct_change()
+        elif rtn_kind == 'oto':  # 今日收益率：昨日信号，今日开盘买入，明日开盘卖出
+            sell_price = pd.read_csv(o_path_, index_col=0, parse_dates=True, dtype=float)
+            sell_price = sell_price.shift(-1)  # Return: long T+1 Open short T+2 Open for T0 Signal
+            a_ret: pd.DataFrame = sell_price.pct_change()
+        else:
+            try:
+                a_ret = pd.read_csv(rtn_.format(rtn_kind), index_col=0, parse_dates=True, dtype=float)
+            except FileNotFoundError:
+                raise FileNotFoundError(f'Generate {rtn_kind} with hold_returns.py')
+        # elif rtn_kind == 'otc':  # 今日收益率：昨日信号，今日开盘买入，今日收盘卖出，不计入隔夜收益
+        #     buy_price = pd.read_csv(o_path_, index_col=0, parse_dates=True, dtype=float)
+        #     sell_price = pd.read_csv(c_path_, index_col=0, parse_dates=True, dtype=float)
+        #     a_ret: pd.DataFrame = (sell_price / buy_price) - 1
+        # else:
+        #     raise ValueError(f"""Invalid config.return_kind {rtn_kind}""")
+        return a_ret
+
+    all_ret = get_daily_return(rtn_kind=return_kind, c_path_=close_path, o_path_=open_path, rtn_=rtn_format)
     all_ret = all_ret.reindex_like(idx_weight) * tradeable_multiplier
+
     # %% Loop All Factors
-    fname = all_factornames[0]
+    # fname = all_factornames[0]
     save_folders = dict()
     # %%
     for fname in all_factornames:
@@ -214,7 +223,7 @@ def single_test(conf: dict):
                 strategy.get_portfolio_statistics(kind='long', wc=wc, path_f=path_format)
                 if ngroups != 1:
                     strategy.get_portfolio_statistics(kind='short', wc=wc, path_f=path_format)
-                    strategy.get_portfolio_statistics(kind='long_short', wc=wc, path_f=path_format)
+                strategy.get_portfolio_statistics(kind='long_short', wc=wc, path_f=path_format)
 
         print(f'Graphs & Tables Saved in {path_format}')
     # %%
