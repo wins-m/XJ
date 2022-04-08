@@ -9,6 +9,7 @@
 - 仅仅作用于 key= tradeable, tradeable_withupdown, tradeable_noupdown
 - 将deprecate
 
+TODO: 自动更新 stk_ipo_date, tdays_d, a_list_suspendsymbol, stk_maxupordown
 """
 from datetime import timedelta
 from tqdm import tqdm
@@ -58,8 +59,8 @@ def update_tradeable_label(conf):
         stk = irow[1]['stockcode']
         d0 = str(irow[1]['ipo_date'])
         d1 = str(irow[1]['delist_date'])
-        d1 = '2022-12-31' if (d1 == 'nan') else d1
-        ipo.loc[d0:d1, stk:stk] = True
+        d1 = '2099-12-31' if (d1 == 'nan') else d1
+        ipo.loc[d0: d1, stk: stk] = True
     print('上市后+退市前保存于 %s, key=%s' % (conf['a_list_tradeable'], 'ipo'))
     ipo.to_hdf(conf['a_list_tradeable'], key='ipo')
 

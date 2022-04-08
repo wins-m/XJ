@@ -78,14 +78,14 @@ def transfer_data(mysql_engine, data_path, access_target, force_update=False):
     grid = grid if force_update else grid[grid['UPDATE'] == 1]
 
     engine_list = []
-    for e in ['engine0', 'engine1', 'engine2', 'engine4']:
+    for e in mysql_engine.keys():  # ['engine0', 'engine1', 'engine2', 'engine4']:
         engine_info = mysql_engine[e]
         engine_list.append(conn_mysql(engine_info))
 
     print(mysql_query("SELECT tradingdate FROM jeffdatabase.tdays_d ORDER BY tradingdate DESC LIMIT 1", engine_list[0]))
 
     save_factor_panel(grid, engine_list, data_path)
-    engine = engine_list[0]
+    # engine = engine_list[0]
 
 
 def get_data(conf):
