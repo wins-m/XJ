@@ -74,7 +74,7 @@ def train_bundle(conf, src_file, cvg_bar=.667):
         dat_train = drop_na_after_sector_mean_fill(dat=dat_train, fea_cols=fea_cols, c0='tradingdate', c1='sector_ci')
         dat_test = drop_na_after_sector_mean_fill(dat=dat_test, fea_cols=fea_cols, c0='tradingdate', c1='sector_ci')
 
-        dat_train.to_pickle(_path.format(f'TRAIN_{bd0}_{bd1}.pkl'))  # TODO: 控制周末更新
+        dat_train.to_pickle(_path.format(f'TRAIN_{bd0}_{bd1}.pkl'))  # 控制周末更新
         dat_test.to_pickle(_path.format(f'TEST_{bd0}_{bd1}.pkl'))
 
         _desc = data_desc.loc[[idx for idx in data_desc.index if idx not in fea2ex]]

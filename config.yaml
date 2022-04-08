@@ -124,6 +124,10 @@ tables :
     - 'pe_residual_ols_3_2013-01-01_2021-12-31.csv'
     - 'pe_residual_2013-01-01_2021-12-31.csv'
 
+# BARRA
+access_barra : '/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/barra/access_barra.xlsx'
+dat_path_barra : '/mnt/c/Users/Winst/Documents/data_local/BARRA/'
+
 # mysql port engine
 mysql_engine :
   engine0 :
@@ -144,15 +148,27 @@ mysql_engine :
     host : '192.168.1.104'
     port : '3306'
     dbname : 'factordatabase'
-  engine3 :  # 上传使用engine3的配置，即存在intern库
-    user : "intern01"
-    password : "rh35th"
-    host : '192.168.1.104'
-    port : '3306'
-    dbname : 'intern'
-  engine4:
+  engine3:
     user: "intern01"
     password: "rh35th"
     host: '192.168.1.104'
     port: '3306'
     dbname: 'alphas101'
+  engine4: # 上传使用engine3的配置，即存在intern库
+    user: "intern01"
+    password: "rh35th"
+    host: '192.168.1.104'
+    port: '3306'
+    dbname: 'intern'
+#  engine3: # 上传使用engine3的配置，即存在intern库
+#    user: "intern01"
+#    password: "rh35th"
+#    host: '192.168.1.104'
+#    port: '3306'
+#    dbname: 'intern'
+#  engine4:
+#    user: "intern01"
+#    password: "rh35th"
+#    host: '192.168.1.104'
+#    port: '3306'
+#    dbname: 'alphas101'

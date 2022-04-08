@@ -2,9 +2,7 @@
 (created by swmao on March 7th)
 - 因子原始值
 - (depreciated)计算原始值在全A的Rank IC,CSI500内分别经过winso&std,neu_i,neu_iv的IC及IC Decay
-- 仅保留CSI500, rescale into (0, 1] and save TODO: 0-1 factors
-TODO: diff btw. Factor & Signal?
-TODO: not final feature rank! This script is aimless.
+- 仅保留CSI500, rescale into (0, 1] and save
 
 """
 import os
@@ -36,7 +34,7 @@ class Factor(object):
         # from supporter.suffix import get_time_suffix
         # self.path_: str = f'{conf["factorsres_path"]}SGN_{self.fname}[{get_time_suffix()}]' + '/{}'
         self.path_: str = f'{conf["factorsres_path"]}SGN_{self.fname}' + '/{}'
-        os.makedirs(self.path_.format(''), exist_ok=True)   # TODO: Windows 不更新文件夹时间戳
+        os.makedirs(self.path_.format(''), exist_ok=True)
         print(f'Result will be saved in {self.path_}')
         self.tradeable_status: pd.DataFrame = pd.DataFrame()
         self.all_ret: pd.DataFrame = pd.DataFrame()
@@ -103,7 +101,7 @@ class Factor(object):
             print(panel_2d_val_mean(sgn.get_fv(), kw=channel))
             sgn.get_fv().to_csv(self.path_.format(f'{self.fname}[{channel}].csv'))
 
-            sgn.cal_ic(self.all_ret)  # TODO: warnings
+            sgn.cal_ic(self.all_ret)
             ic_sr = sgn.get_ic(ranked=False, path=self.path_.format(f'SeriesIC[{channel}].csv'))
             ic_rank_sr = sgn.get_ic(ranked=True, path=self.path_.format(f'SeriesRankIC[{channel}].csv'))
             sgn.cal_ic_statistics()

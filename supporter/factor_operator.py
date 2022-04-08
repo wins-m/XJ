@@ -79,7 +79,7 @@ def factor_neutralization(fv: pd.DataFrame, neu_mtd='n', ind_path=None, mv_path=
             print('NEU INDUS & MKT_SIZE...')
             fv1 = get_neutralize_sector_size(fval=fv0, indus=indus, stdlnsize=size_ln_std)
         return fv1
-    #
+
     return fv1
 
 
