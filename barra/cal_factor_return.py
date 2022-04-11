@@ -51,10 +51,10 @@ def main():
     conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
 
     data_pat = '/mnt/c/Users/Winst/Documents/data_local/BARRA/'  # conf['dat_path_barra']
-    cache_path = data_pat + 'barra_exposure.h5'
-    panel_path = data_pat + 'barra_panel.h5'
-    fval_path = data_pat + 'barra_fval.h5'
-    omega_path = data_pat + 'barra_omega.h5'
+    cache_path = data_pat + 'barra_exposure.h5'  # 对齐的风格因子原始值
+    panel_path = data_pat + 'barra_panel.h5'  # 对行业、规模正交后，WLS用的面板
+    fval_path = data_pat + 'barra_fval.h5'  # 纯因子收益率
+    omega_path = data_pat + 'barra_omega.h5'  # 纯因子构成（各资产权重）
 
     # %%
     cal_fac_ret(conf, data_pat, cache_path, panel_path, fval_path, omega_path)
@@ -62,6 +62,7 @@ def main():
 
 
 def cal_fac_ret(conf, data_pat, cache_path, panel_path, fval_path, omega_path):
+    """计算纯因子收益率，缓存过程文件，分年循环"""
     # %%
     industry: pd.DataFrame = get_ind_citic_all_tradingdate(conf, '2012-01-01', '2099-12-31')
     close_adj = pd.read_csv(conf['closeAdj'], dtype='float', index_col=0, parse_dates=True)
@@ -84,7 +85,7 @@ def cal_fac_ret(conf, data_pat, cache_path, panel_path, fval_path, omega_path):
     
     year = 2019
     # %%
-    for year in range(2022, 2011, -1):
+    for year in range(2022, 2021, -1):
         # %%
         print('\n', year)
         begin_date = f'{year}-01-01'  # '2012-01-01'
@@ -95,7 +96,7 @@ def cal_fac_ret(conf, data_pat, cache_path, panel_path, fval_path, omega_path):
         try:
             dat = pd.DataFrame(pd.read_hdf(cache_path, key=f'y{year}'))
         except KeyError:
-            access_barra = pd.read_excel(conf['access_barra'])
+            access_barra = pd.read_excel(conf['access_barra'])  # get_barra.py 得到的csv文件
             barra_files = access_barra.CSV.to_list()
             # access_barra.head(2)
             dat = pd.DataFrame()
@@ -104,7 +105,7 @@ def cal_fac_ret(conf, data_pat, cache_path, panel_path, fval_path, omega_path):
                 fn = file.split('.')[0]
                 fv1 = fv.stack().rename(fn)
                 dat = pd.concat([dat, fv1], axis=1)
-            dat.to_hdf(cache_path, key=f'y{year}', complevel=9)
+            dat.to_hdf(cache_path, key=f'y{year}', complevel=9)  # 缓存一年的barra因子
     
         # %%
         indus = industry.stack().reindex_like(dat).rename('indus')
@@ -192,6 +193,7 @@ def cal_fac_ret(conf, data_pat, cache_path, panel_path, fval_path, omega_path):
 
 
 def combine(fval_path):
+    """合并key=`y%Y`存在hdf中的纯因子收益率，注意存储名由开始、结束日期决定"""
     res_path = '/mnt/c/Users/Winst/Documents/data_local/BARRA/barra_fval_{}.csv'
     # year = 2012
     fval = pd.DataFrame()
