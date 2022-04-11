@@ -95,7 +95,7 @@ def update_efr_weight(conf):
     # 确定需要更新的EFR范围：efr_baseline_dur3最后一个日期
     target_table = 'efr_baseline_dur3'  # update_target[-1]
     query = f'SELECT 调整日期 FROM intern.{target_table} ORDER BY 调整日期 DESC LIMIT 1;'
-    date_local = mysql_query(query, engine_list['engine3'])
+    date_local = mysql_query(query, engine_list['engine4'])
     if len(date_local) > 0:
         date_local = date_local.loc[0, '调整日期']
     else:
@@ -251,12 +251,12 @@ def update_efr_weight(conf):
         '成本价格': DOUBLE(),
         '是否融资融券': VARCHAR(5),
     }
-    engine_info = conf['mysql_engine']['engine3']
+    engine_info = conf['mysql_engine']['engine4']
 
     def delete_and_upload(tname, efr_df, data_path, begin_date=begin_date, end_date=end_date):
         sql = f"DELETE FROM intern.{tname} WHERE 调整日期 >= '{begin_date}'"
         sql_delete(sql=sql, eg=engine_info)
-        efr_df.to_sql(tname, con=engine_list['engine3'], if_exists='append', index=False, dtype=dtypedict)
+        efr_df.to_sql(tname, con=engine_list['engine4'], if_exists='append', index=False, dtype=dtypedict)
         print(tname, begin_date, end_date, 'Uploaded.')
         filename = f'{tname}[{begin_date},{end_date}].xlsx'
         efr_df.to_excel(data_path + filename)
