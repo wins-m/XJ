@@ -31,9 +31,8 @@ def get_barra():
 
 def get_fund():
     """获取基金信息（5003：增强指数型）"""
-
     try:
-        df = pd.read_pickle(conf['dat_path_barra'] + 'fund_main_info[5003].pkl')  # 增强指数型 公募基金 详情
+        df: pd.DataFrame = pd.read_pickle(conf['dat_path_barra'] + 'fund_main_info[5003].pkl')  # 增强指数型 公募基金 详情
         net_val = pd.DataFrame(pd.read_hdf(conf['data_path'] + 'fund_net_value.h5', key='refactor_net_value'))  # 全部公募基金 累计复权净值 复权单位净值＝单计净值＋成立以来每份累计分红派息的金额（1+涨跌幅）
     except FileNotFoundError:
         from supporter.mysql import conn_mysql, mysql_query
@@ -58,8 +57,30 @@ def get_fund():
 
     code_intersect = net_val.columns.intersection(df.main_code)
     net_val[code_intersect].to_pickle(conf['dat_path_barra'] + 'fund_refactor_net_value[5003].pkl')
+    df[df.main_code.apply(lambda x: x in code_intersect)].astype(object).to_excel(
+        conf['dat_path_barra'] + 'fund_5003_info_intersect.xlsx', index=None, encoding='GBK')
+
+
+def split():
+    fund_info = pd.read_pickle(conf['fund_info_5003'])  # 基金信息
+    fund_val = pd.read_pickle(conf['refactor_net_value_5003'])  # 资产收益
+    fund_rtn: pd.DataFrame = fund_val.pct_change()  # 累计复权净值，盘前9:00更新
+
+    # 基金属性-基准划分
+    desc = fund_rtn.describe().astype(object).T
+    desc['main_code'] = desc.index
+    desc = desc.merge(fund_info, on='main_code', how='left')
+    desc.to_excel(conf['dat_path_barra'] + 'fund_stat.xlsx', index=None)
+    attr_300 = desc[desc['name'].apply(lambda x: '300' in x)]
+    attr_300.to_excel(conf['dat_path_barra'] + 'fund_stat[300].xlsx', index=None)
+    attr_500 = desc[desc['name'].apply(lambda x: '500' in x)]
+    attr_500.to_excel(conf['dat_path_barra'] + 'fund_stat[500].xlsx', index=None)
+    attr_1000 = desc[desc['name'].apply(lambda x: '1000' in x)]
+    attr_1000.to_excel(conf['dat_path_barra'] + 'fund_stat[1000].xlsx', index=None)
 
 
 if __name__ == '__main__':
     # get_barra()
-    get_fund()
+    # get_fund()
+    # split()
+    pass

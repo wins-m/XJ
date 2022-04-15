@@ -1,3 +1,5 @@
+[toc]
+
 ## BARRA模型
 
 假设资产收益由共同因子驱动：
@@ -278,9 +280,34 @@ after missing-drop (586492, 41)
     - ![多因子模拟组合vs.沪深300日度收益（201201-202203）](https://s2.loli.net/2022/04/08/YjWFSJxgKc6Q8Os.png)
     - ![模拟组合vs.沪深300累积收益（201201-202203）](https://s2.loli.net/2022/04/08/EBAzUwvx6aoZsFc.png)
 
+## 指增基金风格归因
+
+### `attribution.py`
+
+**数据来源**
+
+- `jqdata.fund_main_info`是基金基础信息
+- `jqdata.fund_net_value`是净值
+- 说明：[聚宽公募基金数据(净值等)](https://www.joinquant.com/help/api/help#JQData:%E5%85%AC%E5%8B%9F%E5%9F%BA%E9%87%91%E6%95%B0%E6%8D%AE%E5%87%80%E5%80%BC%E7%AD%89)
+- 由`get_barra.py`获取基金净值、基金信息（5003：指增）
+    - `fund_refactor_net_value[5003].pkl`
+    - `fund_main_info[5003].pkl` 
+
+**收益归因**
+
+- 调仓日，回看60日，用T-1纯因子解释T日收益率（T-1纯因子由T的风格暴露算得）
+- 指数和指增对风格因子的暴露，指增超额暴露，超额暴露获取的超额收益，60日求和
+- 指增相对指数的超额收益，60日求和
+- 总超额 - 超额暴露获得超额 = 选股超额
+
+### `backtest.py`
+
+- 选股超额 调仓日最高X只指增 相对全体同类产品 相对指数 表现对比
+
 ## 参考资料
 
 Menchero, J., & Lee, J.-H. (2015). EFFICIENTLY COMBINING MULTIPLE SOURCES OF ALPHA. *Journal of Investment Management*, *Vol. 13*(No. 4), 71–86.
 
 韩振国. (2018). *Barra模型初探：A股市场风格解析* (“星火”多因子系列（一）) [金融工程研究]. 方正证券.
 
+[toc]
