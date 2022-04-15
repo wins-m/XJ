@@ -24,11 +24,14 @@ a_list_tradeable : "/mnt/c/Users/Winst/Documents/data_local/a_list_tradeable.hdf
 # csv data file
 sector_constituent : "/mnt/c/Users/Winst/Documents/data_local/ci_sector_constituent.csv"
 idx_constituent : "/mnt/c/Users/Winst/Documents/data_local/idx_constituent_{}.csv"  # CSI100, CSI400, CSI500, CSI800, SSE50
+idx_marketdata_close : "/mnt/c/Users/Winst/Documents/data_local/idx_marketdata_close.csv"
 a_list_suspendsymbol : "/mnt/c/Users/Winst/Documents/data_local/a_list_suspendsymbol.csv"
 date_last_suspend_alldays : "/mnt/c/Users/Winst/Documents/data_local/last_suspend_ad2d.csv"
 stk_ipo_date : "/mnt/c/Users/Winst/Documents/data_local/stk_ipo_date.csv"
 stk_maxupordown : "/mnt/c/Users/Winst/Documents/data_local/stk_maxupordown.csv"
 tdays_d : "/mnt/c/Users/Winst/Documents/data_local/tdays_d.csv"
+tdays_w : "/mnt/c/Users/Winst/Documents/data_local/tdays_w.csv"
+tdays_m : "/mnt/c/Users/Winst/Documents/data_local/tdays_m.csv"
 alldays_d : '/mnt/c/Users/Winst/Documents/data_local/alldays_d.csv'
 ind_citic : "/mnt/c/Users/Winst/Documents/data_local/ind_citic_constituent.csv"
 ind_list_citic : "/mnt/c/Users/Winst/Documents/data_local/ind_list_citic.csv"
@@ -57,7 +60,7 @@ end_date : '2021-12-31'
 # backtest (single_test.py)
 factors_tested : "/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/factor_backtest/factors_tested.xlsx"
 #with_updown : ''  # '': exclude open  '_withupdown': keep  '_noupdown': exclude all
-save_suffix : '汇报0328'  # 空字段，则后缀为回测开始的时间
+save_suffix : '测试'  # 空字段，则后缀为回测开始的时间
 test_mode : '1'
     # '0': no test;
     # '1': default;
@@ -65,19 +68,19 @@ test_mode : '1'
     # '3': factor is weight
 exclude_tradeable :   # 0: excluded
   ipo60 : 0
-  suspend: 0
-  updown : 0
+  suspend: 1
+  updown : 1
   up : 1
   down : 1
   updown_open : 1
   up_open : 1
   down_open : 1
 neu_mtd : 'n'  # n, i, iv
-return_kind : 'ot5c'  # ctc, oto, vtv  otc有问题
-stk_pool : 'CSI500'  # NA CSI500 CSI300 [CSI800]
+return_kind : 'ctc'  # ctc, oto, vtv  otc有问题
+stk_pool : 'NA'  # NA CSI500 CSI300 [CSI800]
 stk_w : 'ew'  # idx, ew
-ngroups : 5  # less than 0: 多/空各(-)ngroup支;    1: 稀疏事件信号
-holddays : 1  # 交易频率，如1天一换仓
+ngroups : -10  # less than 0: 多/空各(-)ngroup支;    1: 稀疏事件信号
+holddays : 5  # 交易频率，如1天一换仓
 
 tc : 2e-3  # 手续费（双边）
 save_tables : True
@@ -127,6 +130,10 @@ tables :
 # BARRA
 access_barra : '/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/barra/access_barra.xlsx'
 dat_path_barra : '/mnt/c/Users/Winst/Documents/data_local/BARRA/'
+barra_fval : '/mnt/c/Users/Winst/Documents/data_local/BARRA/barra_fval_20120104_20220331.csv'
+fund_net_value : '/mnt/c/Users/Winst/Documents/data_local/fund_net_value.h5'  # key: refactor_net_value
+refactor_net_value_5003 : '/mnt/c/Users/Winst/Documents/data_local/BARRA/fund_refactor_net_value[5003].pkl'
+fund_info_5003 : '/mnt/c/Users/Winst/Documents/data_local/BARRA/fund_main_info[5003].pkl'
 
 # mysql port engine
 mysql_engine :
@@ -148,7 +155,7 @@ mysql_engine :
     host : '192.168.1.104'
     port : '3306'
     dbname : 'factordatabase'
-  engine3:
+  engine3:  # engine 3 & 4 曾经置换
     user: "intern01"
     password: "rh35th"
     host: '192.168.1.104'
