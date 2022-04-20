@@ -131,9 +131,16 @@ tables :
 access_barra : '/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/barra/access_barra.xlsx'
 dat_path_barra : '/mnt/c/Users/Winst/Documents/data_local/BARRA/'
 barra_fval : '/mnt/c/Users/Winst/Documents/data_local/BARRA/barra_fval_20120104_20220331.csv'
+
+# FOF
 fund_net_value : '/mnt/c/Users/Winst/Documents/data_local/fund_net_value.h5'  # key: refactor_net_value
 refactor_net_value_5003 : '/mnt/c/Users/Winst/Documents/data_local/BARRA/fund_refactor_net_value[5003].pkl'
 fund_info_5003 : '/mnt/c/Users/Winst/Documents/data_local/BARRA/fund_main_info[5003].pkl'
+
+# PCA
+dat_path_pca : '/mnt/c/Users/Winst/Documents/data_local/PCA/d120,pc60,ipo60/'
+pca_rtn_150 : '/mnt/c/Users/Winst/Documents/data_local/PCA/d120,pc60,ipo60/PrincipalFactorReturn/PrincipalFactorReturn{}.csv'  # 20120104~20220331
+
 
 # mysql port engine
 mysql_engine :
