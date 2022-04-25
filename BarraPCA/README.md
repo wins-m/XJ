@@ -165,7 +165,7 @@
 **运行记录**
 
 ```zsh
-(base) swmao:PyCharmProject/ (master✗) $ python barra/cal_factor_return.py                  [8:55:13]
+(base) swmao:PyCharmProject/ (master✗) $ python BarraPCA/cal_factor_return.py                  [8:55:13]
 
  2022
 Industry Missing 0.09 %
@@ -303,6 +303,80 @@ after missing-drop (586492, 41)
 ### `backtest.py`
 
 - 选股超额 调仓日最高X只指增 相对全体同类产品 相对指数 表现对比
+
+## PCA全市场分解
+
+###  `daily_pca.py`
+
+> 时间说明：为得到t期的主成分收益/主成分暴露，需要用到截至t期的个股收益
+
+`d120,pc60,ipo60`
+
+- 股池：全市场
+
+- 上市：去除新上市60日
+
+- 日度迭代
+
+    - 过去120天
+
+    - 存在完整收益序列的股池
+
+    - 日收益超过0.1，缩到0.1
+
+    - 日收益协方差矩阵，PCA分解（SVD）
+        $$
+        X: D \times N  = 120 \times N , \quad 
+        \bold{1}^T X = \bold{0} \\
+        X^T = U \Sigma V^T \\
+        \begin{cases}
+        e^{D \times 1} = diag(\Sigma)^2 / 120 \\
+        u^{N \times pn} = \text{First pn columns of } U \\
+        \end{cases}
+        $$
+        主成分权重，获得主成分120日收益
+        $$
+        R^{D \times pn} = X u^2
+        $$
+
+    - 个股收益对主成分收益回归，得到日度截面因子暴露 $F^{N \times pn}$
+        $$
+        F^T = (R^T R)^{-1} R^T X
+        $$
+
+        - 对最近D期收益$X$均可用最近D期的因子收益$R$反推出资产的因子暴露$F$
+
+- `data_local/PCA/`
+
+    - `pc00X.csv`: 纯因子00X在个股上的暴露，截面使用
+    - `PricipalCompnent/`: 所有纯因子，单日在个股上的暴露（回归系数）
+    - `PrincipalFactorReturn/`: 所有纯因子，单日过去150日，因子收益
+    - `PrincipalStockWeight/`: 所有纯因子，单日计算的特征向量，（平方后是）在个股上的权重
+
+### `fof.py`
+
+用PCA选择指增
+
+## 风险矩阵估计
+
+
+
+## 组合优化
+
+$$
+\max_{w} {
+	\sum_{i} {\alpha w} - {1\over2} \gamma w' \Sigma w 
+}  \\
+\text{s.t.} \quad
+\begin{cases}
+F_l \le {X_{f} (w - w_{b}) } \le F_h \\
+H_l \le {H (w - w_{b}) } \le H_h \\
+P_l \le {P(w - w_b)} \le P_h \\
+\sum_{i}{|w_{i,t} - w_{i, t-1}|} < d \\
+0 \le w_i \le k \\
+\sum{ w_i } = 1 \\
+\end{cases}
+$$
 
 ## 参考资料
 

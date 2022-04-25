@@ -1,5 +1,6 @@
 """
 (created by swmao on April 15th)
+用PCA选择指增
 
 """
 import pandas as pd

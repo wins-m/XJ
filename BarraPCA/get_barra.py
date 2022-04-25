@@ -24,7 +24,7 @@ def get_barra():
     force_update = False
     data_pat = '/mnt/c/Users/Winst/Documents/data_local/BARRA/'
     os.makedirs(data_pat, exist_ok=True)
-    access_target = '/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/barra/access_barra.xlsx'
+    access_target = '/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/BarraPCA/access_barra.xlsx'
 
     transfer_data(mysql_engine, data_pat, access_target, force_update)
 
