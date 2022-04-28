@@ -366,7 +366,7 @@ after missing-drop (586492, 41)
 $$
 \max_{w} {
 	\sum_{i} {\alpha w} - {1\over2} \gamma w' \Sigma w 
-}  \\
+},\ \gamma=0  \\
 \text{s.t.} \quad
 \begin{cases}
 F_l \le {X_{f} (w - w_{b}) } \le F_h \\

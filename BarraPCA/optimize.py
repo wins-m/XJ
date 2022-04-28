@@ -33,14 +33,14 @@ begin_date = '2016-02-01'
 end_date = '2022-03-31'
 
 N_ingredient = 2000
-FL = -.5
-FH = .5
-HL = -.5
-HH = .5
-PL = -.5
-PH = .5
+FL = -.1
+FH = .1
+HL = -.2
+HH = .2
+PL = -.1
+PH = .1
 D = 2
-K = .1
+K = .01
 wei_tole = 1e-5
 
 # %% Target to maximize
@@ -108,11 +108,11 @@ portfolio_weight = pd.DataFrame()
 lst_w: pd.DataFrame = pd.DataFrame()
 w_lst = np.zeros([N_ingredient, 1])
 
-td0 = tradedates[0]
+td0 = tradedates[-10]
 for td0 in tradedates:
     td = td0.strftime('%Y-%m-%d')
     # 个股覆盖
-    stk_exposed_pca = set(expo_pca.loc[td].dropna(axis=1).index)
+    stk_exposed_pca = set(expo_pca.loc[td].dropna(axis=1).index)  # PCA 暴露覆盖个股
     stk_exposed_barra = set(expo.loc[td].index)  # Barra 暴露 覆盖个股
     stk_exposed = stk_exposed_barra.intersection(stk_exposed_pca)  # 存在暴露的个股
 
@@ -120,11 +120,12 @@ for td0 in tradedates:
     stk_alpha = set(dat.loc[td].dropna().index)  # Alpha 覆盖个股
 
     tmp = stk_alpha.difference(stk_exposed)  # alpha 覆盖个股中barra暴露未知的
+    # stk_ingredient = set(dat.loc[td, list(stk_alpha)].rank(ascending=False).sort_values().index[:N_ingredient])  # 组合用股
     stk_ingredient = set(dat.loc[td, list(stk_alpha.difference(tmp))].rank(ascending=False).sort_values().index[:N_ingredient])  # 组合用股
-    complement_lst = set(lst_w.index).difference(stk_ingredient)  # 上期持有 组合资产未覆盖
-    # complement_ind = stk_ind_cons.difference(stk_exposed)  # 指数成分股 组合资产未覆盖
     print(td + f'\tAlpha:{stk_alpha.__len__()}({tmp.__len__()})\t覆盖(暴露缺失)')
     del tmp
+    complement_lst = set(lst_w.index).difference(stk_ingredient)  # 上期持有 组合资产未覆盖
+    # complement_ind = stk_ind_cons.difference(stk_exposed)  # 指数成分股 组合资产未覆盖
 
     a = dat.loc[td, list(stk_ingredient)]  # 最大化的 N_ingredient 个alpha
 
@@ -138,12 +139,12 @@ for td0 in tradedates:
     p_del = expo_pca.loc[td].reindex_like(pd.DataFrame(index=list(wb.index), columns=expo_pca.columns)).fillna(0).T @ wb
     d_del = lst_w.loc[list(complement_lst)].abs().sum().values[0] if len(lst_w) > 0 else 0
 
-    fl = np.ones([len(cols_style), 1]) * FL - f_del.values
-    fh = np.ones([len(cols_style), 1]) * FH - f_del.values
-    hl = np.ones([len(cols_indus), 1]) * HL - h_del.values
-    hh = np.ones([len(cols_indus), 1]) * HH - h_del.values
-    pl = np.ones([expo_pca.shape[1], 1]) * PL - p_del.values
-    ph = np.ones([expo_pca.shape[1], 1]) * PH - p_del.values
+    fl = np.ones([len(cols_style), 1]) * FL - f_del.values.reshape(-1, 1)
+    fh = np.ones([len(cols_style), 1]) * FH - f_del.values.reshape(-1, 1)
+    hl = np.ones([len(cols_indus), 1]) * HL - h_del.values.reshape(-1, 1)
+    hh = np.ones([len(cols_indus), 1]) * HH - h_del.values.reshape(-1, 1)
+    pl = np.ones([expo_pca.shape[1], 1]) * PL - p_del.values.reshape(-1, 1)
+    ph = np.ones([expo_pca.shape[1], 1]) * PH - p_del.values.reshape(-1, 1)
     k = np.ones([N_ingredient, 1]) * K
     d = D - d_del
 
@@ -152,8 +153,8 @@ for td0 in tradedates:
     constraints = [
         fl <= xf.values.T @ w,
         xf.values.T @ w <= fh,
-        hl <= h.values.T @ w,
-        h.values.T @ w <= hh,
+        # hl <= h.values.T @ w,
+        # h.values.T @ w <= hh,
         pl <= p.values.T @ w,
         p.values.T @ w <= ph,
         w <= k, cp.sum(w) == 1
@@ -169,10 +170,12 @@ for td0 in tradedates:
         w1 = w.value.copy()
         w1[w1 < wei_tole] = 0
         w1 = w1 / w1.sum()
-        print(f' double-side turnover {np.abs(w_lst - w1).sum() + d_del:.3f}')
+        print(f' turnover {np.abs(w_lst - w1).sum() + d_del:.3f};\tportfolio size {(w1 > 0).sum()}')
         lst_w = pd.DataFrame(w1, index=list(stk_ingredient), columns=[td])
     else:
         print(f' {prob.status} problem, portfolio ingredient unchanged')
+        if len(lst_w) > 0:
+            lst_w.columns = [td]
     portfolio_weight = pd.concat([portfolio_weight, lst_w.T])
 
 # %%
