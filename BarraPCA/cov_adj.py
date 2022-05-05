@@ -30,14 +30,18 @@ plt.rc("font", size=10)
 plt.rcParams["date.autoformatter.hour"] = "%H:%M:%S"
 
 
-def get_barra_factor_return_daily(conf) -> pd.DataFrame:
-    pd.read_hdf(conf['barra_factor_value'], key='y2021').columns
-    return pd.read_csv(conf['barra_fval'], index_col=0, parse_dates=True)
+def get_barra_factor_return_daily(conf, y=None) -> pd.DataFrame:
+    if y is None:
+        return pd.read_csv(conf['barra_fval'], index_col=0, parse_dates=True)
+    else:
+        return pd.DataFrame(pd.read_hdf(conf['barra_factor_value'], key=f'y{y}'))
 
 
-def get_barra_factor_exposure_daily(conf, use_temp=True) -> pd.DataFrame:
+def get_barra_factor_exposure_daily(conf, use_temp=False, y=None) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """获取风格因子暴露"""
-    if use_temp:
+    if y is not None:
+        stk_expo = pd.DataFrame(pd.read_hdf(conf['barra_panel'], key=f'y{y}'))
+    elif use_temp:
         stk_expo = pd.DataFrame(pd.read_hdf(conf['barra_panel_1222'], key='y1222'))
     else:
         # import h5py
@@ -45,10 +49,8 @@ def get_barra_factor_exposure_daily(conf, use_temp=True) -> pd.DataFrame:
         stk_expo = pd.DataFrame()
         for k in [f'y{_}' for _ in range(2012, 2023)]:
             stk_expo = stk_expo.append(pd.read_hdf(conf['barra_panel'], key=k))
-        stk_expo = stk_expo[[c for c in stk_expo.columns if c != 'rtn_ctc']]
-        assert stk_expo.shape[1] == 41
         stk_expo.to_hdf(conf['barra_panel_1222'], key='y1222')
-    return stk_expo
+    return stk_expo['rtn_ctc'].unstack(), stk_expo[[c for c in stk_expo.columns if c != 'rtn_ctc']]
 
 
 def get_tdays_series(conf, freq='w', bd=None, ed=None) -> pd.Series:
@@ -68,21 +70,6 @@ def progressbar(cur, total, msg):
     print("\r[%-50s] %s" % ('=' * int(math.floor(cur * 50 / total)), percent) + msg, end='')
 
 
-def var_newey_west_adj(Y: pd.DataFrame, X: pd.DataFrame, F: pd.DataFrame, tau=90, d=5) -> pd.DataFrame:
-    """
-    特质风险Newey-West调整
-    U = Y - F X^T, Diag(Cov(U))
-    :param d: 假设因子收益d阶MA过程
-    :param tau: 协方差计算半衰期
-    :param Y: T*N 资产收益，T为日度（取h=252），N为资产数量（全A股）
-    :param X: N*K 资产因子暴露，K为因子数
-    :param F: T*K 纯因子收益，由Barra部分WLS回归得到
-    :return N*N NW调整的特异风险（对角阵）
-    """
-    U = Y - F @ X.T  # T*N specific returns
-    return cov_newey_west_adj(U, tau=tau, q=d)
-
-
 def cov_newey_west_adj(ret, tau=90, q=2) -> pd.DataFrame:
     """
     Newey-West调整时序上相关性
@@ -100,7 +87,7 @@ def cov_newey_west_adj(ret, tau=90, q=2) -> pd.DataFrame:
     weights /= weights.sum()
 
     ret1 = np.matrix((ret - ret.T @ weights).values)
-    gamma0 = [weights[t] * ret1[t].T @ ret1[t] for t in range(T)]
+    gamma0 = [weights[t] * ret1[t].T @ ret1[i+t] for t in range(T)]
     v = np.array(gamma0).sum(0)
 
     for i in range(1, q + 1):
@@ -109,6 +96,42 @@ def cov_newey_west_adj(ret, tau=90, q=2) -> pd.DataFrame:
         v += (1 - i / (1 + q)) * (cd + cd.T)
 
     return pd.DataFrame(v, columns=names, index=names)
+
+
+def var_newey_west_adj(ret, tau=90, q=5) -> Tuple[pd.Series, pd.Series]:
+    """
+    Newey-West调整时序上相关性
+    :param ret: column为特异收益，index为时间，一般取T-252,T-1
+    :param tau: 协方差计算半衰期
+    :param q: 假设因子收益q阶MA过程
+    :return: 经调整后的协方差矩阵
+    """
+    T, K = ret.shape
+    if T <= q:
+        raise Exception("T <= q")
+
+    names = ret.columns
+
+    weights = .5 ** (np.arange(T - 1, -1, -1) / tau)
+    weights = (~ret.isna()) * weights.reshape(-1, 1)  # w on all stocks, w=0 if missing
+    weights /= weights.sum()
+
+    # ret1 = np.matrix((ret - (ret * weights).sum()).values)
+    ret1 = ret - (ret * weights).sum()
+    gamma0 = (ret1**2 * weights).sum()
+
+    v = gamma0.copy()
+    for i in range(1, q+1):
+        ret_i = ret1 * ret1.shift(i)
+        weights_i = .5 ** (np.arange(T - 1, -1, -1) / tau)
+        weights_i = (~ret_i.isna()) * weights_i.reshape(-1, 1)  # w on all stocks, w=0 if missing
+        weights_i /= weights_i.sum()
+        gamma_i = (ret_i * weights_i).sum()
+        v += (1 - i / (1 + q)) * (gamma_i + gamma_i)
+
+    sigma_raw = pd.Series(gamma0, index=names)
+    sigma_nw = pd.Series(v, index=names)
+    return sigma_raw, sigma_nw
 
 
 def cov_eigen_risk_adj(cov, T=1000, M=10000, scal=1.2) -> pd.DataFrame:
@@ -144,6 +167,29 @@ def cov_eigen_risk_adj(cov, T=1000, M=10000, scal=1.2) -> pd.DataFrame:
     F0_tilde = U0 @ D0_tilde @ U0.T  # 因子协方差“去偏”调整
 
     return pd.DataFrame(F0_tilde, columns=F0.columns, index=F0.columns).reindex_like(cov)
+
+
+def specific_return_yxf(Y: pd.DataFrame, X: pd.DataFrame, F: pd.DataFrame) -> pd.DataFrame:
+    """
+    U = Y - F X^T
+    :param Y: T*N 资产收益，T为日度（取h=252），N为资产数量（全A股）
+    :param X: (T*N)*K 资产因子暴露，K为因子数
+    :param F: T*K 纯因子收益，由Barra部分WLS回归得到
+    :return N*N NW调整的特异风险（对角阵）
+    """
+    # Y0 = pd.DataFrame()
+    Y0 = []
+    cnt = 0
+    for td in F.index:
+        # Y0 = pd.concat([Y0, (X.loc[td].fillna(0) @ F.loc[td].fillna(0)).rename(td)], axis=1)
+        Y0.append((X.loc[td].fillna(0) @ F.loc[td].fillna(0)).rename(td))
+        cnt += 1
+        progressbar(cnt, F.shape[0], msg=f'\tdates: {td.strftime("%Y-%m-%d")}')
+    Y1 = pd.DataFrame(Y0)
+    U = Y.reindex_like(Y1) - Y1  # T*N specific returns
+    # U.isna().sum().plot.hist(bins=100, title='Missing U=Y-XF')
+    # plt.show()
+    return U
 
 
 class MFM(object):
@@ -281,6 +327,62 @@ class MFM(object):
         cov.to_csv(path + '/' + file_name)
 
 
+class SRR(object):
+    """Specific Return Risk"""
+
+    def __init__(self, sr, fr, expo):
+        self.stk_rtn: pd.DataFrame = sr
+        self.fct_rtn: pd.DataFrame = fr
+        self.exposure: pd.DataFrame = expo
+
+        self.sorted_dates = pd.to_datetime(fr.index.to_series())
+        self.T = len(fr)
+
+        self.u: pd.DataFrame = pd.DataFrame()
+        self.SigmaRaw: pd.DataFrame = pd.DataFrame()
+        self.SigmaNW: pd.DataFrame = pd.DataFrame()
+
+    def specific_return_by_time(self):
+        self.u = specific_return_yxf(Y=self.stk_rtn, X=self.exposure, F=self.fct_rtn)
+
+    def newey_west_adj_by_time(self, h=252, NA_bar=.75, tau=90, q=5) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        特异收益率全历史计算协方差进行 Newey West 调整
+        :param h: 计算协方差回看的长度 T-h, T-1
+        :param tau: 协方差半衰期
+        :param q: 假设因子收益为q阶MA过程
+        :return: dict, key=日期, val=协方差Sigma_NW
+        """
+        if self.u is None:
+            raise Exception('No specific return value')
+
+        # Newey_West_cov = {}
+        print('\n\nNewey West Adjust...')
+        SigmaRaw = []
+        SigmaNW = []
+        t = h
+        for t in range(h, self.T):
+            td = self.sorted_dates[t].strftime('%Y-%m-%d')
+            try:
+                u0 = self.u.iloc[t-h:t]
+                # u0.count().plot.hist(bins=100, title=f'{u0.index[0].strftime("%Y-%m-%d")},{td}')
+                # plt.show()
+                u1 = u0[u0.columns[u0.count() > h*NA_bar]]
+                sigma_raw, sigma_nw = var_newey_west_adj(ret=u1, tau=tau, q=q)
+                SigmaRaw.append(sigma_raw.rename(td))
+                SigmaNW.append(sigma_nw.rename(td))
+            except:
+                SigmaRaw.append(pd.Series([]).rename(td))
+                SigmaNW.append(pd.Series([]).rename(td))
+
+            progressbar(cur=t-h+1, total=self.T-h, msg=f'\tdate: {self.sorted_dates[t-1].strftime("%Y-%m-%d")}')
+
+        self.SigmaRaw = pd.DataFrame(SigmaRaw)
+        self.SigmaNW = pd.DataFrame(SigmaNW)
+
+        return self.SigmaRaw, self.SigmaNW
+
+
 def main():
     import yaml
     conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/config.yaml'
@@ -296,9 +398,16 @@ def main():
     self.vol_regime_adj_cov = vol_regime_adj_cov
     self.save_vol_regime_adj_cov(conf['dat_path_barra'])
 
-    stk_expo = get_barra_factor_exposure_daily(conf, use_temp=True)
-    set(stk_expo.columns) - set(fr.columns)
-    set(fr.columns) - set(stk_expo.columns)
+    sr, expo = get_barra_factor_exposure_daily(conf, use_temp=True)  # 注意T0期因子收益对应T+1期个股收益
+    self = SRR(fr=fr.loc['2019-07-01':], sr=sr.loc['2019-07-01':], expo=expo.loc['2019-07-01':])
+    print(self.T)
+    self.specific_return_by_time()
+    # Raw_var, Newey_West_adj_var = self.newey_west_adj_by_time()
+    self.SigmaRaw = Raw_var
+    self.SigmaNW = Newey_West_adj_var
+
+    sig = Newey_West_adj_var.copy()
+
 
 # if __name__ == '__main__':
 #     main()

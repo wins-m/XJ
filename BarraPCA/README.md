@@ -477,6 +477,9 @@ $$
 \{u_{nt}\}:\ T \times N \\
 u_{nt} = r_{nt} - \sum_{k}{X_{nkt} f_{kt}}
 $$
+特异波动率252日计数，缺失来源：个股n当天因子暴露的缺失。
+
+![image-20220505155938140](https://s2.loli.net/2022/05/05/Q2uW8s3FrPRzp6Z.png)
 
 ##### 特质风险（收益）Newey-West 方差
 
