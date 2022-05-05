@@ -85,7 +85,7 @@ def cal_fac_ret(conf, data_pat, cache_path, panel_path, fval_path, omega_path):
     
     year = 2019
     # %%
-    for year in range(2022, 2021, -1):
+    for year in range(2022, 2011, -1):
         # %%
         print('\n', year)
         begin_date = f'{year}-01-01'  # '2012-01-01'
@@ -129,7 +129,7 @@ def cal_fac_ret(conf, data_pat, cache_path, panel_path, fval_path, omega_path):
     
         fval = pd.DataFrame()
         all_dates = panel.index.get_level_values(0).unique()
-        date = all_dates[1]
+        date = all_dates[0]
         # %%
         for date in tqdm(all_dates[:]):
             # %%
@@ -157,14 +157,17 @@ def cal_fac_ret(conf, data_pat, cache_path, panel_path, fval_path, omega_path):
             panel.loc[date, factor_style] = pan.loc[:, factor_style].values
     
             # 最终进入回归的因子
-            f_cols = ['country'] + factor_style + factor_i[:-1]
+            if pan[factor_i].isna().any().sum() > 1:  # 19年前行业分类只有30个
+                f_cols = ['country'] + factor_style + factor_i[:-1]
+            else:
+                f_cols = ['country'] + factor_style + factor_i # [:-1]
             mat_x = pan[f_cols].values
     
             # 行业因子约束条件
             mv_indus = mv.values.T @ pan[factor_i].values
             pan[factor_i].sum()
             assert mv_indus.prod() != 0
-            k = 1 + len(factor_style) + len(factor_i) - 1
+            k = len(f_cols)  # 1 + len(factor_style) + len(factor_i) - 1
             mat_r = np.diag([1.] * k)[:, :-1]
             # pan[factor_i].sum()
             mat_r[-1:, -len(factor_i)+1:] = - mv_indus[:-1] / mv_indus[-1]
