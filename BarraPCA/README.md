@@ -2,6 +2,8 @@
 
 ## BARRA模型
 
+### 纯因子收益：截面WLS回归
+
 假设资产收益由共同因子驱动：
 
 - $r_n$可以由国家因子$f_c$，行业因子$f_i$，风格因子$f_s$表出；
@@ -357,9 +359,246 @@ after missing-drop (586492, 41)
 
 用PCA选择指增
 
-## 风险矩阵估计
+## 风险矩阵估计 $V = X^T F X + \Delta$
 
+$$
+r_n = f_c + \sum_{i}{ X_{n,i} f_i} + \sum_{s}{X_{n, s} f_s} + \sum_{p}{X_{n, p} f_p} + u_n
+$$
 
+最小化投资组合风险
+$$
+Risk(Portfolio) = w^T V w
+$$
+合理估计股票收益协方差矩阵
+$$
+V = X^T F X + \Delta
+$$
+对T期，只能用T-1期及以前的纯因子收益估计。
+
+#### Step1：共同因子协方差矩阵 $F$
+
+```python
+mod = MFM(fr=pure_factor_return)
+mod.newey_west_adj_by_time()
+mod.eigen_risk_adj_by_time()
+mod.vol_regime_adj_by_time()
+mod.save_vol_regime_adj_cov(conf['dat_path_barra'])
+```
+
+半衰指数权平均EWMA：过去252日的因子收益协方差
+$$
+F^{Raw}_{k,l} 
+= cov(f_k, f_l)_t 
+= {
+    \sum_{s=t-h+1}^{t} {
+        \lambda^{t-s} 
+        (f_{k,s} - \bar{f_k})
+        (f_{l,s} - \bar{f_l})
+    }  \over 
+    \sum_{s=t-h}^{t} {\lambda^{t-s}}
+} \\
+\text{where} \quad 
+\lambda = 0.5^{1/90}, \  h=252
+$$
+
+##### 风险Newey-West调整
+
+$$
+F^{NW} =
+\left[ 
+    F^{Raw} 
+    + \sum_{\Delta=1}^{D} {
+        \left(1 - {\Delta \over D+1}\right)
+        \left(C_{+\Delta}^{(d)} + C_{-\Delta}^{(d)}\right)
+    }
+\right] \\
+C_{kl, +\Delta}^{(d)} 
+= cov(f_{k, t-\Delta}, f_{l, t}) 
+= {
+    \sum_{s=t-h+\Delta}^{t} {
+        \lambda^{t-s} 
+        (f_{k,s-\Delta} - \bar{f_k})
+        (f_{l,s} - \bar{f_l})
+    }  \over 
+    \sum_{s=t-h+\Delta}^{t} {\lambda^{t-s}}
+} \\
+= C_{kl, -\Delta}^{(d)} 
+= cov(f_{k, t}, f_{l, t-\Delta})
+= {
+    \sum_{s=t-h+\Delta}^{t} {
+        \lambda^{t-s} 
+        (f_{k,s} - \bar{f_k})
+        (f_{l,s-\Delta} - \bar{f_l})
+    }  \over 
+    \sum_{s=t-h+\Delta}^{t} {\lambda^{t-s}}
+} \\
+
+\text{where} \quad D=2,\ h=252,\ \lambda = 0.5^{1/90}
+$$
+
+> 只能调整成月度？——不×21
+
+##### 特征值调整 Eigenfactor Risk Adjustment
+
+$$
+U_0 D_0 U_0^T = F^{NW}
+$$
+
+- $M=10000$次蒙特卡洛模拟，第$m$次：
+
+1. 生成 模拟特征因子收益 $b_m: N\times T$：均值$0$，方差$D_0$
+2. 计算 模拟因子收益 $r_m = U_0 b_m$
+3. 计算 模拟因子收益协方差（？？）$F_m^{MC}=cov(r_m, r_m)$ 【满足$E[F_m^{MC}] = F^{NW}$】
+4. 执行 模拟协方差特征值分解 $U_m D_m U_m^T = F_m^{MC}$
+5. 计算 模拟特征因子“真实”协方差 $\widetilde{D}_m = U_m^T F^{NW} U_m$
+6. 记录 $D_m, \widetilde{D}_m$ 对角元素
+
+- 计算 第$k$个特征的模拟风险偏差 $\lambda(k) = \sqrt{{1 \over M} \sum_{m=1}^M{\widetilde{D}_m(k) \over D_m(k)}}$
+- 实际因子收益“尖峰厚尾”调整 $\gamma(k) = a[\lambda(k) -1] + 1, \text{let}\ a=1.2$
+- 特征因子协方差“去偏” $\widetilde{D}_0 = \gamma^2 D_0$
+- 因子协方差“去偏”调整 $F^{Eigen} = U_0 \widetilde{D}_0 U_0^T$
+
+##### 波动率偏误调整 Volatility Regime Adjustment
+
+$$
+F^{VRA} = \lambda_F^2 F^{Eigen}
+$$
+
+- 因子波动率乘数  $\lambda_F = \sqrt{ \sum_{s=t-h+1}^{t}{w^{t-s} (B_s^F)^2}},\ w=0.5^{1/42},\ h=252$
+- 日风险预测即时偏差 $B_t^F = \sqrt{{1\over K} \sum_k{\left({f_{k,t} \over \sigma_{k,t}}\right)^2}}$
+- 样本外标准化收益 $b_{t,q} = {r_{t+q} / \sigma_{t}}$
+    - $r_{t+q}$：时刻$t$至$t+q$时间段（去21天）内资产收益率
+    - $\sigma_t$：当前时刻$t$的预测风险
+
+#### Step2：特异风险方差矩阵 $\Delta$
+
+横截面回归，不由公共因子解释的残差序列
+$$
+\{u_{nt}\}:\ T \times N \\
+u_{nt} = r_{nt} - \sum_{k}{X_{nkt} f_{kt}}
+$$
+
+##### 特质风险（收益）Newey-West 方差
+
+EWM方差进行Newey-West 调整（h=252, tau=90, d=5）
+$$
+\sigma^{Raw}_{n} 
+= cov(u_n)_t 
+= {
+    \sum_{s=t-h+1}^{t} {
+        \lambda^{t-s} 
+        (u_{n, s} - \bar{u}_n)^2
+    }  \over 
+    \sum_{s=t-h}^{t} {\lambda^{t-s}}
+} \\
+\text{where} \quad 
+\lambda = 0.5^{1/90}, \  h=252
+\\
+\\
+\sigma_{u}^{NW} = \left[ 
+    \sigma^{Raw} 
+    + \sum_{\Delta=1}^{D} {
+        \left(1 - {\Delta \over D+1}\right)
+        \left(C_{+\Delta}^{(d)} + C_{-\Delta}^{(d)}\right)
+    }
+\right] \\
+C_{n, +\Delta}^{(d)} 
+= cov(u_{k, t-\Delta}, u_{l, t}) 
+= {
+    \sum_{s=t-h+\Delta}^{t} {
+        \lambda^{t-s} 
+        (u_{n,s-\Delta} - \bar{u}_n)
+        (u_{n,s} - \bar{u}_n)
+    }  \over 
+    \sum_{s=t-h+\Delta}^{t} {\lambda^{t-s}}
+} \\
+= C_{n, -\Delta}^{(d)} 
+= cov(u_{k, t}, u_{l, t-\Delta})
+= {
+    \sum_{s=t-h+\Delta}^{t} {
+        \lambda^{t-s} 
+        (u_{n,s} - \bar{u}_n)
+        (u_{n,s-\Delta} - \bar{u}_n)
+    }  \over 
+    \sum_{s=t-h+\Delta}^{t} {\lambda^{t-s}}
+} \\
+
+\text{where} \quad D=5,\ h=252,\ \lambda = 0.5^{1/90}
+$$
+
+##### 结构化模型调整 Structural Model
+
+个股特质收益异常值：具有相同特征的股票可能具有相同的特质波动
+$$
+\hat{\sigma}_{u} = \gamma \sigma_{u}^{NW} + (1 - \gamma) \sigma_{u}^{STR} \\
+\\
+\sigma^{STR}_n = E_0 \times \exp{\left(\sum_{k}{X_{nk} b_{k}}\right)}\\
+	\begin{aligned}
+        \text{where} \quad
+        & E_{0}: \text{去除残差项的指数次幂带来的偏误，取1.05}  \\
+        & X_{nk}: \text{因子暴露} \\
+        & b_{k}: \text{以下WLS回归拟合系数} \\
+	\end{aligned} \\
+\\
+b_{k} \text{: WLS Reg on stocks whose } \lambda = 1 \\
+\ln{\sigma_n^{NW}} = \sum_{k} X_{nk} b_{k} + \varepsilon_{n} \\
+\\
+\gamma = 
+	\min{ \left( 1, \max{\left(0, {h-60\over120} \right)} \right)} 
+	\times \min{(1, \max{(0, \exp{(1 - Z_{u})})})} \\
+\begin{aligned}
+	\text{where} \quad
+	& h = 252, \quad Z_u = \left| {\sigma_{u, eq} - \tilde{\sigma}_{u} \over \tilde{\sigma}_{u} } \right| \\
+	& \tilde{\sigma}_{u} \text{ : 特异收益稳健标准差, } \tilde{\sigma}_{u} = {1 \over 1.35} (Q_3 - Q_1) \\
+	& Q_3, Q_1 \text{ : 特异收益h=252日的1/4和3/4分位数} \\
+	& \sigma_{u, eq} \text{ : 特异收益}[-10 \tilde{\sigma}_{u}, 10\tilde{\sigma}_{u}]{内等权重样本标准差} \\
+\end{aligned}
+$$
+图：特异收益数据质量较优（$\gamma = 1$）股票比率
+
+[]
+
+均值？
+
+##### 贝叶斯压缩调整 Bayesian Shrinkage
+
+时序处理得到特异风险，高估历史高波动率股票，低估历史低波动率股票
+$$
+\sigma_{n}^{SH} = v_{n} \bar{\sigma}(S_n) + (1 - v_n) \hat{\sigma}_n \\
+\\
+\begin{aligned}
+	\text{where} \quad 
+	& v_{n} = { 
+            q \left| \hat{\sigma}_n - \bar{\sigma}(S_n)\right|  \over 
+            \Delta_{\sigma}{(S_n)} + q \left| \hat{\sigma}_n - \bar{\sigma}(S_n) \right| 
+        }, \text{ where } q = 1 \\
+	& \bar{\sigma}(S_n) = \sum_{n \subset S_n} {w_{n} \hat{\sigma}_n} \quad
+		\text{所在市值分组（10分组）市值加权的平均风险} \\
+	& \Delta_{\sigma}{(S_n)} = \sqrt{{1 \over N(S_n)} \sum_{n \subset S_n}{(\hat{\sigma}_n - \bar{\sigma}(S_n))^2}}
+\end{aligned}
+$$
+图：不同波动率分组下偏误统计量
+
+[Raw, NW, SM, Shrink, VRA]
+
+##### 波动率偏误调整  Volatility Regime Adjustment
+
+$$
+\sigma_{n}^{VRA} =  \lambda_S \sigma^{SH}_{n} \\
+
+\lambda_S = \sqrt{ \sum_{t=T-h+1}^{T}{w^{T-t} (B_t^S)^2}},\ w=0.5^{1/42},\ h=252 \\ 
+B_t^S = \sqrt{ \sum_n{w_{nt}\left( u_{nt} \over \sigma_{nt} \right)^2 }},\ w_{nt} \text{ : t期股票n的市值权重}
+$$
+
+图：特异风险波动乘数$\lambda_S$ V.S. 横截面波动$CSV^S$
+
+[CSV, lambda]
+$$
+CSV_t^S = \sqrt{ \sum_{n}{w_{nt} u_{nt}^2} }
+$$
+图：特质风险偏差统计量12个月滚动平均
+
+[Shrink, VRA]
 
 ## 组合优化
 
@@ -377,6 +616,8 @@ P_l \le {P(w - w_b)} \le P_h \\
 \sum{ w_i } = 1 \\
 \end{cases}
 $$
+
+
 
 ## 参考资料
 
