@@ -2,7 +2,7 @@
 
 ## BARRA模型
 
-### 纯因子收益：截面WLS回归
+### 截面WLS
 
 假设资产收益由共同因子驱动：
 
@@ -483,7 +483,7 @@ $$
 
 ##### 特质风险（收益）Newey-West 方差
 
-EWM方差进行Newey-West 调整（h=252, tau=90, d=5）
+EWM方差进行siNewey-West 调整（h=252, tau=90, d=5）
 $$
 \sigma^{Raw}_{n} 
 = cov(u_n)_t 
@@ -531,7 +531,7 @@ $$
 
 ##### 结构化模型调整 Structural Model
 
-个股特质收益异常值：具有相同特征的股票可能具有相同的特质波动
+个股特质收益异常值：具有相同特征的股S票可能具有相同的特质波动
 $$
 \hat{\sigma}_{u} = \gamma \sigma_{u}^{NW} + (1 - \gamma) \sigma_{u}^{STR} \\
 \\
@@ -557,7 +557,7 @@ b_{k} \text{: WLS Reg on stocks whose } \lambda = 1 \\
 	& \sigma_{u, eq} \text{ : 特异收益}[-10 \tilde{\sigma}_{u}, 10\tilde{\sigma}_{u}]{内等权重样本标准差} \\
 \end{aligned}
 $$
-图：特异收益数据质量较优（$\gamma = 1$）股票比率
+图：特异收益数据质ga1量较优（$\gamma = 1$）股票比率
 
 []
 

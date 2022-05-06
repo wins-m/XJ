@@ -87,11 +87,11 @@ def cov_newey_west_adj(ret, tau=90, q=2) -> pd.DataFrame:
     weights /= weights.sum()
 
     ret1 = np.matrix((ret - ret.T @ weights).values)
-    gamma0 = [weights[t] * ret1[t].T @ ret1[i+t] for t in range(T)]
+    gamma0 = [weights[t] * ret1[t].T @ ret1[t] for t in range(T)]
     v = np.array(gamma0).sum(0)
 
     for i in range(1, q + 1):
-        gamma1 = [weights[i + t] * ret1[t].T @ ret1[t] for t in range(T - i)]
+        gamma1 = [weights[i + t] * ret1[t].T @ ret1[t+i] for t in range(T - i)]
         cd = np.array(gamma1).sum(0)
         v += (1 - i / (1 + q)) * (cd + cd.T)
 
@@ -104,7 +104,7 @@ def var_newey_west_adj(ret, tau=90, q=5) -> Tuple[pd.Series, pd.Series]:
     :param ret: column为特异收益，index为时间，一般取T-252,T-1
     :param tau: 协方差计算半衰期
     :param q: 假设因子收益q阶MA过程
-    :return: 经调整后的协方差矩阵
+    :return: 经调整后的协方差（截面）
     """
     T, K = ret.shape
     if T <= q:
@@ -132,6 +132,54 @@ def var_newey_west_adj(ret, tau=90, q=5) -> Tuple[pd.Series, pd.Series]:
     sigma_raw = pd.Series(gamma0, index=names)
     sigma_nw = pd.Series(v, index=names)
     return sigma_raw, sigma_nw
+
+
+def var_struct_mod_adj(U: pd.DataFrame, sigNW: pd.DataFrame, expo: pd.DataFrame, MV: pd.DataFrame, E=1.05) -> Tuple[pd.Series, pd.Series]:
+    """
+    Structural Model: robust estimates for stocks with specific return histories that are not well-behaved
+    :param U: specific risk, parse last h=252 days
+    :param sigNW: one day sigma after Newey-West adjustment
+    :param expo: one day factor exposure
+    :param MV: one day market value (raw, from local mv file rather than JoinQuant)
+    :param E: sqrt(mv)-weighted average of the ratio between time series and structural specific risk forecasts,
+    average over the back-testing periods, 1.026 for EUE3
+    :return:
+    """
+    h = U.shape[0]
+    sigTilde = (U.quantile(.75) - U.quantile(.25)) / 1.35
+    sigEq = U[(U >= -10*sigTilde) & (U <= 10*sigTilde)].std()
+    Z = (sigEq / sigTilde - 1).abs()
+
+    gamma = Z.apply(lambda _: np.nan if np.isnan(_) else min(1., max(0., (h-60)/120)) * min(1., max(0., np.exp(1 - _))))
+    stk_gamma_eq_1 = gamma.index[gamma == 1]
+    stk_has_sigNW = sigNW.columns.intersection(stk_gamma_eq_1)
+    stk_has_expo = expo.index.intersection(stk_has_sigNW)
+    stk_has_mv = MV.index.intersection(stk_has_expo)
+
+    Y = sigNW.loc[:, stk_has_mv].applymap(np.log)
+    factor_i = [c for c in expo.columns if 'ind_' in c]
+    X = expo.loc[stk_has_mv, [c for c in expo.columns if 'ind_' not in c] + factor_i].astype(float)
+    assert 'size' in X.columns
+    mv = MV.loc[stk_has_mv]  # raw market value
+    w_mv = mv.apply(np.sqrt)  # stk with exposure must have market value, or Error
+    w_mv /= w_mv.sum()
+
+    # WLS
+    mat_v = np.diag(w_mv)
+    mat_x = X.values
+    mv_indus = mv @ X[factor_i]
+    k = X.shape[1]
+    mat_r = np.diag([1.] * k)[:, :-1]
+    mat_r[-1:, -len(factor_i)+1:] = -mv_indus[:-1] / mv_indus[-1]
+    mat_omega = mat_r @ np.linalg.inv(mat_r.T @ mat_x.T @ mat_v @ mat_x @ mat_r) @ mat_r.T @ mat_x.T @ mat_v
+    mat_y = Y.values
+    mat_b = mat_omega @ mat_y.reshape(-1, 1)
+    b_hat = pd.DataFrame(mat_b, index=X.columns)
+
+    sigSTR = E * np.exp(expo @ b_hat)
+    sigma_hat = (gamma * sigNW.iloc[0] + (1 - gamma) * sigSTR.iloc[:, 0]).dropna()
+
+    return gamma, sigma_hat
 
 
 def cov_eigen_risk_adj(cov, T=1000, M=10000, scal=1.2) -> pd.DataFrame:
@@ -330,10 +378,11 @@ class MFM(object):
 class SRR(object):
     """Specific Return Risk"""
 
-    def __init__(self, sr, fr, expo):
+    def __init__(self, sr, fr, expo, mv):
         self.stk_rtn: pd.DataFrame = sr
         self.fct_rtn: pd.DataFrame = fr
         self.exposure: pd.DataFrame = expo
+        self.mkt_val: pd.DataFrame = mv
 
         self.sorted_dates = pd.to_datetime(fr.index.to_series())
         self.T = len(fr)
@@ -341,13 +390,17 @@ class SRR(object):
         self.u: pd.DataFrame = pd.DataFrame()
         self.SigmaRaw: pd.DataFrame = pd.DataFrame()
         self.SigmaNW: pd.DataFrame = pd.DataFrame()
+        self.GammaSM: pd.DataFrame = pd.DataFrame()
+        self.SigmaSM: pd.DataFrame = pd.DataFrame()
 
     def specific_return_by_time(self):
+        print('\n\nSpecific Return...')
         self.u = specific_return_yxf(Y=self.stk_rtn, X=self.exposure, F=self.fct_rtn)
 
     def newey_west_adj_by_time(self, h=252, NA_bar=.75, tau=90, q=5) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
         特异收益率全历史计算协方差进行 Newey West 调整
+        :param NA_bar:
         :param h: 计算协方差回看的长度 T-h, T-1
         :param tau: 协方差半衰期
         :param q: 假设因子收益为q阶MA过程
@@ -375,15 +428,55 @@ class SRR(object):
                 SigmaRaw.append(pd.Series([]).rename(td))
                 SigmaNW.append(pd.Series([]).rename(td))
 
-            progressbar(cur=t-h+1, total=self.T-h, msg=f'\tdate: {self.sorted_dates[t-1].strftime("%Y-%m-%d")}')
+            progressbar(cur=t-h+1, total=self.T-h, msg=f'\tdate: {td}')
 
         self.SigmaRaw = pd.DataFrame(SigmaRaw)
         self.SigmaNW = pd.DataFrame(SigmaNW)
-
+        self.SigmaRaw.index = pd.to_datetime(self.SigmaRaw.index.to_series())
+        self.SigmaNW.index = pd.to_datetime(self.SigmaNW.index.to_series())
         return self.SigmaRaw, self.SigmaNW
 
+    def struct_mod_adj_by_time(self, h=252, NA_bar=.75, E=1.05):
+        if len(self.SigmaNW) == 0:
+            raise Exception('No Newey-West Adjusted Sigma SigmaNW')
 
+        print('\n\nStructural Model Adjust...')
+        GammaSM = []
+        SigmaSM = []
+        cnt = 0
+        for td in self.sorted_dates[h: self.T]:
+            sigNW = self.SigmaNW.loc[td:td]
+            U = self.u.loc[:td].iloc[-h:]
+            U = U.loc[:, U.count() > h * NA_bar]
+            expo = self.exposure.loc[td].dropna(axis=1, how='all').dropna(axis=0, how='any')  # 全空的风格暴露&有空的个股
+            MV = self.mkt_val.loc[td]
+            try:
+                res = var_struct_mod_adj(U=U, sigNW=sigNW, expo=expo, MV=MV, E=E)
+                GammaSM.append(res[0].rename(td))
+                SigmaSM.append(res[1].rename(td))
+            except:
+                GammaSM.append(pd.Series([]).rename(td))
+                SigmaSM.append(pd.Series([]).rename(td))
+            cnt += 1
+            progressbar(cur=cnt, total=self.T-h, msg=f'\tdate: {td.strftime("%Y-%m-%d")}')
+
+        self.SigmaSM = pd.DataFrame(SigmaSM)
+        self.GammaSM = pd.DataFrame(GammaSM)
+
+        return self.GammaSM, self.SigmaSM
+
+    def plot_structural_model_gamma(self):
+        if len(self.GammaSM) == 0:
+            raise Exception('No Structural Model Gamma')
+        g = self.GammaSM.copy()
+        ratio = (g == 1).sum(axis=1) / g.count(axis=1)
+        ratio.plot(title='ratio of good-quality specific return (with $\gamma=1$)')
+        plt.show()
+
+
+# %%
 def main():
+    # %%
     import yaml
     conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/config.yaml'
     conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
@@ -398,16 +491,21 @@ def main():
     self.vol_regime_adj_cov = vol_regime_adj_cov
     self.save_vol_regime_adj_cov(conf['dat_path_barra'])
 
-    sr, expo = get_barra_factor_exposure_daily(conf, use_temp=True)  # 注意T0期因子收益对应T+1期个股收益
-    self = SRR(fr=fr.loc['2019-07-01':], sr=sr.loc['2019-07-01':], expo=expo.loc['2019-07-01':])
+    mkt_val = pd.read_csv(conf['marketvalue'], index_col=0, parse_dates=True)
+    sr, exposure = get_barra_factor_exposure_daily(conf, use_temp=True)  # 注意T0期因子收益对应T+1期个股收益
+    # %%
+    fbegin_date = '2019-07-01'
+    self = SRR(fr=fr.loc[fbegin_date:], sr=sr.loc[fbegin_date:], expo=exposure.loc[fbegin_date:], mv=mkt_val.loc[fbegin_date:])
     print(self.T)
     self.specific_return_by_time()
     # Raw_var, Newey_West_adj_var = self.newey_west_adj_by_time()
-    self.SigmaRaw = Raw_var
-    self.SigmaNW = Newey_West_adj_var
+    self.SigmaRaw, self.SigmaNW = Raw_var, Newey_West_adj_var
+    # Gamma_STR, Sigma_STR = self.struct_mod_adj_by_time()
+    self.GammaSM, self.SigmaSM = Gamma_STR, Sigma_STR
 
-    sig = Newey_West_adj_var.copy()
+    # %%
 
 
+# %%
 # if __name__ == '__main__':
 #     main()
