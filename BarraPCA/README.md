@@ -359,7 +359,68 @@ after missing-drop (586492, 41)
 
 用PCA选择指增
 
-## 风险矩阵估计 $V = X^T F X + \Delta$
+## 组合优化
+
+$$
+\max_{w} {
+	\sum_{i} {\alpha w} - {1\over2} \gamma w' \Sigma w 
+},\ \gamma=0  \\
+\text{s.t.} \quad
+\begin{cases}
+F_l \le {X_{f} (w - w_{b}) } \le F_h \\
+H_l \le {H (w - w_{b}) } \le H_h \\
+P_l \le {P(w - w_b)} \le P_h \\
+\sum_{i}{|w_{i,t} - w_{i, t-1}|} < d \\
+0 \le w_i \le k \\
+\sum{ w_i } = 1 \\
+\end{cases}
+$$
+
+### $\gamma=0$ 不惩罚风险项
+
+- 最大化组合期望收益
+
+- 风格因子切换的风险和个股异质性风险通过超额暴露和个股权重的边界条件
+
+- CSI300
+
+    - ```
+        N_ingredient = 2000
+        FL = -.02
+        FH = .02
+        HL = -.04
+        HH = .04
+        PL = -.02
+        PH = .02
+        D = 1
+        K = .01
+        wei_tole = 1e-5
+        ```
+
+    - ![image-20220512090813919](https://s2.loli.net/2022/05/12/Ky1zvU6oONiLuxf.png)
+
+    - ![image-20220512090823206](https://s2.loli.net/2022/05/12/61xqPEvX4btuB7i.png)
+
+- CSI500
+
+    - ```
+        N_ingredient = 2000
+        FL = -.01
+        FH = .01
+        HL = -.02
+        HH = .02
+        PL = -.01
+        PH = .01
+        D = 1
+        K = .005
+        wei_tole = 1e-5
+        ```
+
+    - ![image-20220512090850919](https://s2.loli.net/2022/05/12/RaUYL8jXnS2xy6r.png)
+
+    - ![image-20220512090915014](https://s2.loli.net/2022/05/12/HX8WGoAVN3MQzn7.png)
+
+### $\gamma \neq 0$ 风险矩阵估计
 
 $$
 r_n = f_c + \sum_{i}{ X_{n,i} f_i} + \sum_{s}{X_{n, s} f_s} + \sum_{p}{X_{n, p} f_p} + u_n
@@ -485,7 +546,7 @@ $$
 
 EWM方差进行siNewey-West 调整（h=252, tau=90, d=5）
 $$
-\sigma^{Raw}_{n} 
+(\sigma^{Raw}_{n})^2
 = cov(u_n)_t 
 = {
     \sum_{s=t-h+1}^{t} {
@@ -498,7 +559,7 @@ $$
 \lambda = 0.5^{1/90}, \  h=252
 \\
 \\
-\sigma_{u}^{NW} = \left[ 
+(\sigma_{u}^{NW})^2 = \left[ 
     \sigma^{Raw} 
     + \sum_{\Delta=1}^{D} {
         \left(1 - {\Delta \over D+1}\right)
@@ -553,15 +614,15 @@ b_{k} \text{: WLS Reg on stocks whose } \lambda = 1 \\
 	\text{where} \quad
 	& h = 252, \quad Z_u = \left| {\sigma_{u, eq} - \tilde{\sigma}_{u} \over \tilde{\sigma}_{u} } \right| \\
 	& \tilde{\sigma}_{u} \text{ : 特异收益稳健标准差, } \tilde{\sigma}_{u} = {1 \over 1.35} (Q_3 - Q_1) \\
-	& Q_3, Q_1 \text{ : 特异收益h=252日的1/4和3/4分位数} \\
+	& Q_1, Q_3 \text{ : 特异收益h=252日的1/4和3/4分位数} \\
 	& \sigma_{u, eq} \text{ : 特异收益}[-10 \tilde{\sigma}_{u}, 10\tilde{\sigma}_{u}]{内等权重样本标准差} \\
 \end{aligned}
 $$
-图：特异收益数据质ga1量较优（$\gamma = 1$）股票比率
+![image-20220509112732331](https://s2.loli.net/2022/05/09/DQrZaeb8j6RXitu.png)
 
-[]
+<center>图：特异收益数据质量较优的股票比率</center>
 
-均值？
+> 非常接近1，似乎无需进行调整？
 
 ##### 贝叶斯压缩调整 Bayesian Shrinkage
 
@@ -580,9 +641,11 @@ $$
 	& \Delta_{\sigma}{(S_n)} = \sqrt{{1 \over N(S_n)} \sum_{n \subset S_n}{(\hat{\sigma}_n - \bar{\sigma}(S_n))^2}}
 \end{aligned}
 $$
-图：不同波动率分组下偏误统计量
+![image-20220509174312787](https://s2.loli.net/2022/05/09/WFZdKCUAjtaLvn4.png)
 
-[Raw, NW, SM, Shrink, VRA]
+<center>图：不同波动率分组下偏误统计量</center>
+
+> $u_{nt} / \sigma_{nt}$截面等权均值21日波动；调整后应该更接近1
 
 ##### 波动率偏误调整  Volatility Regime Adjustment
 
@@ -603,29 +666,17 @@ $$
 
 [Shrink, VRA]
 
-## 组合优化
-
-$$
-\max_{w} {
-	\sum_{i} {\alpha w} - {1\over2} \gamma w' \Sigma w 
-},\ \gamma=0  \\
-\text{s.t.} \quad
-\begin{cases}
-F_l \le {X_{f} (w - w_{b}) } \le F_h \\
-H_l \le {H (w - w_{b}) } \le H_h \\
-P_l \le {P(w - w_b)} \le P_h \\
-\sum_{i}{|w_{i,t} - w_{i, t-1}|} < d \\
-0 \le w_i \le k \\
-\sum{ w_i } = 1 \\
-\end{cases}
-$$
-
-
 
 ## 参考资料
 
 Menchero, J., & Lee, J.-H. (2015). EFFICIENTLY COMBINING MULTIPLE SOURCES OF ALPHA. *Journal of Investment Management*, *Vol. 13*(No. 4), 71–86.
 
 韩振国. (2018). *Barra模型初探：A股市场风格解析* (“星火”多因子系列（一）) [金融工程研究]. 方正证券.
+
+Menchero, J., Orr, D. J., & Wang, J. (2011). *The Barra US Equity Model (USE4)*. 44.
+
+Orr, D. J., Mashtaler, I., & Nagy, A. (2012). *The Barra China Equity Model (CNE5)*. 59.
+
+*Research Notes: The Barra Europe Equity Model (EUE3)*. (2009).
 
 [toc]

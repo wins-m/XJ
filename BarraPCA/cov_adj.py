@@ -1,6 +1,8 @@
 """
 (created by swmao on April 28th)
-
+风险矩阵估计，包括
+- 共同因子协方差矩阵 MFM
+- 特异风险方差矩阵 SRR
 """
 from typing import Dict, List, Tuple
 import pandas as pd
@@ -129,8 +131,8 @@ def var_newey_west_adj(ret, tau=90, q=5) -> Tuple[pd.Series, pd.Series]:
         gamma_i = (ret_i * weights_i).sum()
         v += (1 - i / (1 + q)) * (gamma_i + gamma_i)
 
-    sigma_raw = pd.Series(gamma0, index=names)
-    sigma_nw = pd.Series(v, index=names)
+    sigma_raw = pd.Series(gamma0.apply(np.sqrt), index=names)
+    sigma_nw = pd.Series(v.apply(np.sqrt), index=names)
     return sigma_raw, sigma_nw
 
 
@@ -145,6 +147,7 @@ def var_struct_mod_adj(U: pd.DataFrame, sigNW: pd.DataFrame, expo: pd.DataFrame,
     average over the back-testing periods, 1.026 for EUE3
     :return:
     """
+    # %
     h = U.shape[0]
     sigTilde = (U.quantile(.75) - U.quantile(.25)) / 1.35
     sigEq = U[(U >= -10*sigTilde) & (U <= 10*sigTilde)].std()
@@ -152,19 +155,20 @@ def var_struct_mod_adj(U: pd.DataFrame, sigNW: pd.DataFrame, expo: pd.DataFrame,
 
     gamma = Z.apply(lambda _: np.nan if np.isnan(_) else min(1., max(0., (h-60)/120)) * min(1., max(0., np.exp(1 - _))))
     stk_gamma_eq_1 = gamma.index[gamma == 1]
-    stk_has_sigNW = sigNW.columns.intersection(stk_gamma_eq_1)
+    stk_has_sigNW = sigNW.index.intersection(stk_gamma_eq_1)
     stk_has_expo = expo.index.intersection(stk_has_sigNW)
     stk_has_mv = MV.index.intersection(stk_has_expo)
 
-    Y = sigNW.loc[:, stk_has_mv].applymap(np.log)
-    factor_i = [c for c in expo.columns if 'ind_' in c]
-    X = expo.loc[stk_has_mv, [c for c in expo.columns if 'ind_' not in c] + factor_i].astype(float)
+    Y = sigNW.loc[stk_has_mv].apply(np.log)
+    factor_i = [c for c in expo.columns if 'ind_' in c and expo[c].abs().sum() > 0]
+    factor_cs = [c for c in expo.columns if 'ind_' not in c]
+    X = expo.loc[stk_has_mv, factor_cs + factor_i].astype(float)
     assert 'size' in X.columns
     mv = MV.loc[stk_has_mv]  # raw market value
     w_mv = mv.apply(np.sqrt)  # stk with exposure must have market value, or Error
     w_mv /= w_mv.sum()
 
-    # WLS
+    # % WLS
     mat_v = np.diag(w_mv)
     mat_x = X.values
     mv_indus = mv @ X[factor_i]
@@ -172,14 +176,35 @@ def var_struct_mod_adj(U: pd.DataFrame, sigNW: pd.DataFrame, expo: pd.DataFrame,
     mat_r = np.diag([1.] * k)[:, :-1]
     mat_r[-1:, -len(factor_i)+1:] = -mv_indus[:-1] / mv_indus[-1]
     mat_omega = mat_r @ np.linalg.inv(mat_r.T @ mat_x.T @ mat_v @ mat_x @ mat_r) @ mat_r.T @ mat_x.T @ mat_v
+
     mat_y = Y.values
     mat_b = mat_omega @ mat_y.reshape(-1, 1)
     b_hat = pd.DataFrame(mat_b, index=X.columns)
+    sigSTR = E * np.exp(expo[factor_cs + factor_i] @ b_hat)
+    sigma_hat = (gamma * sigNW + (1 - gamma) * sigSTR.iloc[:, 0]).dropna()
 
-    sigSTR = E * np.exp(expo @ b_hat)
-    sigma_hat = (gamma * sigNW.iloc[0] + (1 - gamma) * sigSTR.iloc[:, 0]).dropna()
-
+    # %
     return gamma, sigma_hat
+
+
+def var_baysian_shrink(sigSM: pd.Series, mv: pd.Series, gn=10, q=1) -> pd.Series:
+    """Baysian Shrinkage"""
+    mv_group = mv.rank(pct=True, ascending=False).apply(lambda x: (1-x)//(1/gn))  # low-rank: small size
+    # print(mv_group.isna().sum())
+    tmp = pd.DataFrame(sigSM.rename('sig_hat'))
+    tmp['mv'] = mv
+    tmp['g'] = mv_group
+    tmp = tmp.reset_index()
+    tmp = tmp.merge(tmp.groupby('g')['mv'].sum().rename('mv_gsum').reset_index(), on='g', how='left')
+    tmp['w'] = tmp['mv'] / tmp['mv_gsum']
+    tmp = tmp.merge((tmp['w'] * tmp['sig_hat']).groupby(tmp['g']).sum().rename('sig_bar').reset_index(), on='g', how='left')
+    tmp['sig_d'] = tmp['sig_hat'] - tmp['sig_bar']
+    tmp = tmp.merge((tmp['sig_d']**2).groupby(tmp['g']).mean().apply(np.sqrt).rename('D').reset_index(), on='g', how='left')
+    tmp['v'] = tmp['sig_d'].abs() * q / (tmp['D'] + tmp['sig_d'].abs() * q)
+    tmp['sig_sh'] = tmp['v'] * tmp['sig_bar'] + (1 - tmp['v']) * tmp['sig_hat']
+    tmp = tmp.set_index('index')
+    sigSH = tmp['sig_sh']
+    return sigSH
 
 
 def cov_eigen_risk_adj(cov, T=1000, M=10000, scal=1.2) -> pd.DataFrame:
@@ -232,7 +257,7 @@ def specific_return_yxf(Y: pd.DataFrame, X: pd.DataFrame, F: pd.DataFrame) -> pd
         # Y0 = pd.concat([Y0, (X.loc[td].fillna(0) @ F.loc[td].fillna(0)).rename(td)], axis=1)
         Y0.append((X.loc[td].fillna(0) @ F.loc[td].fillna(0)).rename(td))
         cnt += 1
-        progressbar(cnt, F.shape[0], msg=f'\tdates: {td.strftime("%Y-%m-%d")}')
+        progressbar(cnt, F.shape[0], msg=f'\tdate: {td.strftime("%Y-%m-%d")}')
     Y1 = pd.DataFrame(Y0)
     U = Y.reindex_like(Y1) - Y1  # T*N specific returns
     # U.isna().sum().plot.hist(bins=100, title='Missing U=Y-XF')
@@ -392,10 +417,13 @@ class SRR(object):
         self.SigmaNW: pd.DataFrame = pd.DataFrame()
         self.GammaSM: pd.DataFrame = pd.DataFrame()
         self.SigmaSM: pd.DataFrame = pd.DataFrame()
+        self.SigmaSH: pd.DataFrame = pd.DataFrame()
+        self.SigmaVRA: pd.DataFrame = pd.DataFrame()
 
     def specific_return_by_time(self):
         print('\n\nSpecific Return...')
         self.u = specific_return_yxf(Y=self.stk_rtn, X=self.exposure, F=self.fct_rtn)
+        return self.u
 
     def newey_west_adj_by_time(self, h=252, NA_bar=.75, tau=90, q=5) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
@@ -444,17 +472,20 @@ class SRR(object):
         GammaSM = []
         SigmaSM = []
         cnt = 0
+        # td = self.sorted_dates[-2]
         for td in self.sorted_dates[h: self.T]:
-            sigNW = self.SigmaNW.loc[td:td]
+            # %
+            sigNW = self.SigmaNW.loc[td].dropna()
             U = self.u.loc[:td].iloc[-h:]
             U = U.loc[:, U.count() > h * NA_bar]
             expo = self.exposure.loc[td].dropna(axis=1, how='all').dropna(axis=0, how='any')  # 全空的风格暴露&有空的个股
-            MV = self.mkt_val.loc[td]
+            MV = self.mkt_val.loc[td].dropna()
+            # %
             try:
                 res = var_struct_mod_adj(U=U, sigNW=sigNW, expo=expo, MV=MV, E=E)
                 GammaSM.append(res[0].rename(td))
                 SigmaSM.append(res[1].rename(td))
-            except:
+            except:  # TODO: WLS回归可能出现奇异阵
                 GammaSM.append(pd.Series([]).rename(td))
                 SigmaSM.append(pd.Series([]).rename(td))
             cnt += 1
@@ -464,6 +495,51 @@ class SRR(object):
         self.GammaSM = pd.DataFrame(GammaSM)
 
         return self.GammaSM, self.SigmaSM
+
+    def baysian_shrink_by_time(self, q=1, gn=10):
+        T = len(self.SigmaSM)
+        if T == 0:
+            raise Exception('No Newey-West Adjusted Sigma SigmaNW')
+
+        print('\n\nBaysian Shrink Adjust...')
+        cnt = 0
+        SigmaSH = []
+        # td = self.SigmaSM.index[-1]
+        for td in self.SigmaSM.index:
+            MV = self.mkt_val.loc[td]
+            sigSM = self.SigmaSM.loc[td].rename('sig_hat')
+            mv: pd.Series = MV[sigSM.index]  # TODO: why MV=NA?
+            # print(mv.isna().sum())
+            try:
+                SigmaSH.append(var_baysian_shrink(sigSM=sigSM, mv=mv, q=q, gn=gn).rename(td))
+            except:
+                SigmaSH.append(pd.Series([]).rename(td))
+            cnt += 1
+            progressbar(cur=cnt, total=T, msg=f'\tdate: {td.strftime("%Y-%m-%d")}')
+
+        self.SigmaSH = pd.DataFrame(SigmaSH)
+        return self.SigmaSH
+
+    def vol_regime_adj_by_time(self, h=252, tau=42):
+        B2 = (self.u.reindex_like(self.SigmaSH) / self.SigmaSH) ** 2
+        w = self.mkt_val.reindex_like(B2) * (1 - B2.isna())
+        w = w.apply(lambda s: s / s.sum(), axis=1)
+        B2 = (B2 * w).sum(axis=1)
+
+        weights = .5 ** (np.arange(h - 1, -1, -1) / tau)
+        weights /= weights.sum()
+        tradedates = B2.index
+        SigmaVRA = pd.DataFrame()
+        cnt = 0
+        print('\n\nVolatility Regime Adjustment...')
+        for td0, td1 in zip(tradedates[:-h], tradedates[h - 1:]):
+            # lamb2[td1] = B2.loc[td0: td1] @ weights
+            lamb2 = B2.loc[td0: td1] @ weights
+            SigmaVRA[td1] = self.SigmaSH.loc[td1] * lamb2
+            cnt += 1
+            progressbar(cnt, len(tradedates) - h, f'\tdate: {td1.strftime("%Y-%m-%d")}')
+        self.SigmaVRA = SigmaVRA.T
+        return self.SigmaVRA
 
     def plot_structural_model_gamma(self):
         if len(self.GammaSM) == 0:
@@ -480,8 +556,11 @@ def main():
     import yaml
     conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/config.yaml'
     conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
-
     fr = get_barra_factor_return_daily(conf)
+    mkt_val = pd.read_csv(conf['marketvalue'], index_col=0, parse_dates=True)
+    sr, exposure = get_barra_factor_exposure_daily(conf, use_temp=True)  # 注意T0期因子收益对应T+1期个股收益
+
+    # %%
     self = MFM(fr.iloc[-1000:])
     Newey_West_adj_cov = self.newey_west_adj_by_time()
     eigen_risk_adj_cov = self.eigen_risk_adj_by_time()
@@ -491,21 +570,31 @@ def main():
     self.vol_regime_adj_cov = vol_regime_adj_cov
     self.save_vol_regime_adj_cov(conf['dat_path_barra'])
 
-    mkt_val = pd.read_csv(conf['marketvalue'], index_col=0, parse_dates=True)
-    sr, exposure = get_barra_factor_exposure_daily(conf, use_temp=True)  # 注意T0期因子收益对应T+1期个股收益
     # %%
-    fbegin_date = '2019-07-01'
+    fbegin_date = '2012-01-01'  # '2019-07-01'
     self = SRR(fr=fr.loc[fbegin_date:], sr=sr.loc[fbegin_date:], expo=exposure.loc[fbegin_date:], mv=mkt_val.loc[fbegin_date:])
     print(self.T)
-    self.specific_return_by_time()
-    # Raw_var, Newey_West_adj_var = self.newey_west_adj_by_time()
-    self.SigmaRaw, self.SigmaNW = Raw_var, Newey_West_adj_var
-    # Gamma_STR, Sigma_STR = self.struct_mod_adj_by_time()
-    self.GammaSM, self.SigmaSM = Gamma_STR, Sigma_STR
+    Ret_U = self.specific_return_by_time()
+    # self.u = Ret_U
+    Raw_var, Newey_West_adj_var = self.newey_west_adj_by_time()
+    # self.SigmaRaw, self.SigmaNW = Raw_var, Newey_West_adj_var
+    Gamma_STR, Sigma_STR = self.struct_mod_adj_by_time()
+    # self.GammaSM, self.SigmaSM = Gamma_STR, Sigma_STR
+    self.plot_structural_model_gamma()
+    self.SigmaSM.count(axis=1).plot(); plt.show()
+    Sigma_Shrink = self.baysian_shrink_by_time()
+    # self.SigmaSH = Sigma_Shrink
+    Sigma_VRA = self.vol_regime_adj_by_time()
+    # self.SigmaVRA = Sigma_VRA
 
-    # %%
+
+# %% TODO: Plot and Check
+tmp = pd.DataFrame()
+for k, sr in zip(['SigmaRaw', 'SigmaNW', 'SigmaSM', 'SigmaSH', 'SigmaVRA'],
+                 [self.SigmaRaw, self.SigmaNW, self.SigmaSM, self.SigmaSH, self.SigmaVRA]):
+    tmp = tmp.append((self.u.reindex_like(sr) / sr).rolling(21).std().mean(axis=1).rename(k))
+tmp = tmp.T
+tmp.plot()
+plt.show()
 
 
-# %%
-# if __name__ == '__main__':
-#     main()
