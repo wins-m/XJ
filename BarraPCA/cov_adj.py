@@ -418,6 +418,7 @@ class SRR(object):
         self.GammaSM: pd.DataFrame = pd.DataFrame()
         self.SigmaSM: pd.DataFrame = pd.DataFrame()
         self.SigmaSH: pd.DataFrame = pd.DataFrame()
+        self.LambdaVRA: pd.DataFrame = pd.DataFrame()
         self.SigmaVRA: pd.DataFrame = pd.DataFrame()
 
     def specific_return_by_time(self):
@@ -520,7 +521,7 @@ class SRR(object):
         self.SigmaSH = pd.DataFrame(SigmaSH)
         return self.SigmaSH
 
-    def vol_regime_adj_by_time(self, h=252, tau=42):
+    def vol_regime_adj_by_time(self, h=252, tau=42) -> Tuple[pd.DataFrame, pd.DataFrame]:
         B2 = (self.u.reindex_like(self.SigmaSH) / self.SigmaSH) ** 2
         w = self.mkt_val.reindex_like(B2) * (1 - B2.isna())
         w = w.apply(lambda s: s / s.sum(), axis=1)
@@ -529,17 +530,25 @@ class SRR(object):
         weights = .5 ** (np.arange(h - 1, -1, -1) / tau)
         weights /= weights.sum()
         tradedates = B2.index
+        Lambda = pd.DataFrame()
         SigmaVRA = pd.DataFrame()
         cnt = 0
         print('\n\nVolatility Regime Adjustment...')
         for td0, td1 in zip(tradedates[:-h], tradedates[h - 1:]):
             # lamb2[td1] = B2.loc[td0: td1] @ weights
-            lamb2 = B2.loc[td0: td1] @ weights
-            SigmaVRA[td1] = self.SigmaSH.loc[td1] * lamb2
+            lamb = np.sqrt(B2.loc[td0: td1] @ weights)
+            Lambda[td1] = lamb
+            SigmaVRA[td1] = self.SigmaSH.loc[td1] * lamb
             cnt += 1
             progressbar(cnt, len(tradedates) - h, f'\tdate: {td1.strftime("%Y-%m-%d")}')
+        self.LambdaVRA = Lambda.T
         self.SigmaVRA = SigmaVRA.T
-        return self.SigmaVRA
+        return self.LambdaVRA, self.SigmaVRA
+
+    def cal_volatility_cross_section(self):
+        sr_mv = (self.mkt_val.reindex_like(self.u) * (1 - self.u.isna())).apply(lambda s: s / s.sum(), axis=1)
+        sr_mv @ self.u**2
+        pass
 
     def plot_structural_model_gamma(self):
         if len(self.GammaSM) == 0:
@@ -574,17 +583,17 @@ def main():
     fbegin_date = '2012-01-01'  # '2019-07-01'
     self = SRR(fr=fr.loc[fbegin_date:], sr=sr.loc[fbegin_date:], expo=exposure.loc[fbegin_date:], mv=mkt_val.loc[fbegin_date:])
     print(self.T)
-    Ret_U = self.specific_return_by_time()
-    # self.u = Ret_U
-    Raw_var, Newey_West_adj_var = self.newey_west_adj_by_time()
-    # self.SigmaRaw, self.SigmaNW = Raw_var, Newey_West_adj_var
-    Gamma_STR, Sigma_STR = self.struct_mod_adj_by_time()
-    # self.GammaSM, self.SigmaSM = Gamma_STR, Sigma_STR
-    self.plot_structural_model_gamma()
-    self.SigmaSM.count(axis=1).plot(); plt.show()
-    Sigma_Shrink = self.baysian_shrink_by_time()
-    # self.SigmaSH = Sigma_Shrink
-    Sigma_VRA = self.vol_regime_adj_by_time()
+    # Ret_U = self.specific_return_by_time()
+    self.u = Ret_U
+    # Raw_var, Newey_West_adj_var = self.newey_west_adj_by_time()
+    self.SigmaRaw, self.SigmaNW = Raw_var, Newey_West_adj_var
+    # Gamma_STR, Sigma_STR = self.struct_mod_adj_by_time()
+    self.GammaSM, self.SigmaSM = Gamma_STR, Sigma_STR
+    # self.plot_structural_model_gamma()
+    # self.SigmaSM.count(axis=1).plot(); plt.show()
+    # Sigma_Shrink = self.baysian_shrink_by_time()
+    self.SigmaSH = Sigma_Shrink
+    Lambda_VRA = Sigma_VRA = self.vol_regime_adj_by_time()
     # self.SigmaVRA = Sigma_VRA
 
 
@@ -592,7 +601,10 @@ def main():
 tmp = pd.DataFrame()
 for k, sr in zip(['SigmaRaw', 'SigmaNW', 'SigmaSM', 'SigmaSH', 'SigmaVRA'],
                  [self.SigmaRaw, self.SigmaNW, self.SigmaSM, self.SigmaSH, self.SigmaVRA]):
-    tmp = tmp.append((self.u.reindex_like(sr) / sr).rolling(21).std().mean(axis=1).rename(k))
+    B = (self.u.reindex_like(sr) / sr).rolling(21).std()
+    w = (self.mkt_val.reindex_like(B) * (1 - B.isna())).apply(lambda s: s / s.sum(), axis=1)
+    tmp = tmp.append((B * w).sum(axis=1).rolling(120).mean().rename(k))
+    # tmp = tmp.append((self.u.reindex_like(sr) / sr).rolling(21).std().mean(axis=1).rename(k))
 tmp = tmp.T
 tmp.plot()
 plt.show()

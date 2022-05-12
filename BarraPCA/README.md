@@ -420,6 +420,16 @@ $$
 
     - ![image-20220512090915014](https://s2.loli.net/2022/05/12/HX8WGoAVN3MQzn7.png)
 
+富国500 300
+
+#### 测试
+
+> 1. 用个未来数据因子，比如未来三天收益，去做优化，看看能不能随着条件放宽，收益一点点变高
+> 2. 解决一下优化器无解的情况
+> 3. 还有个小事就是测一下那个apm自己回测什么样吧，那个跃起是不是因为这个因子
+
+
+
 ### $\gamma \neq 0$ 风险矩阵估计
 
 $$
@@ -626,7 +636,7 @@ $$
 
 ##### 贝叶斯压缩调整 Bayesian Shrinkage
 
-时序处理得到特异风险，高估历史高波动率股票，低估历史低波动率股票
+时序处理得到特异风险，高估历史高波动率股票未来风险，低估历史低波动率股票未来风险
 $$
 \sigma_{n}^{SH} = v_{n} \bar{\sigma}(S_n) + (1 - v_n) \hat{\sigma}_n \\
 \\
@@ -641,11 +651,9 @@ $$
 	& \Delta_{\sigma}{(S_n)} = \sqrt{{1 \over N(S_n)} \sum_{n \subset S_n}{(\hat{\sigma}_n - \bar{\sigma}(S_n))^2}}
 \end{aligned}
 $$
-![image-20220509174312787](https://s2.loli.net/2022/05/09/WFZdKCUAjtaLvn4.png)
+[]
 
 <center>图：不同波动率分组下偏误统计量</center>
-
-> $u_{nt} / \sigma_{nt}$截面等权均值21日波动；调整后应该更接近1
 
 ##### 波动率偏误调整  Volatility Regime Adjustment
 
@@ -656,16 +664,23 @@ $$
 B_t^S = \sqrt{ \sum_n{w_{nt}\left( u_{nt} \over \sigma_{nt} \right)^2 }},\ w_{nt} \text{ : t期股票n的市值权重}
 $$
 
-图：特异风险波动乘数$\lambda_S$ V.S. 横截面波动$CSV^S$
+**准确性评价**
 
-[CSV, lambda]
 $$
 CSV_t^S = \sqrt{ \sum_{n}{w_{nt} u_{nt}^2} }
 $$
-图：特质风险偏差统计量12个月滚动平均
 
-[Shrink, VRA]
+[CSV, lambda]
 
+<center>图：特异风险波动乘数$\lambda_S$ V.S. 横截面波动$CSV^S$</center>
+
+> ...
+
+![image-20220512132509149](README.assets/image-20220512132509149.png)
+
+<center>特异风险偏差统计量 12 个月滚动平均</center>
+
+> $u_{nt} / \sigma_{nt}$截面等权均值21日波动；调整后应该更接近1
 
 ## 参考资料
 
