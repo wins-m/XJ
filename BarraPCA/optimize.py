@@ -61,11 +61,16 @@ def get_fval_alpha(conf, begin_date, end_date, pred_days=5, wn_m=0., wn_s=0.) ->
     return dat
 
 
-def get_fval_apm(conf, begin_date, end_date) -> pd.DataFrame:
+def get_fval_apm(conf, begin_date, end_date, uni=False) -> Tuple[str, pd.DataFrame]:
     dat = pd.read_csv(conf['data_path'] + 'factor_apm.csv', index_col=0, parse_dates=True)
-    dat = dat.apply(lambda s: (s - s.mean()) / s.std(), axis=1)
+    if uni:
+        dat = dat.rank(pct=True, axis=1) * 2 - 1
+        alpha_name = 'APM(-1t1)'
+    else:
+        dat = dat.apply(lambda s: (s - s.mean()) / s.std(), axis=1)
+        alpha_name = 'APM'
     dat = dat.loc[begin_date: end_date].shift(1)
-    return dat
+    return alpha_name, dat
 
 
 def check_ic_5d(conf, dat, begin_date, end_date, lag=5) -> float:
@@ -244,7 +249,8 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
                      'N': N, 'FL': FL, 'FH': FH, 'HL': HL, 'HH': HH, 'PL': PL, 'PH': PH, 'D': D,
                      'K': K, 'K0': K0, 'K1': K1}
         iter_info = iter_info | (f_del.to_dict() | h_del.to_dict() if use_barra else p_del.to_dict())
-        iter_info = iter_info | {'index-alpha': sp_info['#i_a'], 'index-beta': sp_info['#i_b'], }
+        iter_info = iter_info | {'index-alpha': sp_info['#i_a'], 'index-beta': sp_info['#i_b'], 
+                                 'stk_i_a': ', '.join(sp_info['i_a']), 'stk_i_b': ', '.join(sp_info['i_b'])}
         optimize_iter_info[td] = pd.Series(iter_info)
 
     return holding_weight, optimize_iter_info
@@ -291,43 +297,59 @@ def main():
     conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
     opt_verbose = False
     #
-    use_barra = True
+    use_barra = False
     begin_date = '2016-02-01'
     end_date = '2022-03-31'
     mkt_type = 'CSI500'
     PN = 20
-    suffix = '1602_2203'
+    pca_suffix = '1602_2203'
     N = np.inf  # 2000
-    expoL = FL = HL = PL = -.1
-    expoH = FH = HH = PH = .1
+    expoL = FL = HL = PL = -.0
+    expoH = FH = HH = PH = .0
     D = 2
     K = 5  # %
     wei_tole = 1e-5
 
+
     # %% Run:
+
+    # Use Fake Alpha
     pred_days = 5
     wn_m = 0.
-    wn_s = 0.
+    wn_s = 1.  # TODO: (pca + 1. / 3.)  *  (.0 .05 .10 apm apm_u)
     alpha_name = f'FRtn{pred_days}D({wn_m},{wn_s})'
-
     save_suffix = f'OptResWeekly[{mkt_type}]{alpha_name}'
     save_path = f"{conf['factorsres_path']}{save_suffix}/"
-    os.makedirs(save_path, exist_ok=True)
-
+    os.makedirs(save_path, exist_ok=True)  
     alpha_save_name = save_path + f'factor_{alpha_name}.csv'
     if os.path.exists(alpha_save_name):
         dat = pd.read_csv(alpha_save_name, index_col=0, parse_dates=True)
     else:
         dat = get_fval_alpha(conf, begin_date, end_date, pred_days, wn_m, wn_s)
-        dat.to_csv(alpha_save_name)
-    # alpha_name, dat = 'APM', get_fval_apm(conf, begin_date, end_date)
+    
+    # # Use APM
+    # alpha_name, dat = get_fval_apm(conf, begin_date, end_date, uni=True)
+    # alpha_save_name = save_path + f'factor_{alpha_name}.csv'
+    # save_suffix = f'OptResWeekly[{mkt_type}]{alpha_name}'
+    # save_path = f"{conf['factorsres_path']}{save_suffix}/"
+    # os.makedirs(save_path, exist_ok=True)
+
+    dat.to_csv(alpha_save_name)
+
+
+    # %%
+    suffix = f'(H={expoH},L={expoL},K={K})'
+    suffix = ('' if use_barra else 'pca') + suffix
+    save_path1 = f'{save_path}{suffix}/'
+    os.makedirs(save_path1, exist_ok=False)
+    print(f'Save in: {save_path1}')
 
     print(f"Factor name: {alpha_name}")
     alpha_5d_rank_ic = check_ic_5d(conf, dat, begin_date, end_date, lag=5)
     expo_style, expo_indus = get_style_indus_exposure(conf, begin_date, end_date)
     ind_cons = get_index_constitution(conf, mkt_type, begin_date, end_date)
     tradedates = get_tradedates(conf, begin_date, end_date, kind='tdays_w')
-    expo_pca = get_pca_exposure(conf, begin_date, end_date, PN=PN, suffix=suffix)
+    expo_pca = get_pca_exposure(conf, begin_date, end_date, PN=PN, suffix=pca_suffix)
 
     # %% Optimize
     args = (N, FL, FH, HL, HH, PL, PH, D, K, wei_tole, opt_verbose, use_barra)
@@ -337,11 +359,6 @@ def main():
     portfolio_weight, optimize_iter_info = portfolio_optimize(all_args, telling)
 
     # %% Save:
-    suffix = f'(H={expoH},L={expoL},K={K})'
-    suffix = ('' if use_barra else 'pca') + suffix
-    save_path1 = f'{save_path}/{suffix}/'
-    os.makedirs(save_path1, exist_ok=False)
-
     script_info = {
         'begin_date': begin_date, 'end_date': end_date, 'mkt_type': mkt_type,
         'PN': PN, 'suffix': suffix, 'N': N, 'FL': FL, 'FH': FH, 'HL': HL, 'HH': HH,
