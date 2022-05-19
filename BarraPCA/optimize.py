@@ -2,14 +2,21 @@
 (created by swmao on April 22nd)
 
 """
-import warnings
-
-warnings.simplefilter("ignore")
+import os
+import pandas as pd
+import numpy as np
+import cvxpy as cp
+import yaml
+from tqdm import tqdm
+import sys
+sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
+from supporter.factor_operator import cal_ic
 
 # %matplotlib inline
+import warnings
+warnings.simplefilter("ignore")
 import matplotlib.pyplot as plt
 import seaborn
-
 seaborn.set_style("darkgrid")
 # plt.rc("figure", figsize=(16, 10))
 plt.rc("figure", figsize=(8, 5))
@@ -17,60 +24,59 @@ plt.rc("savefig", dpi=90)
 # plt.rc("font", family="sans-serif")
 # plt.rc("font", size=12)
 plt.rc("font", size=10)
-
 plt.rcParams["date.autoformatter.hour"] = "%H:%M:%S"
 
-import pandas as pd
-import numpy as np
-import cvxpy as cp
-import yaml
-from tqdm import tqdm
 
-conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/config.yaml'
-conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
+def main():
+    conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/config.yaml'
+    conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
+    dat_path = conf['dat_path_barra']
+    opt_verbose = False
+    #
+    save_suffix = '中证500_等暴露_K=5_APM1'
+    os.makedirs(dat_path + save_suffix, exist_ok=True)
+    begin_date = '2016-02-01'
+    end_date = '2022-03-31'
+    mkt_type = 'CSI500'
+    N = np.inf  # 2000
+    FL = HL = PL = -.0
+    FH = HH = PH = .0
+    D = 2
+    K = 5  # %
+    wei_tole = 1e-5
+    # FL = -.1
+    # FH = .1
+    # HL = -.1
+    # HH = .1
+    # PL = -.1
+    # PH = .1
 
-dat_path = conf['dat_path_barra']
-begin_date = '2016-02-01'
-end_date = '2022-03-31'
-mkt_type = 'CSI300'
 
-opt_verbose = False
-N_ingredient = np.inf  # 2000
-FL = -.0
-FH = .0
-HL = -.0
-HH = .0
-PL = -.0
-PH = .0
-D = 2
-K = .01
-wei_tole = 1e-5
+def get_fval_alpha(conf, begin_date, end_date):
+    alpha_name = 'FRtn5D'
+    close_adj = pd.read_csv(conf['closeAdj'], index_col=0, parse_dates=True)
+    pred_days = 5
+    rtn_rt5c = close_adj.pct_change(pred_days).shift(-pred_days)  # 未来5日的收益
+    alpha_val = rtn_rt5c.shift(-1)
+    dat = alpha_val.loc[begin_date: end_date]
+    return alpha_name, dat
 
-# %% Manipulate alpha
-alpha_name = 'FRtn5D'
+
+def get_fval_apm(conf, begin_date, end_date):
+    alpha_name = 'APM'
+    alpha_val = pd.read_csv(conf['data_path'] + 'factor_apm.csv', index_col=0, parse_dates=True)
+    alpha_val = alpha_val.apply(lambda s: (s - s.min()) / (s.max() - s.min()), axis=1)
+    alpha_val = alpha_val.apply(lambda s: (s - s.mean()) / s.std(), axis=1)
+    dat = alpha_val.loc[begin_date: end_date].shift(1)
+    return alpha_name, dat
+
+
+"""check IC-5days"""
+#
 close_adj = pd.read_csv(conf['closeAdj'], index_col=0, parse_dates=True)
-pred_days = 5
-rtn_rt5c = close_adj.pct_change(pred_days).shift(-pred_days)  # 未来5日的收益
-alpha_val = rtn_rt5c.shift(-1)
-dat = alpha_val.loc[begin_date: end_date]
-
-# alpha_name = 'APM'
-# alpha_val = pd.read_csv(conf['data_path'] + 'factor_apm.csv', index_col=0, parse_dates=True)
-# alpha_val = alpha_val.apply(lambda s: (s - s.min()) / (s.max() - s.min()))
-# dat = alpha_val.loc[begin_date: end_date]
-# dat.tail()
-
-# %% check IC-5days
-import sys
-
-sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
-
-from supporter.factor_operator import cal_ic
-
-close_adj = pd.read_csv(conf['closeAdj'], index_col=0, parse_dates=True)
-dat_ic = cal_ic(fv_l1=alpha_val.shift(1).loc[begin_date: end_date],
+dat_ic = cal_ic(fv_l1=dat,
                 ret=close_adj.pct_change().loc[begin_date: end_date],
-                lag=5,
+                lag=1,
                 ranked=True)
 dat_ic.mean()
 
@@ -80,43 +86,47 @@ expo = pd.DataFrame()
 for _ in range(int(begin_date.split('-')[0]), int(end_date.split('-')[0]) + 1):
     expo = pd.concat([expo, pd.DataFrame(pd.read_hdf(conf['barra_panel'], key=f'y{_}'))])
 expo: pd.DataFrame = expo.loc[begin_date: end_date]
-
+#
 cols_style = [c for c in expo.columns if 'rtn' not in c and 'ind' not in c and 'country' != c]
 cols_indus = [c for c in expo.columns if 'ind' in c]
 expo_style: pd.DataFrame = expo[cols_style].groupby(
     expo[cols_style].index.get_level_values(0)).apply(lambda s: (s - s.mean()) / s.std())
 expo_indus: pd.DataFrame = expo[cols_indus]
-# expo_style.tail()
-
 # Baseline Portfolio 股指成分
 ind_cons = pd.read_csv(conf['idx_constituent'].format(mkt_type), index_col=0, parse_dates=True).reindex_like(
     dat).fillna(0)
 ind_cons = ind_cons / 100
 ind_cons.tail()
-
 # Trade days 交易日期
 tdays_d = pd.read_csv(conf['tdays_w'], header=None, index_col=0, parse_dates=True).loc[begin_date: end_date]
 tdays_d['tdays_d'] = tdays_d.index
 tradedates = tdays_d.tdays_d
-
 # Exposure on PCA factors top 20
 expo_pca: pd.DataFrame = pd.read_pickle(conf['data_path'] + 'exposure_pca20_1602_2203.pkl')
 expo_pca = expo_pca.groupby(expo_pca.index.get_level_values(0)).apply(lambda s: (s - s.mean()) / s.std())
-# expo_pca = pd.DataFrame()
-# for pn in tqdm(range(20)):
-#     kw = f'pc{pn:03d}'
-#     df = pd.read_csv(conf['dat_path_pca'] + f'{kw}.csv', index_col=0, parse_dates=True).loc[begin_date: end_date]
-#     expo_pca = pd.concat([expo_barra, df.stack().rename(kw)], axis=1)
-# expo_pca.to_pickle(conf['data_path'] + 'exposure_pca20_1602_2203.pkl')
+
+
+def combine_pca_exposure(conf, begin_date: str, end_date: str, PN=20, suffix='1602_2203'):
+    """Run it ONCE to COMBINE principal exposures, when PCA is updated"""
+    expo_pca = pd.DataFrame()
+    for pn in tqdm(range(PN)):
+        kw = f'pc{pn:03d}'
+        df = pd.read_csv(conf['dat_path_pca'] + f'{kw}.csv', index_col=0, parse_dates=True).loc[begin_date: end_date]
+        expo_pca = pd.concat([expo_pca, df.stack().rename(kw)], axis=1)
+    #
+    file_name = f'exposure_pca{PN}_{suffix}.pkl'
+    expo_pca.to_pickle(conf['data_path'] + file_name)
+    return expo_pca
+
 
 # %%
 portfolio_weight = pd.DataFrame()
 lst_w: pd.DataFrame = pd.DataFrame()
 w_lst = None
-
 optimize_iter_info = pd.DataFrame()
 td0 = tradedates[0]
-for td0 in tradedates:
+td = td0.strftime('%Y-%m-%d')
+for td0 in tradedates.loc[td:]:
     td = td0.strftime('%Y-%m-%d')
     print(f'\n{td}')
 
@@ -128,7 +138,7 @@ for td0 in tradedates:
     stk_alpha = set(dat.loc[td].dropna().index)  # Alpha 覆盖个股
 
     # alpha覆盖个股中选
-    N_ingredient = len(stk_alpha) if (N_ingredient == np.inf) else N_ingredient
+    N_ingredient = len(stk_alpha) if (N == np.inf) else N
     stk_ingredient = set(dat.loc[td, list(stk_alpha)].rank(ascending=False).sort_values().index[:N_ingredient])  # 组合用股
 
     # 缺失不考虑
@@ -141,7 +151,7 @@ for td0 in tradedates:
         ind_diff_barra = ind_ingredient.difference(barra_ingredient)
         print(f'\t忽略缺少barra暴露的({len(ind_diff_barra)}支){mkt_type}成分股:  {",".join(list(ind_diff_barra))}')
         alpha_diff_barra = stk_ingredient.difference(set(barra_ingredient))
-        print(f'\t忽略缺少barra暴露的({len(alpha_diff_barra)}支)备选个股:  {",".join(list(alpha_diff_barra))}')
+        print(f'\t忽略缺少barra暴露的({len(alpha_diff_barra)}支)备选个股')  # :  {",".join(list(alpha_diff_barra))}')
         ind_ingredient = ind_ingredient.difference(ind_diff_barra)
         stk_ingredient = stk_ingredient.difference(alpha_diff_barra)
     if PH < np.inf:
@@ -149,7 +159,7 @@ for td0 in tradedates:
         ind_diff_pca = ind_ingredient.difference(pca_ingredient)
         print(f'\t忽略缺少pca暴露的({len(ind_diff_pca)}支){mkt_type}成分股:  {",".join(list(ind_diff_pca))}')
         alpha_diff_pca = stk_ingredient.difference(set(pca_ingredient))
-        print(f'\t忽略缺少pca暴露的({len(alpha_diff_pca)}支)备选个股:  {",".join(list(alpha_diff_pca))}')
+        print(f'\t忽略缺少pca暴露的({len(alpha_diff_pca)}支)备选个股')  # :  {",".join(list(alpha_diff_pca))}')
         ind_ingredient = ind_ingredient.difference(ind_diff_pca)
         stk_ingredient = stk_ingredient.difference(alpha_diff_pca)
     print(f'.从{len(stk_ingredient)}支股中组合增强{mkt_type}中的({len(ind_ingredient)}/{len(ind_ingredient0)})')
@@ -158,15 +168,14 @@ for td0 in tradedates:
     ind_w_cvg = ind_cons.loc[td, ind_ingredient].sum() / ind_cons.loc[td, ind_ingredient0].sum()
     optimize_iter_info[td] = pd.Series({'pool_size': len(stk_ingredient), 'ind_w_cvg': ind_w_cvg,
                                         'ind_cvr': len(ind_ingredient), 'ind_size': len(ind_ingredient0),
-                                        'N_ingredient': N_ingredient, 'FL': FL, 'FH': FH, 'HL': HL, 'HH': HH,
-                                        'PL': PL, 'PH': PH, 'D': D, 'K': K, 'wei_tole': wei_tole})
+                                        'N': N, 'FL': FL, 'FH': FH, 'HL': HL, 'HH': HH,
+                                        'PL': PL, 'PH': PH, 'D': D, 'K': K, 'K1': K, 'wei_tole': wei_tole})
 
     # alpha中存在暴露的前N支个股中选
     a = dat.loc[td, list(stk_ingredient)]  # 最大化的 N_ingredient 个alpha
 
     # 上期持仓权重
-    if w_lst is None:
-        w_lst = np.zeros([len(stk_ingredient), 1])
+    w_lst = np.zeros([len(stk_ingredient), 1]) if w_lst is None else w_lst
 
     # 公共因子暴露，缺失填充以 0
     xf: pd.DataFrame = expo_style.loc[td].reindex_like(
@@ -190,17 +199,24 @@ for td0 in tradedates:
     hh = np.ones([h.shape[-1], 1]) * HH + h_del.values.reshape(-1, 1)
     pl = np.ones([p.shape[-1], 1]) * PL + p_del.values.reshape(-1, 1)
     ph = np.ones([p.shape[-1], 1]) * PH + p_del.values.reshape(-1, 1)
-
-    # 约束个股最大持仓权重 和 换手率
-    complement_lst = set(lst_w.index).difference(stk_ingredient)  # 上期持有 组合资产未覆盖
+    # 约束组合内个股最大权重
+    K1 = wb.max() * 100
+    if K1 > K:
+        K2 = int(K1) + 1
+        print(f'*warning: K={K}% < 指数中成分股最大权重{K1:.2}%, 放宽到{K2}%')
+        K1 = K2
+        optimize_iter_info.loc['K1', td] = K1
+    k = np.ones([len(stk_ingredient), 1]) * (max(K, K1) / 100)
+    # 约束换手率
+    complement_lst = set(lst_w.replace(0, np.nan).dropna().index).difference(stk_ingredient)  # 上期持有 组合资产未覆盖
     print(f'\t清除在上期持仓内但不在当前选股池的({len(complement_lst)}支): {",".join(list(complement_lst))}')
-    k = np.ones([len(stk_ingredient), 1]) * K
     d_del = lst_w.loc[list(complement_lst)].abs().sum().values[0] if len(lst_w) > 0 else 0
     d = D - d_del
 
     # 优化问题求解
     w = cp.Variable((len(stk_ingredient), 1), nonneg=True)
     objective = cp.Maximize(a.values.reshape(1, -1) @ w)
+    # objective = cp.Minimize(a.values.reshape(1, -1) @ w)
     constraints = [
         fl - xf.values.T @ w <= 0,
         xf.values.T @ w - fh <= 0,
@@ -214,10 +230,11 @@ for td0 in tradedates:
     if len(lst_w) > 0:
         w_lst = lst_w.reindex_like(pd.DataFrame(index=list(stk_ingredient), columns=lst_w.columns)).fillna(0).values
         constraints.append(cp.norm(w - w_lst, 1) <= d)
-
     prob = cp.Problem(objective, constraints)
-    result = prob.solve(verbose=opt_verbose)
-    # result = prob.solve(verbose=True)
+    result = prob.solve(verbose=opt_verbose, solver='ECOS', max_iters=1000)
+    if prob.status == 'optimal_inaccurate':
+        result = prob.solve(verbose=opt_verbose, solver='ECOS', max_iters=10000)
+    # result = prob.solve(verbose=True, solver='ECOS', abstol=1e-8, max_iters=100)
 
     if prob.status == 'optimal':
         w1 = w.value.copy()
@@ -226,37 +243,49 @@ for td0 in tradedates:
         print(f'.换手率({np.abs(w_lst - w1).sum() + d_del:.3f}/2)\t.持仓个股数 {(w1 > 0).sum()}')
         lst_w = pd.DataFrame(w1, index=list(stk_ingredient), columns=[td])
     else:
-        print(f' {prob.status} problem, portfolio ingredient unchanged')
-        if len(lst_w) > 0:
-            lst_w.columns = [td]
+        raise Exception(f'.{prob.status} problem')
+        # print(f'.{prob.status} problem, portfolio ingredient unchanged')
+        # if len(lst_w) > 0:
+        #     lst_w.columns = [td]
     portfolio_weight = pd.concat([portfolio_weight, lst_w.T])
 
+
 # %%
+def tf_portfolio_weight(portfolio_weight, dat_path, suffix, ishow=False, t_file='portfolio_weight_{}.csv', g_file='figure_portfolio_size_{}.png'):
+    """Table & Graph: Holding weight, holding number"""
+    portfolio_weight.sum(axis=1)
+    portfolio_weight.to_csv(dat_path + t_file.format(suffix))
+    (portfolio_weight > 0).sum(axis=1).plot()
+    plt.savefig(dat_path + g_file.format(suffix))
+    if ishow:
+        plt.show()
+    else:
+        plt.close()
+
+
+def tf_historical_result(close_adj, tdays_d, begin_date, end_date, portfolio_weight, ind_cons, mkt_type, dat_path, suffix, p_file='figure_result_wealth_{}.png', t_file='table_result_wealth_{}.xlsx'):
+    """Table & Graph: wealth curve comparison"""
+    df = pd.DataFrame()
+
+    rtn_w2w = close_adj.pct_change(5).loc[tdays_d.loc[begin_date: end_date].index]
+    rtn_portfolio = (portfolio_weight * rtn_w2w.reindex_like(portfolio_weight)).sum(axis=1)
+    df['portfolio'] = rtn_portfolio
+
+    ind_cons_w = ind_cons.loc[tdays_d.loc[begin_date: end_date].index]
+    rtn_ind = (ind_cons_w * rtn_w2w.reindex_like(ind_cons_w)).sum(axis=1)
+    df[mkt_type] = rtn_ind
+
+    df['Excess'] = df['portfolio'] - df[mkt_type]
+
+    tmp = df.cumsum().add(1)
+    tmp.plot()
+    plt.savefig(dat_path + p_file.format(suffix))
+    plt.close()
+    tmp.to_excel(dat_path + t_file.format(suffix))
+    del tmp
+
+
 suffix = f'{alpha_name}_weekly[{mkt_type}]'
-optimize_iter_info.T.to_excel(dat_path + f'opt_info_{suffix}.xlsx')
-
-# %% Portfolio size (stock number)
-portfolio_weight.sum(axis=1)
-portfolio_weight.to_csv(dat_path + f'portfolio_weight_{suffix}.csv')
-(portfolio_weight > 0).sum(axis=1).plot()
-plt.savefig(dat_path + f'figure_portfolio_size_{suffix}.png')
-plt.close()
-# (portfolio_weight.iloc[46].dropna() > wei_tole).sum()
-
-# %%
-rtn_w2w = close_adj.pct_change(5).loc[tdays_d.loc[begin_date: end_date].index]
-rtn_portfolio = (portfolio_weight * rtn_w2w.reindex_like(portfolio_weight)).sum(axis=1)
-
-ind_cons_w = ind_cons.loc[tdays_d.loc[begin_date: end_date].index]
-rtn_ind = (ind_cons_w * rtn_w2w.reindex_like(ind_cons_w)).sum(axis=1)
-
-df = pd.DataFrame()
-df['portfolio'] = rtn_portfolio
-df[mkt_type] = rtn_ind
-df['Excess'] = df['portfolio'] - df[mkt_type]
-tmp = df.cumsum().add(1)
-tmp.plot()
-plt.savefig(dat_path + f'figure_result_wealth_{suffix}.png')
-plt.close()
-tmp.to_excel(dat_path + f'table_result_wealth_{suffix}.xlsx')
-del tmp
+optimize_iter_info.T.to_excel(dat_path + save_suffix + '/' + f'opt_info_{suffix}.xlsx')
+tf_portfolio_weight(portfolio_weight, f'{dat_path}{save_suffix}/', suffix)
+tf_historical_result(close_adj, tdays_d, begin_date, end_date, portfolio_weight, ind_cons, mkt_type, f'{dat_path}{save_suffix}/', suffix)
