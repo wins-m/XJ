@@ -10,6 +10,6 @@
 *.ipynb
 ~$*
 .ipynb_checkpoints
-*.xlsx
+~$*.xlsx
 *README.assets
 
