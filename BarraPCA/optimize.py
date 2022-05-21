@@ -61,14 +61,19 @@ def get_fval_alpha(conf, begin_date, end_date, pred_days=5, wn_m=0., wn_s=0.) ->
     return dat
 
 
-def get_fval_apm(conf, begin_date, end_date, uni=False) -> Tuple[str, pd.DataFrame]:
+def get_fval_apm(conf, begin_date, end_date, kind='zscore') -> Tuple[str, pd.DataFrame]:
     dat = pd.read_csv(conf['data_path'] + 'factor_apm.csv', index_col=0, parse_dates=True)
-    if uni:
+    if kind == 'uniform':
         dat = dat.rank(pct=True, axis=1) * 2 - 1
         alpha_name = 'APM(-1t1)'
-    else:
+    elif kind == 'zscore':
         dat = dat.apply(lambda s: (s - s.mean()) / s.std(), axis=1)
         alpha_name = 'APM'
+    elif kind == 'reverse':
+        dat = dat.apply(lambda s: (s.mean() - s) / s.std(), axis=1)
+        alpha_name = 'APM(R)'
+    else:
+        raise Exception(f'APM kind not in `zscore, uniform, reverse`')
     dat = dat.loc[begin_date: end_date].shift(1)
     return alpha_name, dat
 
@@ -167,8 +172,7 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
 
         td = tradedates.iloc[cur_td].strftime('%Y-%m-%d')
         # pool coverage
-        stk_alpha = set(dat.loc[td].rank(ascending=False).sort_values().index[:N]) if (N < np.inf) else set(
-            dat.loc[td].dropna().index)
+        stk_alpha = set(dat.loc[td].rank(ascending=False).sort_values().index[:N]) if (N < np.inf) else set(dat.loc[td].dropna().index)
         stk_index = set(ind_cons.loc[td].dropna().index)
         stk_beta = set(expo_style.loc[td].index) if use_barra else set(expo_pca.loc[td].index)
         ls_ab, ls_ib, sp_info = get_accessible_stk(i=stk_index, a=stk_alpha, b=stk_beta)
@@ -304,36 +308,37 @@ def main():
     PN = 20
     pca_suffix = '1602_2203'
     N = np.inf  # 2000
-    expoL = FL = HL = PL = -.0
-    expoH = FH = HH = PH = .0
+    expoL = FL = HL = PL = -.2
+    expoH = FH = HH = PH = .2
     D = 2
-    K = 5  # %
+    K = .5  # %
     wei_tole = 1e-5
 
 
-    # %% Run:
+    # %% Alpha
 
-    # Use Fake Alpha
-    pred_days = 5
-    wn_m = 0.
-    wn_s = 1.  # TODO: (pca + 1. / 3.)  *  (.0 .05 .10 apm apm_u)
-    alpha_name = f'FRtn{pred_days}D({wn_m},{wn_s})'
-    save_suffix = f'OptResWeekly[{mkt_type}]{alpha_name}'
-    save_path = f"{conf['factorsres_path']}{save_suffix}/"
-    os.makedirs(save_path, exist_ok=True)  
-    alpha_save_name = save_path + f'factor_{alpha_name}.csv'
-    if os.path.exists(alpha_save_name):
-        dat = pd.read_csv(alpha_save_name, index_col=0, parse_dates=True)
-    else:
-        dat = get_fval_alpha(conf, begin_date, end_date, pred_days, wn_m, wn_s)
-    
-    # # Use APM
-    # alpha_name, dat = get_fval_apm(conf, begin_date, end_date, uni=True)
-    # alpha_save_name = save_path + f'factor_{alpha_name}.csv'
+    # # Use Fake Alpha
+    # pred_days = 5
+    # wn_m = 0.
+    # wn_s = 3.
+    # alpha_name = f'FRtn{pred_days}D({wn_m},{wn_s})'
     # save_suffix = f'OptResWeekly[{mkt_type}]{alpha_name}'
     # save_path = f"{conf['factorsres_path']}{save_suffix}/"
-    # os.makedirs(save_path, exist_ok=True)
-
+    # os.makedirs(save_path, exist_ok=True)  
+    # alpha_save_name = save_path + f'factor_{alpha_name}.csv'
+    # if os.path.exists(alpha_save_name):
+    #     dat = pd.read_csv(alpha_save_name, index_col=0, parse_dates=True)
+    # else:
+    #     dat = get_fval_alpha(conf, begin_date, end_date, pred_days, wn_m, wn_s)
+    #     dat.to_csv(alpha_save_name) 
+    
+    # Use APM
+    apm_kind = 'reverse'
+    alpha_name, dat = get_fval_apm(conf, begin_date, end_date, kind=apm_kind)
+    save_suffix = f'OptResWeekly[{mkt_type}]{alpha_name}'
+    save_path = f"{conf['factorsres_path']}{save_suffix}/"
+    os.makedirs(save_path, exist_ok=True)
+    alpha_save_name = save_path + f'factor_{alpha_name}.csv'
     dat.to_csv(alpha_save_name)
 
 
