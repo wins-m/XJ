@@ -55,7 +55,7 @@ alpha_y012_csi500 : "/mnt/c/Users/Winst/Documents/data_local/Y012_TmrRtn{}_CSI50
 
 # target period
 begin_date : '2016-01-01'
-end_date : '2021-12-31'
+end_date : '2022-03-31'
 
 # backtest (single_test.py)
 factors_tested : "/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/factor_backtest/factors_tested.xlsx"
@@ -79,7 +79,7 @@ neu_mtd : 'n'  # n, i, iv
 return_kind : 'ctc'  # ctc, oto, vtv  otc有问题
 stk_pool : 'NA'  # NA CSI500 CSI300 [CSI800]
 stk_w : 'ew'  # idx, ew
-ngroups : 10  # less than 0: 多/空各(-)ngroup支;    1: 稀疏事件信号
+ngroups : 5  # less than 0: 多/空各(-)ngroup支;    1: 稀疏事件信号
 holddays : 5  # 交易频率，如1天一换仓
 
 tc : 2e-3  # 手续费（双边）
@@ -178,6 +178,12 @@ mysql_engine :
     host: '192.168.1.104'
     port: '3306'
     dbname: 'intern'
+  engine5 :
+    user : "intern01"
+    password : "rh35th"
+    host : '192.168.1.104'
+    port : '3306'
+    dbname : 'jqdata'
 #  engine3: # 上传使用engine3的配置，即存在intern库
 #    user: "intern01"
 #    password: "rh35th"

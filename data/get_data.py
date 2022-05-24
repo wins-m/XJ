@@ -48,23 +48,6 @@ def check_idx_constituent(conf):
     (idx_cons - idx_cons0).abs().max(axis=1).plot(); plt.show()
 
 
-def save_marketdata(begin_date, end_date, engine, data_path):
-    """按日存市场行情数据 %Y-%m-%d.h5"""
-    pass
-    """
-    import os
-    save_path = data_path + 'stk_marketdata/'
-    os.makedirs(save_path, exist_ok=True)
-    filename_local = sorted(os.listdir(save_path)).pop().replace('.h5', '')
-    sql0 = f"SELECT DISTINCT tradingdate FROM stk_marketdata " \
-           f"WHERE tradingdate>={max(begin_date, filename_local)} " \
-           f"AND tradingdate<={end_date};"
-    tradedates = mysql_query(query=sql0, engine=engine)
-    for td in tradedates:
-        pass
-    """
-
-
 def save_factor_panel(grid: pd.DataFrame, engine_list, data_path):
     """对name_cols中的表格（以IND,COL,VAL二维获取），取到本地"""
     print(f'\nDownload remote tables, grid size={len(grid)} ...')
@@ -128,13 +111,14 @@ def transfer_data(mysql_engine, data_path, access_target, force_update=False):
         'UPDATE': int, 'SERVER': int, 'BASE': str, 'TABLE': str, 'IND': str,
         'B_DATE': str, 'E_DATE': str, 'COL': str, 'VAL': str, 'WHERE': str, 'CSV': str
     })
-    grid['B_DATE'] = pd.to_datetime(grid['B_DATE'])
-    grid['E_DATE'] = pd.to_datetime(grid['E_DATE'])
+    # grid['B_DATE'] = pd.to_datetime(grid['B_DATE'])
+    # grid['E_DATE'] = pd.to_datetime(grid['E_DATE'])
     grid_mv = grid[grid['CSV'] == 'stk_marketvalue.csv']
     grid = grid if force_update else grid[grid['UPDATE'] == 1]
     if len(grid) == 0:
         print(f'set UPDATE=1 in `{access_target}`')
         return
+    print(grid)
 
     # sql engines initialize here
     engine_list = []
@@ -169,11 +153,31 @@ def get_data(conf):
     transfer_data(mysql_engine, data_path, access_target, force_update)
 
 
-# %%
-if __name__ == '__main__':
+def main():
     import yaml
     conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/config.yaml'
     conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
 
     get_data(conf)
     # check_idx_constituent(conf)
+
+
+if __name__ == '__main__':
+    main()
+
+
+"""depreciated
+def save_marketdata(begin_date, end_date, engine, data_path):
+    ""按日存市场行情数据 %Y-%m-%d.h5""
+    pass
+    import os
+    save_path = data_path + 'stk_marketdata/'
+    os.makedirs(save_path, exist_ok=True)
+    filename_local = sorted(os.listdir(save_path)).pop().replace('.h5', '')
+    sql0 = f"SELECT DISTINCT tradingdate FROM stk_marketdata " \
+           f"WHERE tradingdate>={max(begin_date, filename_local)} " \
+           f"AND tradingdate<={end_date};"
+    tradedates = mysql_query(query=sql0, engine=engine)
+    for td in tradedates:
+        pass
+"""
