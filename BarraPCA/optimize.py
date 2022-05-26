@@ -9,7 +9,7 @@ sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmP
 from supporter.bata_etf import *
 
 OPTIMIZE_TARGET = '/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/BarraPCA/optimize_target.xlsx'
-PROCESS_NUM = 4
+PROCESS_NUM = 6
 
 
 def optimize(conf: dict, ir1: pd.Series, dir_force: bool):
@@ -38,7 +38,7 @@ def optimize(conf: dict, ir1: pd.Series, dir_force: bool):
     # %% Load Data
     beta_expo, beta_cnstr = get_beta_expo_cnstr(beta_kind, conf, begin_date, end_date, expoL, expoH, beta_args)
     save_path, dat = get_alpha_dat(alpha_name, mkt_type, conf, begin_date, end_date)
-    alpha_5d_rank_ic = check_ic_5d(conf['closeAdj'], dat, begin_date, end_date, lag=5)
+    alpha_5d_rank_ic = check_ic_5d(conf['closeAdj'], dat, begin_date, end_date, lag=5)  # TODO: cal ic once
     script_info['alpha_5d_rank_ic'] = str(alpha_5d_rank_ic)
     save_path_sub = f'{save_path}{suffix}/'
     io_make_sub_dir(save_path_sub, force=dir_force)
