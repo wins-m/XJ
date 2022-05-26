@@ -364,22 +364,23 @@ after missing-drop (586492, 41)
 $$
 \max_{w} {
 	\sum_{i} {\alpha w} - {1\over2} \gamma w' \Sigma w 
-},\ \gamma=0  \\
+},
+\\
 \text{s.t.} \quad
 \begin{cases}
-F_l \le {X_{f} (w - w_{b}) } \le F_h \\
-H_l \le {H (w - w_{b}) } \le H_h \\
-P_l \le {P(w - w_b)} \le P_h \\
-\sum_{i}{|w_{i,t} - w_{i, t-1}|} \le d \\
-0 \le w_i \le k \\
-\sum{ w_i } = 1 \\
+L \le {X_{f} (w - w_{b}) } \le H \\
+\sum_{i}{|w_{i,t} - w_{i, t-1}|} \le D \\
+0 \le w_i \le K \\
+\sum{ w_i } = 1 - \text{(weight overflow)} \\
 \end{cases}
-\\
+, 
+\quad  \text{Let} \quad
 \begin{cases}
-F_l = H_l = P_l = -x \\
-F_h = H_h = P_h = x \\
-d = \infin \\
-k = .05 \\
+\alpha \in \set{\text{FRtn5D}, \text{APM}} \\
+\gamma=0 \\
+(-)L, H \in \set{0.0, 0.1} \\
+D = 2 \\
+K \in \set{0.2\%, 0.5\%, 5\%} \\
 \end{cases}
 $$
 
@@ -396,46 +397,11 @@ prob.solve(verbose=False, solver='ECOS', abstol='1e-6')
 ### $\gamma=0$ 不惩罚风险项
 
 - 最大化组合期望收益
-
 - 风格因子切换的风险和个股异质性风险通过超额暴露和个股权重的边界条件
-
 - CSI300
-
-    - ```
-        N_ingredient = 2000
-        FL = -.02
-        FH = .02
-        HL = -.04
-        HH = .04
-        PL = -.02
-        PH = .02
-        D = 1
-        K = .01
-        wei_tole = 1e-5
-        ```
-
-    - <img src="https://s2.loli.net/2022/05/12/Ky1zvU6oONiLuxf.png" alt="image-20220512090813919" style="zoom:25%;" />
-
-    - <img src="https://s2.loli.net/2022/05/12/61xqPEvX4btuB7i.png" alt="image-20220512090823206" style="zoom:25%;" />
 
 - CSI500
 
-    - ```
-        N_ingredient = 2000
-        FL = -.01
-        FH = .01
-        HL = -.02
-        HH = .02
-        PL = -.01
-        PH = .01
-        D = 1
-        K = .005
-        wei_tole = 1e-5
-        ```
-
-    - <img src="https://s2.loli.net/2022/05/12/RaUYL8jXnS2xy6r.png" alt="image-20220512090850919" style="zoom:25%;" />
-
-    - <img src="https://s2.loli.net/2022/05/12/HX8WGoAVN3MQzn7.png" alt="image-20220512090915014" style="zoom:25%;" />
 
 富国500 300
 
@@ -466,13 +432,10 @@ prob.solve(verbose=False, solver='ECOS', abstol='1e-6')
 - 原因1：约束过紧。具体为，组合内个股最大权重$K$小于指数内成分股权重，无法模拟指数
     - 个股最大权重对指数膨胀，取为指数成分股权重最大值（向上取整%）
     
-        ![image-20220516111915834](https://s2.loli.net/2022/05/16/Bgn1cpHG6PyK4Am.png)
-    
 - 原因2：迭代次数不够。ECOS到达最大迭代次数`max_iters=100`；改为，最大1000次，若未最优，则10000次
 
 - 原因3：因子暴露缺失严重，覆盖指数成分股不足（不影响“未来因子”）
 
-    ![image-20220516111907752](https://s2.loli.net/2022/05/16/6XEL7WUzQvCJPKq.png)
 
 ##### apm回测
 
