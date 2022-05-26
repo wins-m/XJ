@@ -2,9 +2,10 @@
 (created by swmao on April 22nd)
 
 """
-from multiprocessing import Pool
-import yaml
 import sys
+from multiprocessing import Pool, RLock, freeze_support
+import yaml
+
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
 from supporter.bata_etf import *
 
@@ -12,7 +13,12 @@ OPTIMIZE_TARGET = '/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyChar
 PROCESS_NUM = 6
 
 
-def optimize(conf: dict, ir1: pd.Series, dir_force: bool):
+def optimize(args):
+    conf: dict = args[0]
+    ir1: pd.Series = args[1]
+    dir_force: bool = args[2]
+    pos: int = args[3]
+
     mkt_type = ir1['mkt_type']
     begin_date = ir1['begin_date']
     end_date = ir1['end_date']
@@ -35,7 +41,7 @@ def optimize(conf: dict, ir1: pd.Series, dir_force: bool):
         'alpha_name': alpha_name, 'beta_kind': beta_kind, 'alpha_5d_rank_ic': 'NA', 'suffix': suffix,
     }
 
-    # %% Load Data
+    # Load Data
     beta_expo, beta_cnstr = get_beta_expo_cnstr(beta_kind, conf, begin_date, end_date, expoL, expoH, beta_args)
     save_path, dat = get_alpha_dat(alpha_name, mkt_type, conf, begin_date, end_date)
     alpha_5d_rank_ic = check_ic_5d(conf['closeAdj'], dat, begin_date, end_date, lag=5)  # TODO: cal ic once
@@ -45,14 +51,15 @@ def optimize(conf: dict, ir1: pd.Series, dir_force: bool):
     ind_cons = get_index_constitution(conf['idx_constituent'].format(mkt_type), begin_date, end_date)
     tradedates = get_tradedates(conf, begin_date, end_date, kind='tdays_w')
 
-    # %% Optimize
-    args = (mkt_type, N, D, K, wei_tole, opt_verbose)
+    # Optimize
+    desc = alpha_name + '/' + suffix
+    args = (mkt_type, N, D, K, wei_tole, opt_verbose, desc, pos)
     all_args = tradedates, beta_expo, beta_cnstr, ind_cons, dat, args
     telling = False  # True
 
     portfolio_weight, optimize_iter_info = portfolio_optimize(all_args, telling)
 
-    # %% Save:
+    # Save:
     with open(save_path_sub + 'config_optimize.yaml', 'w', encoding='utf-8') as f:
         yaml.safe_dump(script_info, f)
 
@@ -70,19 +77,25 @@ def optimize(conf: dict, ir1: pd.Series, dir_force: bool):
                          portfolio_weight, ind_cons, mkt_type, gra_path, tab_path)
 
 
-# %%
 def main():
-    # %% Configs:
+    t0 = time.time()
+    # Configs:
     conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/config.yaml'
     conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
-    # %% Run optimize:
     optimize_target: pd.DataFrame = pd.read_excel(OPTIMIZE_TARGET, index_col=0, dtype=object).loc[1]
-    p = Pool(PROCESS_NUM)
+    # Run optimize:
+    print(f'father process {os.getpid()}')
+    freeze_support()
+    p = Pool(PROCESS_NUM, initializer=tqdm.set_lock, initargs=(RLock(),))
+    cnt = 0
     for ir in optimize_target.iterrows():
         ir1 = ir[1]
-        p.apply_async(optimize, args=[conf, ir1, False])
+        p.apply_async(optimize, args=[(conf, ir1, False, cnt % PROCESS_NUM)])
+        cnt += 1
     p.close()
     p.join()
+    # Exit:
+    print(f'\nTime used: {second2clock(round(time.time() - t0))}')
 
 
 if __name__ == '__main__':

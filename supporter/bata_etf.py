@@ -31,19 +31,19 @@ plt.rcParams["date.autoformatter.hour"] = "%H:%M:%S"
 np.random.seed(9)
 
 
+def second2clock(x: int):
+    if x < 3600:
+        return f"{(x // 60):02d}:{x % 60:02d}"
+    elif x < 3600 * 24:
+        return f"{(x // 3600):02d}:{(x // 60) % 60:02d}:{x % 60:02d}"
+    else:
+        d = x // (24 * 3600)
+        x = x % (24 * 3600)
+        return f"{d}d {(x // 3600):02d}:{(x // 60) % 60:02d}:{x % 60:02d}"
+
+
 def progressbar(cur, total, msg, stt=None):
     """显示进度条"""
-
-    def second2clock(x: int):
-        if x < 3600:
-            return f"{(x//60):02d}:{x%60:02d}"
-        elif x < 3600 * 24:
-            return f"{(x//3600):02d}:{(x//60)%60:02d}:{x%60:02d}"
-        else:
-            d = x // (24 * 3600)
-            x = x % (24 * 3600)
-            return f"{d}d {(x//3600):02d}:{(x//60)%60:02d}:{x%60:02d}"
-
     import math
     percent = '{:.2%}'.format(cur / total)
     lth = int(math.floor(cur * 25 / total))
@@ -134,9 +134,10 @@ def io_make_sub_dir(path, force=False):
         if os.path.exists(path):
             if os.path.isdir(path) and len(os.listdir(path)) == 0:
                 print("Write in empty dir '{path}'")
-            cmd = input(f"Write in non-empty dir '{path}' ?(y/N)")
-            if cmd != 'y' and cmd != 'Y':
-                raise FileExistsError(path)
+            else:
+                cmd = input(f"Write in non-empty dir '{path}' ?(y/N)")
+                if cmd != 'y' and cmd != 'Y':
+                    raise FileExistsError(path)
         else:
             os.makedirs(path, exist_ok=False)
     print(f'Save in: {path}')
@@ -292,7 +293,7 @@ def get_accessible_stk(i: set, a: set, b: set) -> Tuple[list, list, dict]:
 
 def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFrame]:
     tradedates, beta_expo, beta_cnstr, ind_cons, dat, args = all_args
-    mkt_type, N, D, K, wei_tole, opt_verbose = args
+    mkt_type, N, D, K, wei_tole, opt_verbose, desc, pos = args
 
     def get_stk_alpha(dat_td) -> set:
         if N < np.inf:
@@ -307,8 +308,10 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
     w_lst = None
 
     # cur_td = 0
-    start_time = time.time()
-    for cur_td in range(len(tradedates)):
+    # start_time = time.time()
+    loop_bar = tqdm(range(len(tradedates)), ncols=90,
+                    desc=desc, delay=0.01, position=pos, ascii=False)
+    for cur_td in loop_bar:
         td = tradedates.iloc[cur_td].strftime('%Y-%m-%d')
 
         # asset pool accessible
@@ -377,7 +380,6 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
         holding_weight = pd.concat([holding_weight, df_lst_w.T])
 
         # update optimize iteration information
-        progressbar(cur_td + 1, len(tradedates), msg=f' {td} turnover={turnover:.3f} #stk={hdn}', stt=start_time)
         iter_info = {'#alpha^beta': len(ls_ab), '#index^beta': len(ls_ib), '#index': len(stk_index),
                      'turnover': turnover, 'holding': hdn,
                      'status': prob.status, 'opt0': result, 'opt1': (a @ w1)[0],
@@ -387,6 +389,7 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
                                  'stk_i_a': ', '.join(sp_info['i_a']), 'stk_i_b': ', '.join(sp_info['i_b'])}
         iter_info = iter_info | f_del.to_dict()
         optimize_iter_info[td] = pd.Series(iter_info)
+        # progressbar(cur_td + 1, len(tradedates), msg=f' {td} turnover={turnover:.3f} #stk={hdn}', stt=start_time)
 
     return holding_weight, optimize_iter_info
 
