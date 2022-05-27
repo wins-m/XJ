@@ -15,12 +15,14 @@ import matplotlib.pyplot as plt
 import seaborn
 
 seaborn.set_style("darkgrid")
-# plt.rc("figure", figsize=(16, 6))
-plt.rc("figure", figsize=(8, 3))
+# plt.rc("figure", figsize=(18, 10))
+plt.rc("figure", figsize=(9, 5))
+plt.rc("font", size=12)
+plt.rcParams['axes.autolimit_mode'] = 'round_numbers'
+plt.rcParams['axes.xmargin'] = 0
+plt.rcParams['axes.ymargin'] = 0
 plt.rc("savefig", dpi=90)
 # plt.rc("font", family="sans-serif")
-# plt.rc("font", size=12)
-plt.rc("font", size=10)
 
 plt.rcParams["date.autoformatter.hour"] = "%H:%M:%S"
 

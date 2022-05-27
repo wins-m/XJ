@@ -23,9 +23,12 @@ import matplotlib.pyplot as plt
 import seaborn
 
 seaborn.set_style("darkgrid")
-plt.rc("figure", figsize=(8, 5))
+plt.rc("figure", figsize=(9, 5))
+plt.rc("font", size=12)
+plt.rcParams['axes.autolimit_mode'] = 'round_numbers'
+plt.rcParams['axes.xmargin'] = 0
+plt.rcParams['axes.ymargin'] = 0
 plt.rc("savefig", dpi=90)
-plt.rc("font", size=10)
 plt.rcParams["date.autoformatter.hour"] = "%H:%M:%S"
 
 np.random.seed(9)
@@ -152,7 +155,27 @@ def check_ic_5d(closeAdj_path, dat, begin_date, end_date, lag=5, ranked=True) ->
     return dat_ic
 
 
-def get_beta_expo_cnstr(beta_kind, conf, begin_date, end_date, expoL, expoH, beta_args):
+def get_beta_expo_cnstr(beta_kind, conf, begin_date, end_date, expoL, expoH, beta_args, l_cvg_fill=True):
+
+    def cvg_f_fill(fr, w=10, q=.75, ishow=False) -> pd.DataFrame:
+        """F-Fill if Low Coverage: 日覆盖率过去w日均值的q倍时填充"""
+        beta_covered_stk_num = fr.index.get_level_values(0).value_counts().sort_index()
+        if ishow:
+            beta_covered_stk_num.plot()
+            plt.tight_layout()
+            plt.show()
+        mask_l_cvg = beta_covered_stk_num < (beta_covered_stk_num.shift(1).rolling(w).mean() * q)
+        rep_tds = beta_covered_stk_num[mask_l_cvg]
+        # print(rep_tds)
+        tds = fr.index.get_level_values(0).unique()
+        tds = pd.Series(tds, index=tds)
+        # td = rep_tds.index[0]
+        for td in rep_tds.index:
+            td_1 = tds[:td].iloc[-2]
+            td1 = tds[td:].iloc[1]
+            print(td.strftime('%Y-%m-%d'), '->', td_1.strftime('%Y-%m-%d'), len(fr.loc[td]), '->', len(fr.loc[td_1]))
+            fr = fr.loc[:td_1].append(fr.loc[td_1:td_1].rename(index={td_1: td})).append(fr.loc[td1:])
+        return fr
 
     def get_barra_exposure() -> pd.DataFrame:
         """
@@ -187,6 +210,7 @@ def get_beta_expo_cnstr(beta_kind, conf, begin_date, end_date, expoL, expoH, bet
         expo_indus: pd.DataFrame = expo[cols_indus]
 
         res = pd.concat([expo_style, expo_indus], axis=1)
+
         return res
 
     def get_pca_exposure(PN=20) -> pd.DataFrame:
@@ -260,6 +284,9 @@ def get_beta_expo_cnstr(beta_kind, conf, begin_date, end_date, expoL, expoH, bet
     else:
         raise Exception('beta_kind {Barra, PCA}')
 
+    if l_cvg_fill:
+        expo_beta = cvg_f_fill(expo_beta, w=10, q=.75, ishow=False)
+
     return expo_beta, cnstr_beta
 
 
@@ -332,7 +359,7 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
         wb /= wb.sum()  # part of index-constituent are not exposed to beta factors; (not) treat them as zero-exposure.
         xf = beta_expo.loc[td].loc[ls_ab].dropna(axis=1)
         ls_gw = list(wb[wb * 100 > K].index)
-        w_overflow = wb.loc[ls_gw] - K/100
+        w_overflow = wb.loc[ls_gw] - K / 100
         f_del_overflow = beta_expo.loc[td].dropna(axis=1).loc[ls_gw].T @ w_overflow
         k = np.ones([len(ls_ab), 1]) * (K / 100)  # (max(K, K1) / 100)
         f_del = beta_expo.dropna(axis=1).loc[td].loc[ls_ib].T @ wb - f_del_overflow

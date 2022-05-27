@@ -90,6 +90,7 @@ def main():
     freeze_support()
     p = Pool(PROCESS_NUM, initializer=tqdm.set_lock, initargs=(RLock(),))
     cnt = 0
+    # ir1 = optimize_target.iloc[0]
     for ir in optimize_target.iterrows():
         ir1 = ir[1]
         p.apply_async(optimize, args=[(conf, ir1, mkdir_force, cnt % PROCESS_NUM)])
