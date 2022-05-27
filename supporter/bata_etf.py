@@ -133,7 +133,7 @@ def io_make_sub_dir(path, force=False):
     else:
         if os.path.exists(path):
             if os.path.isdir(path) and len(os.listdir(path)) == 0:
-                print("Write in empty dir '{path}'")
+                print(f"Write in empty dir '{path}'")
             else:
                 cmd = input(f"Write in non-empty dir '{path}' ?(y/N)")
                 if cmd != 'y' and cmd != 'Y':

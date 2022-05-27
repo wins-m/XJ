@@ -10,7 +10,8 @@ sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmP
 from supporter.bata_etf import *
 
 OPTIMIZE_TARGET = '/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/BarraPCA/optimize_target.xlsx'
-PROCESS_NUM = 6
+PROCESS_NUM = 4
+mkdir_force = False
 
 
 def optimize(args):
@@ -83,6 +84,7 @@ def main():
     conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/config.yaml'
     conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
     optimize_target: pd.DataFrame = pd.read_excel(OPTIMIZE_TARGET, index_col=0, dtype=object).loc[1]
+    print(optimize_target)
     # Run optimize:
     print(f'father process {os.getpid()}')
     freeze_support()
@@ -90,7 +92,7 @@ def main():
     cnt = 0
     for ir in optimize_target.iterrows():
         ir1 = ir[1]
-        p.apply_async(optimize, args=[(conf, ir1, False, cnt % PROCESS_NUM)])
+        p.apply_async(optimize, args=[(conf, ir1, mkdir_force, cnt % PROCESS_NUM)])
         cnt += 1
     p.close()
     p.join()

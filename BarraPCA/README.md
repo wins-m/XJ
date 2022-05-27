@@ -378,9 +378,9 @@ L \le {X_{f} (w - w_{b}) } \le H \\
 \begin{cases}
 \alpha \in \set{\text{FRtn5D}, \text{APM}} \\
 \gamma=0 \\
-(-)L, H \in \set{0.0, 0.1} \\
-D = 2 \\
+(-)L, H \in \set{0.0, 0.05, 0.1, 0.2} \\
 K \in \set{0.2\%, 0.5\%, 5\%} \\
+D = 2 \\
 \end{cases}
 $$
 
