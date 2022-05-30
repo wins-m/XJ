@@ -13,7 +13,6 @@ from typing import Tuple
 import time
 
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
-from supporter.factor_operator import cal_ic
 
 # %matplotlib inline
 import warnings
@@ -59,77 +58,6 @@ def progressbar(cur, total, msg, stt=None):
         print("\r[%-25s] %s (%s<%s)" % ('=' * lth, percent, time_used, time_left) + msg, end='')
 
 
-def get_alpha_dat(alpha_name, mkt_type, conf, begin_date, end_date) -> Tuple[str, pd.DataFrame]:
-    """
-    Get Alpha Value
-    :param alpha_name:
-    :param mkt_type:
-    :param conf:
-    :param begin_date:
-    :param end_date:
-    :return:
-
-    """
-    print(f"Factor name: {alpha_name}")
-    save_suffix = f'OptResWeekly[{mkt_type}]{alpha_name}'
-    save_path = f"{conf['factorsres_path']}{save_suffix}/"
-    os.makedirs(save_path, exist_ok=True)
-    alpha_save_name = save_path + f'factor_{alpha_name}.csv'
-    if os.path.exists(alpha_save_name):
-        dat = pd.read_csv(alpha_save_name, index_col=0, parse_dates=True)
-    else:
-        a_kind, a_para = alpha_name[:-1].split('(')
-        if a_kind[:4] == 'FRtn':  # Use Fake Alpha
-            pred_days = int(a_kind[4:-1])
-            wn_m, wn_s = [float(_) for _ in a_para.split(',')]
-            assert alpha_name == f'FRtn{pred_days}D({wn_m},{wn_s})'
-            dat = get_fval_alpha(conf, begin_date, end_date, pred_days, wn_m, wn_s)
-        elif a_kind == 'APM':  # Use APM
-            a_name, dat = get_fval_apm(conf, begin_date, end_date, kind=a_para)
-            assert a_name == alpha_name
-        else:
-            raise Exception(f'Invalid alpha_name `{alpha_name}`')
-        dat.to_csv(alpha_save_name)
-    return save_path, dat
-
-
-def get_fval_alpha(conf, begin_date, end_date, pred_days=5, wn_m=0., wn_s=0.) -> pd.DataFrame:
-    def wn(s):
-        mean = wn_m
-        std = wn_s
-        return np.random.normal(loc=mean, scale=std, size=s)
-
-    close_adj = pd.read_csv(conf['closeAdj'], index_col=0, parse_dates=True)
-    dat = close_adj.pct_change(pred_days).shift(-pred_days).loc[begin_date: end_date]  # 未来5日的收益
-    if (wn_m == 0) and (wn_s == 0):
-        dat = dat.apply(lambda x: (x - x.mean()) / x.std(), axis=1)
-    else:
-        dat = dat.apply(lambda x: (x - x.mean()) / x.std() + wn(len(x)), axis=1)
-        print("future return + white noise", end='\n\t')
-        print(f"cross-section mu={dat.mean(axis=1).mean():.3f} sigma={dat.std(axis=1).mean():.3f}")
-
-    return dat
-
-
-def get_fval_apm(conf, begin_date, end_date, kind='zscore') -> Tuple[str, pd.DataFrame]:
-    """Get APM"""
-    dat = pd.read_csv(conf['data_path'] + 'factor_apm.csv', index_col=0, parse_dates=True)
-    if kind == 'uniform':
-        dat = dat.rank(pct=True, axis=1) * 2 - 1
-        # alpha_name = 'APM(-1t1)'
-    elif kind == 'zscore':
-        dat = dat.apply(lambda s: (s - s.mean()) / s.std(), axis=1)
-        # alpha_name = 'APM'
-    elif kind == 'reverse':
-        dat = dat.apply(lambda s: (s.mean() - s) / s.std(), axis=1)
-        # alpha_name = 'APM(R)'
-    else:
-        raise Exception(f'APM kind not in `zscore, uniform, reverse`')
-    alpha_name = f'APM({kind})'
-    dat = dat.shift(1).loc[begin_date: end_date]
-    return alpha_name, dat
-
-
 def io_make_sub_dir(path, force=False):
     if force:
         os.makedirs(path, exist_ok=True)
@@ -146,8 +74,79 @@ def io_make_sub_dir(path, force=False):
     print(f'Save in: {path}')
 
 
+def get_alpha_dat(alpha_name, mkt_type, conf, begin_date, end_date) -> Tuple[str, pd.DataFrame]:
+    """
+    Get Alpha Value
+    :param alpha_name:
+    :param mkt_type:
+    :param conf:
+    :param begin_date:
+    :param end_date:
+    :return:
+
+    """
+
+    def get_fval_alpha(_pred_days=5, _wn_m=0., _wn_s=0.) -> pd.DataFrame:
+        def wn(s):
+            mean = _wn_m
+            std = _wn_s
+            return np.random.normal(loc=mean, scale=std, size=s)
+
+        close_adj = pd.read_csv(conf['closeAdj'], index_col=0, parse_dates=True)
+        res = close_adj.pct_change(_pred_days).shift(-_pred_days).loc[begin_date: end_date]  # 未来5日的收益
+        if (_wn_m == 0) and (_wn_s == 0):
+            res = res.apply(lambda x: (x - x.mean()) / x.std(), axis=1)
+        else:
+            res = res.apply(lambda x: (x - x.mean()) / x.std() + wn(len(x)), axis=1)
+            print("future return + white noise", end='\n\t')
+            print(f"cross-section mu={res.mean(axis=1).mean():.3f} sigma={res.std(axis=1).mean():.3f}")
+
+        return res
+
+    def get_fval_apm(kind='zscore') -> Tuple[str, pd.DataFrame]:
+        """Get APM"""
+        res = pd.read_csv(conf['data_path'] + 'factor_apm.csv', index_col=0, parse_dates=True)
+        if kind == 'uniform':
+            res = res.rank(pct=True, axis=1) * 2 - 1
+            # alpha_name = 'APM(-1t1)'
+        elif kind == 'zscore':
+            res = res.apply(lambda s: (s - s.mean()) / s.std(), axis=1)
+            # alpha_name = 'APM'
+        elif kind == 'reverse':
+            res = res.apply(lambda s: (s.mean() - s) / s.std(), axis=1)
+            # alpha_name = 'APM(R)'
+        else:
+            raise Exception(f'APM kind not in `zscore, uniform, reverse`')
+        _alpha_name = f'APM({kind})'
+        res = res.shift(1).loc[begin_date: end_date]
+        return _alpha_name, res
+
+    print(f"Factor name: {alpha_name}")
+    save_suffix = f'OptResWeekly[{mkt_type}]{alpha_name}'
+    save_path = f"{conf['factorsres_path']}{save_suffix}/"
+    os.makedirs(save_path, exist_ok=True)
+    alpha_save_name = save_path + f'factor_{alpha_name}.csv'
+    if os.path.exists(alpha_save_name):
+        dat = pd.read_csv(alpha_save_name, index_col=0, parse_dates=True)
+    else:
+        a_kind, a_para = alpha_name[:-1].split('(')
+        if a_kind[:4] == 'FRtn':  # Use Fake Alpha
+            pred_days = int(a_kind[4:-1])
+            wn_m, wn_s = [float(_) for _ in a_para.split(',')]
+            assert alpha_name == f'FRtn{pred_days}D({wn_m},{wn_s})'
+            dat = get_fval_alpha(pred_days, wn_m, wn_s)
+        elif a_kind == 'APM':  # Use APM
+            a_name, dat = get_fval_apm(kind=a_para)
+            assert a_name == alpha_name
+        else:
+            raise Exception(f'Invalid alpha_name `{alpha_name}`')
+        dat.to_csv(alpha_save_name)
+    return save_path, dat
+
+
 def check_ic_5d(closeAdj_path, dat, begin_date, end_date, lag=5, ranked=True) -> float:
     """check IC-5days"""
+    from supporter.factor_operator import cal_ic
     close_adj = pd.read_csv(closeAdj_path, index_col=0, parse_dates=True).pct_change()
     close_adj = close_adj.loc[begin_date: end_date]
     dat_ic = cal_ic(fv_l1=dat, ret=close_adj, lag=lag, ranked=ranked).mean()[0]
@@ -284,7 +283,7 @@ def get_beta_expo_cnstr(beta_kind, conf, begin_date, end_date, expoL, expoH, bet
     else:
         raise Exception('beta_kind {Barra, PCA}')
 
-    if l_cvg_fill:
+    if l_cvg_fill:  # beta覆盖不足，用上一日的beta暴露填充
         expo_beta = cvg_f_fill(expo_beta, w=10, q=.75, ishow=False)
 
     return expo_beta, cnstr_beta
@@ -336,8 +335,7 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
 
     # cur_td = 0
     # start_time = time.time()
-    loop_bar = tqdm(range(len(tradedates)), ncols=90,
-                    desc=desc, delay=0.01, position=pos, ascii=False)
+    loop_bar = tqdm(range(len(tradedates)), ncols=90, desc=desc, delay=0.01, position=pos, ascii=False)
     for cur_td in loop_bar:
         td = tradedates.iloc[cur_td].strftime('%Y-%m-%d')
 
@@ -406,7 +404,7 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
             #     lst_w.columns = [td]
         holding_weight = pd.concat([holding_weight, df_lst_w.T])
 
-        # update optimize iteration information
+        # Update optimize iteration information
         iter_info = {'#alpha^beta': len(ls_ab), '#index^beta': len(ls_ib), '#index': len(stk_index),
                      'turnover': turnover, 'holding': hdn,
                      'status': prob.status, 'opt0': result, 'opt1': (a @ w1)[0],
@@ -426,6 +424,7 @@ def tf_portfolio_weight(portfolio_weight, tab_path, gra_path, ishow=False):
     portfolio_weight.sum(axis=1)
     portfolio_weight.to_csv(tab_path)
     (portfolio_weight > 0).sum(axis=1).plot()
+    plt.tight_layout()
     plt.savefig(gra_path)  # dat_path + g_file.format(suffix))
     if ishow:
         plt.show()
@@ -449,6 +448,7 @@ def tf_historical_result(close_adj, tradedates, begin_date, end_date, portfolio_
 
     tmp = df.cumsum().add(1)
     tmp.plot()
+    plt.tight_layout()
     plt.savefig(gra_path)
     plt.close()
 

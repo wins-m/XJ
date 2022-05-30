@@ -57,7 +57,6 @@ def optimize(args):
     args = (mkt_type, N, D, K, wei_tole, opt_verbose, desc, pos)
     all_args = tradedates, beta_expo, beta_cnstr, ind_cons, dat, args
     telling = False  # True
-
     portfolio_weight, optimize_iter_info = portfolio_optimize(all_args, telling)
 
     # Save:
@@ -83,7 +82,7 @@ def main():
     # Configs:
     conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/config.yaml'
     conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
-    optimize_target: pd.DataFrame = pd.read_excel(OPTIMIZE_TARGET, index_col=0, dtype=object).loc[1]
+    optimize_target: pd.DataFrame = pd.read_excel(OPTIMIZE_TARGET, index_col=0, dtype=object).loc[1:1]
     print(optimize_target)
     # Run optimize:
     print(f'father process {os.getpid()}')

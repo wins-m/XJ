@@ -8,8 +8,15 @@ import numpy as np
 import sys
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
 from supporter.transformer import get_neutralize_sector, get_neutralize_sector_size, get_winsorize, get_standardize
-from matplotlib import pyplot as plt
 from scipy import stats
+from matplotlib import pyplot as plt
+plt.rc("figure", figsize=(9, 5))
+plt.rc("font", size=12)
+plt.rcParams['axes.autolimit_mode'] = 'round_numbers'
+plt.rcParams['axes.xmargin'] = 0
+plt.rcParams['axes.ymargin'] = 0
+plt.rc("savefig", dpi=90)
+plt.rcParams["date.autoformatter.hour"] = "%H:%M:%S"
 
 # def keep_pool_stk(df: pd.DataFrame, pool_multi: pd.DataFrame):
 #     """
@@ -190,7 +197,8 @@ def panel_long_short_absolute(long_short_return_nc, ishow=False, title='', save_
         long_short_absolute_nc = long_short_return_nc.add(1).cumprod()  # 用累乘
 
     if save_path is not None:
-        long_short_absolute_nc.plot(figsize=(10, 5), grid=True, title=title)
+        long_short_absolute_nc.plot(figsize=(9, 5), grid=True, title=title)
+        plt.tight_layout()
         plt.savefig(save_path)
         if ishow:
             plt.show()
@@ -216,7 +224,8 @@ def panel_long_short_excess(long_short_absolute_nc, ishow=False, title='Long-Sho
     long_short_excess_nc['short'] = long_short_absolute_nc['short'] - long_short_absolute_nc['baseline']
 
     if save_path is not None:
-        long_short_excess_nc.plot(figsize=(10, 5), grid=True, title=title)
+        long_short_excess_nc.plot(figsize=(9, 5), grid=True, title=title)
+        plt.tight_layout()
         plt.savefig(save_path)
         if ishow:
             plt.show()
@@ -235,7 +244,8 @@ def plot_rtns_group(ret_group: pd.DataFrame, ishow=False, save_path=None, cumsum
 
     if save_path is not None:
         # ret_group_cumulative.plot(grid=True, figsize=(16, 8), linewidth=3, title="Group Test Result")
-        ret_group_cumulative.plot(grid=True, figsize=(10, 5), linewidth=3, title="Group Test Result")
+        ret_group_cumulative.plot(grid=True, figsize=(9, 5), linewidth=3, title="Group Test Result")
+        plt.tight_layout()
         plt.savefig(save_path)
         if ishow:
             plt.show()
@@ -312,7 +322,8 @@ def cal_total_ret_group(ret_group, ishow=False, save_path=None) -> pd.DataFrame:
     ret_group_total = ret_group.sum()  # add(1).prod().add(-1)  改成累加
 
     if save_path is not None:
-        ret_group_total.plot(figsize=(10, 5), title="Total Return of Group")
+        ret_group_total.plot(figsize=(9, 5), title="Total Return of Group")
+        plt.tight_layout()
         plt.savefig(save_path)
         if ishow:
             plt.show()
@@ -330,11 +341,12 @@ def cal_sr_max_drawdown(df: pd.Series, ishow=False, title=None, save_path=None, 
 
     if save_path is not None:
         try:
-            mdd.plot(kind='area', figsize=(10, 5), grid=True, color='y', alpha=.5, title=title)
+            mdd.plot(kind='area', figsize=(9, 5), grid=True, color='y', alpha=.5, title=title)
         except ValueError:
             mdd[mdd > 0] = 0
-            mdd.plot(kind='area', figsize=(10, 5), grid=True, color='y', alpha=.5, title=title)
+            mdd.plot(kind='area', figsize=(9, 5), grid=True, color='y', alpha=.5, title=title)
         finally:
+            plt.tight_layout()
             plt.savefig(save_path)
             if ishow:
                 plt.show()
@@ -350,9 +362,10 @@ def cal_yearly_return(data, ishow=False, title='Annual Return', save_path=None) 
     aret = data.groupby(year_group).apply(lambda s: np.prod(s + 1) - 1)
 
     if save_path is not None:
-        aret.plot.bar(figsize=(10, 5), title=title)
-        # rolling_yearly_ret.plot(figsize=(10, 5))
+        aret.plot.bar(figsize=(9, 5), title=title)
+        # rolling_yearly_ret.plot(figsize=(9, 5))
         plt.grid(axis='y')
+        plt.tight_layout()
         plt.savefig(save_path)
         if ishow:
             plt.show()
@@ -368,9 +381,10 @@ def cal_yearly_sharpe(data, ishow=False, title='Annual Sharpe', save_path=None, 
     asharp = data.groupby(year_group).apply(lambda s: s.mean() / s.std() * np.sqrt(y_len / s.count()))
 
     if save_path is not None:
-        asharp.plot.bar(figsize=(10, 5), title=title)
-        # asharp.plot(figsize=(10, 5))
+        asharp.plot.bar(figsize=(9, 5), title=title)
+        # asharp.plot(figsize=(9, 5))
         plt.grid(axis='y')
+        plt.tight_layout()
         plt.savefig(save_path)
         if ishow:
             plt.show()
@@ -407,7 +421,8 @@ def cal_turnover_long_short(long_short_group, idx_weight, ngroups, ishow=False, 
 
     if save_path is not None:
         dw.to_csv(save_path)
-        dw[['long', 'short']].plot(figsize=(10, 5), grid=True, title='Turnover')
+        dw[['long', 'short']].plot(figsize=(9, 5), grid=True, title='Turnover')
+        plt.tight_layout()
         plt.savefig(save_path.replace('.csv', '.png'))
         if ishow:
             plt.show()
@@ -425,7 +440,8 @@ def cal_ic(fv_l1, ret, lag=1, ranked=False, ishow=False, save_path=None) -> pd.D
     ic.columns = ['IC']
 
     if save_path is not None:
-        ic.plot.hist(figsize=(10, 5), bins=50, title='IC distribution')
+        ic.plot.hist(figsize=(9, 5), bins=50, title='IC distribution')
+        plt.tight_layout()
         plt.savefig(save_path)
         if ishow:
             plt.show()
@@ -464,7 +480,8 @@ def cal_ic_decay(fval_neutralized, ret, maxlag=20, ishow=False, save_path=None) 
     res = pd.DataFrame.from_dict(ic_decay, orient='index', columns=['IC_mean'])
 
     if save_path is not None:
-        res.plot.bar(figsize=(10, 5), title='IC Decay')
+        res.plot.bar(figsize=(9, 5), title='IC Decay')
+        plt.tight_layout()
         plt.savefig(save_path)
         if ishow:
             plt.show()
