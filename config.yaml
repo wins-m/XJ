@@ -77,9 +77,9 @@ exclude_tradeable :   # 0: excluded
   down_open : 1
 neu_mtd : 'n'  # n, i, iv
 return_kind : 'ctc'  # ctc, oto, vtv  otc有问题
-stk_pool : 'NA'  # NA CSI500 CSI300 [CSI800]
+stk_pool : 'CSI500'  # NA CSI500 CSI300 [CSI800]
 stk_w : 'ew'  # idx, ew
-ngroups : 10  # less than 0: 多/空各(-)ngroup支;    1: 稀疏事件信号
+ngroups : 5  # less than 0: 多/空各(-)ngroup支;    1: 稀疏事件信号
 holddays : 5  # 交易频率，如1天一换仓
 
 tc : 2e-3  # 手续费（双边）

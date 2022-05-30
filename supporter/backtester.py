@@ -1,10 +1,6 @@
 import sys
-import time
 from datetime import timedelta
 from typing import Dict
-
-import supporter.io
-
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
 from supporter.factor_operator import *
 from supporter.io import get_time_suffix
@@ -74,7 +70,8 @@ class Portfolio(object):
     def plot_turnover(self, ishow, path):
         if self.panel is None:
             raise AssertionError('Calculate panel result before plot turnover!')
-        self.panel['Turnover'].plot(figsize=(10, 5), grid=True, title='Turnover')
+        self.panel['Turnover'].plot(figsize=(9, 5), grid=True, title='Turnover')
+        plt.tight_layout()
         plt.savefig(path)
         if ishow:
             plt.show()
@@ -83,7 +80,8 @@ class Portfolio(object):
 
     def plot_cumulative_returns(self, ishow, path, kind='cumsum', title=None):
         title = f'Portfolio Absolute Result ({kind})' if title is None else title
-        self.panel[[f'Wealth({kind})', f'Wealth_wc({kind})']].plot(figsize=(10, 5), grid=True, title=title)
+        self.panel[[f'Wealth({kind})', f'Wealth_wc({kind})']].plot(figsize=(9, 5), grid=True, title=title)
+        plt.tight_layout()
         plt.savefig(path)
         if ishow:
             plt.plot()
@@ -183,13 +181,15 @@ class Signal(object):
         pass
 
     def plot_ic(self, ishow: bool, path_f: str):
-        self.ic.plot.hist(figsize=(10, 5), bins=50, title='IC distribution')
+        self.ic.plot.hist(figsize=(9, 5), bins=50, title='IC distribution')
+        plt.tight_layout()
         plt.savefig(path_f.format('IC.png'))
         if ishow:
             plt.show()
         else:
             plt.close()
-        self.ic_rank.plot.hist(figsize=(10, 5), bins=50, title='IC distribution')
+        self.ic_rank.plot.hist(figsize=(9, 5), bins=50, title='IC distribution')
+        plt.tight_layout()
         plt.savefig(path_f.format('ICRank.png'))
         if ishow:
             plt.show()
@@ -197,7 +197,8 @@ class Signal(object):
             plt.close()
 
     def plot_ic_decay(self, ishow, path):
-        self.ic_decay.plot.bar(figsize=(10, 5), title='IC Decay')
+        self.ic_decay.plot.bar(figsize=(9, 5), title='IC Decay')
+        plt.tight_layout()
         plt.savefig(path)
         if ishow:
             plt.show()
@@ -273,7 +274,8 @@ class Strategy(object):
 
     def plot_long_short_turnover(self, ishow, path):
         long_short_turnover = pd.concat([self.portfolio[k].get_turnover().rename(k) for k in ['long', 'short']], axis=1)
-        long_short_turnover.plot(figsize=(10, 5), grid=True, title='Turnover')
+        long_short_turnover.plot(figsize=(9, 5), grid=True, title='Turnover')
+        plt.tight_layout()
         plt.savefig(path)
         if ishow:
             plt.show()
@@ -286,7 +288,8 @@ class Strategy(object):
             df[['long_short', 'long', 'short']] -= df['baseline'].values.reshape(-1, 1)
             df = df[['long_short', 'long', 'short']]
         title = f'Long-Short {["Absolute", "Excess"][excess]} Result({kind}) {["No Cost", "With Cost"][wc]}'
-        df.plot(figsize=(10, 5), grid=True, title=title)
+        df.plot(figsize=(9, 5), grid=True, title=title)
+        plt.tight_layout()
         plt.savefig(path)
         if ishow:
             plt.show()
