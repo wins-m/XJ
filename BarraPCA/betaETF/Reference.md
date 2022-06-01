@@ -33,19 +33,18 @@ $$
 \begin{cases}
 \begin{gather}
 & 0 \le w  \le K  \tag{1}\\
-& |w_t - w_{t-1}| \le \delta \tag{2}\\
+& \sum{|w_t - w_{t-1}|} \le \delta \tag{2}\\
 & \left(\bold{1}_{\{\text{in bench}\}}\right)^T w \ge B \tag{3}\\
 & -E \le w - w_b \le E \tag{4}\\
-& -H \le X_{indus} (w - w_b) \le H \tag{5}\\
-& -F \le X_{style} (w - w_b) \le F \tag{6}\\
-& (w - w_b)^T \Sigma (w - w_b) \le \sigma^2 \tag{7}\\
-& \bold{1}^T \bold{1}_{\{w > 0\}} \le N_{max} \tag{8}\\
+& L \le X_{f} (w - w_b) \le H \tag{5}\\
+& (w - w_b)^T \Sigma (w - w_b) \le \sigma^2 \tag{6}\\
+& \bold{1}^T \bold{1}_{\{w > 0\}} \le N_{max} \tag{7}\\
 \end{gather}
 \end{cases}
 $$
 基本限制条件为：
 
-1. lamda 系数为 10
+1. lambda 系数为 10
 2. 不设置换手率限制
 3. 全部在成份股中进行选择
 4. 权重偏离度1.5%
@@ -58,7 +57,7 @@ $$
 
 > 印花税为 0.1%，佣金为 0.02%，买入冲击成 本为 0.15%，卖出冲击成本为 0.3%
 
-- 个股权重偏离度：(tight)成分股权重上下1% // (loose)成分股行业权重
+- 个股权重偏离度：(T)成分股权重上下1% // (L)成分股行业权重
 - 累积收益；月度胜率（对基准）；年度收益；年化超额收益；跟踪误差；换手率
 - lambda = [0, 20, 40, 60, 80, 100] 
 - 成分股权重限制 [1., .95, .90, .85, .80]

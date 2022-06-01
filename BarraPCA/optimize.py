@@ -10,12 +10,51 @@ sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmP
 from supporter.bata_etf import *
 
 OPTIMIZE_TARGET = '/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/BarraPCA/optimize_target.xlsx'
-PROCESS_NUM = 1
-mkdir_force = False
+PROCESS_NUM = 4
+mkdir_force = True
 TELLING = False
 
 
+# %%
+def main():
+    # %%
+    t0 = time.time()
+
+    # Configs:
+    conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/config.yaml'
+    conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
+    optimize_target: pd.DataFrame = pd.read_excel(OPTIMIZE_TARGET, index_col=0, dtype=object).loc[1:1]
+    print(optimize_target)
+
+    # Run optimize:
+    ir1 = optimize_target.iloc[0]
+    args = (conf, ir1, mkdir_force, 0)
+    # %%
+    if PROCESS_NUM > 1:
+        print(f'father process {os.getpid()}')
+        freeze_support()
+        p = Pool(PROCESS_NUM, initializer=tqdm.set_lock, initargs=(RLock(),))
+        cnt = 0
+        for ir in optimize_target.iterrows():
+            ir1 = ir[1]
+            p.apply_async(optimize, args=[(conf, ir1, mkdir_force, cnt % PROCESS_NUM)])
+            cnt += 1
+        p.close()
+        p.join()
+    else:
+        cnt = 0
+        for ir in optimize_target.iterrows():
+            ir1 = ir[1]
+            args = (conf, ir1, mkdir_force, cnt % PROCESS_NUM)
+            optimize(args)
+            cnt += 1
+
+    # Exit:
+    print(f'\nTime used: {second2clock(round(time.time() - t0))}')
+
+
 def optimize(args):
+    # %%
     conf: dict = args[0]
     ir1: pd.Series = args[1]
     dir_force: bool = args[2]
@@ -43,7 +82,7 @@ def optimize(args):
         'alpha_name': alpha_name, 'beta_kind': beta_kind, 'alpha_5d_rank_ic': 'NA', 'suffix': suffix,
     }
 
-    # Load Data
+    # %% Load Data
     beta_expo, beta_cnstr = get_beta_expo_cnstr(beta_kind, conf, begin_date, end_date, expoL, expoH, beta_args)
     save_path, dat = get_alpha_dat(alpha_name, mkt_type, conf, begin_date, end_date)
     alpha_5d_rank_ic = check_ic_5d(conf['closeAdj'], dat, begin_date, end_date, lag=5)  # TODO: cal ic once
@@ -53,11 +92,12 @@ def optimize(args):
     ind_cons = get_index_constitution(conf['idx_constituent'].format(mkt_type), begin_date, end_date)
     tradedates = get_tradedates(conf, begin_date, end_date, kind='tdays_w')
 
-    # Optimize
     desc = alpha_name + '/' + suffix
     args = (mkt_type, N, D, K, wei_tole, opt_verbose, desc, pos)
     all_args = tradedates, beta_expo, beta_cnstr, ind_cons, dat, args
-    portfolio_weight, optimize_iter_info = portfolio_optimize(all_args, telling=TELLING)
+    telling = TELLING
+    # %% Optimize
+    portfolio_weight, optimize_iter_info = portfolio_optimize(all_args, telling=telling)
 
     # Save:
     with open(save_path_sub + 'config_optimize.yaml', 'w', encoding='utf-8') as f:
@@ -75,40 +115,6 @@ def optimize(args):
     gra_path = save_path_sub + 'figure_result_wealth_{}.png'.format(suffix)
     tf_historical_result(close_adj, tradedates, begin_date, end_date,
                          portfolio_weight, ind_cons, mkt_type, gra_path, tab_path)
-
-
-def main():
-    t0 = time.time()
-
-    # Configs:
-    conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/config.yaml'
-    conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
-    optimize_target: pd.DataFrame = pd.read_excel(OPTIMIZE_TARGET, index_col=0, dtype=object).loc[1:1]
-    print(optimize_target)
-
-    # Run optimize:
-    ir1 = optimize_target.iloc[0]
-    if PROCESS_NUM > 1:
-        print(f'father process {os.getpid()}')
-        freeze_support()
-        p = Pool(PROCESS_NUM, initializer=tqdm.set_lock, initargs=(RLock(),))
-        cnt = 0
-        for ir in optimize_target.iterrows():
-            ir1 = ir[1]
-            p.apply_async(optimize, args=[(conf, ir1, mkdir_force, cnt % PROCESS_NUM)])
-            cnt += 1
-        p.close()
-        p.join()
-    else:
-        cnt = 0
-        for ir in optimize_target.iterrows():
-            ir1 = ir[1]
-            args = (conf, ir1, mkdir_force, cnt % PROCESS_NUM)
-            optimize(args)
-            cnt += 1
-
-    # Exit:
-    print(f'\nTime used: {second2clock(round(time.time() - t0))}')
 
 
 if __name__ == '__main__':

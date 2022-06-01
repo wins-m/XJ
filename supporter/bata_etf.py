@@ -270,7 +270,8 @@ def get_beta_expo_cnstr(beta_kind, conf, begin_date, end_date, expoL, expoH, bet
         expo_beta = get_barra_exposure()
         sty_c = beta_args[0]  # ['size', 'beta', 'momentum']
         ind_c = [c for c in expo_beta.columns if 'ind' == c[:3]]
-        cnstr_info = [(sty_c, expoL, expoH), (ind_c, expoL, expoH)]
+        # cnstr_info = [(sty_c, expoL, expoH), (ind_c, expoL, expoH)]
+        cnstr_info = [(sty_c, expoL, expoH), (ind_c, -.05, .05)]  # TODO: adjustable indus threshold
         cnstr_beta = get_beta_constraint(all_c=expo_beta.columns, info=cnstr_info)
 
     elif beta_kind == 'PCA':
@@ -317,6 +318,7 @@ def get_accessible_stk(i: set, a: set, b: set) -> Tuple[list, list, dict]:
 
 
 def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    # %%
     tradedates, beta_expo, beta_cnstr, ind_cons, dat, args = all_args
     mkt_type, N, D, K, wei_tole, opt_verbose, desc, pos = args
 
@@ -335,7 +337,9 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
     cur_td = 0
     # start_time = time.time()
     loop_bar = tqdm(range(len(tradedates)), ncols=90, desc=desc, delay=0.01, position=pos, ascii=False)
+    # %%
     for cur_td in loop_bar:
+        # %%
         td = tradedates.iloc[cur_td].strftime('%Y-%m-%d')
 
         # asset pool accessible
@@ -355,45 +359,51 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
         wb = ind_cons.loc[td, ls_ib]
         wb /= wb.sum()  # part of index-constituent are not exposed to beta factors; (not) treat them as zero-exposure.
         xf = beta_expo.loc[td].loc[ls_ab].dropna(axis=1)
-        ls_gw = list(wb[wb * 100 > K].index)  # stocks in index with weight greater than K
-        w_overflow = wb.loc[ls_gw] - K / 100
-        f_del_overflow = beta_expo.loc[td].dropna(axis=1).loc[ls_gw].T @ w_overflow
-        f_del = beta_expo.dropna(axis=1).loc[td].loc[ls_ib].T @ wb - f_del_overflow
+        # ls_gw = list(wb[wb * 100 > K].index)  # stocks in index with weight greater than K
+        # w_overflow = wb.loc[ls_gw] - K / 100
+        # f_del_overflow = beta_expo.loc[td].dropna(axis=1).loc[ls_gw].T @ w_overflow
+        f_del = beta_expo.dropna(axis=1).loc[td].loc[ls_ib].T @ wb  # - f_del_overflow
         fl = (f_del + beta_cnstr.loc[f_del.index, 'L']).dropna()
         fh = (f_del + beta_cnstr.loc[f_del.index, 'H']).dropna()
 
         d_del = df_lst_w.loc[ls_clear].abs().sum().values[0] if len(ls_clear) > 0 else 0
         d = D - d_del
 
-        # Constraints
+        # %% Constraints
         wN = len(ls_ab)
         w = cp.Variable((wN, 1))
         opt_cnstr = OptCnstr()
-        opt_cnstr.uni_bound(w, down=np.zeros([wN, 1]), up=np.ones([wN, 1]) * (K / 100))
-        opt_cnstr.sum_bound(w, e=np.ones([1, wN]), down=None, up=1 - w_overflow.sum())
-        opt_cnstr.sum_bound(w, e=xf[f_del.index].values.T, down=fl.values.reshape(-1, 1), up=fh.values.reshape(-1, 1))
+        opt_cnstr.sum_bound(w, e=np.ones([1, wN]), down=None, up=1)  # - w_overflow.sum())  # (0)
+        # opt_cnstr.uni_bound(w, down=np.zeros([wN, 1]), up=np.ones([wN, 1]) * (K / 100))  # (1)
+        B = .8
+        opt_cnstr.sum_bound(w, e=(1 - pd.Series(wb, index=ls_ab).isna()).values.reshape(1, -1), down=B, up=None)  # (3)
+        E = .015
+        tmp = pd.Series(wb, index=ls_ab).fillna(0).values.reshape(-1, 1)
+        opt_cnstr.uni_bound(w, down=tmp - E, up=tmp + E)  # (4)
+        del tmp
+        opt_cnstr.sum_bound(w, e=xf[fl.index].values.T, down=fl.values.reshape(-1, 1), up=fh.values.reshape(-1, 1))  # (5)
 
         if len(df_lst_w) > 0:  # turnover constraint
             w_lst = df_lst_w.reindex_like(pd.DataFrame(index=ls_ab, columns=df_lst_w.columns)).fillna(0)
-            w_lst = w_lst - pd.DataFrame(w_overflow, index=ls_ab, columns=df_lst_w.columns).fillna(0)
+            # w_lst = w_lst - pd.DataFrame(w_overflow, index=ls_ab, columns=df_lst_w.columns).fillna(0)
             w_lst = w_lst.values
-            opt_cnstr.norm_bound(w, w0=w_lst, d=d, L=1)
+            opt_cnstr.norm_bound(w, w0=w_lst, d=d, L=1)  # (2)
         else:
             w_lst = np.zeros([len(ls_ab), 1]) if w_lst is None else w_lst  # former holding
 
-        # Solve optimize problem
+        # %% Solve optimize problem
         objective = cp.Maximize(a.values.reshape(1, -1) @ w)
         constraints = opt_cnstr.get_constraints()
         prob = cp.Problem(objective, constraints)
         result = prob.solve(verbose=opt_verbose, solver='ECOS', max_iters=1000)
+        # result = prob.solve(verbose=True, solver='ECOS', max_iters=1000)
         if prob.status == 'optimal_inaccurate':
             result = prob.solve(verbose=opt_verbose, solver='ECOS', max_iters=10000)
-        # result = prob.solve(verbose=True, solver='ECOS', abstol=1e-8, max_iters=10000)
 
         if prob.status == 'optimal':
             w1 = w.value.copy()
             df_w = pd.DataFrame(w1, index=ls_ab, columns=[td])
-            df_w += pd.DataFrame(w_overflow, index=ls_ab, columns=[td]).fillna(0)
+            # df_w += pd.DataFrame(w_overflow, index=ls_ab, columns=[td]).fillna(0)
             df_w[df_w < wei_tole] = 0
             df_w /= df_w.sum()
             turnover = np.abs(w_lst - df_w.values).sum() + d_del
@@ -411,7 +421,7 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
         iter_info = {'#alpha^beta': len(ls_ab), '#index^beta': len(ls_ib), '#index': len(stk_index),
                      'turnover': turnover, 'holding': hdn,
                      'status': prob.status, 'opt0': result, 'opt1': (a @ w1)[0],
-                     '#overflow': w_overflow.count(),
+                     # '#overflow': w_overflow.count(),
                      }
         iter_info = iter_info | {'index-alpha': sp_info['#i_a'], 'index-beta': sp_info['#i_b'],
                                  'stk_i_a': ', '.join(sp_info['i_a']), 'stk_i_b': ', '.join(sp_info['i_b'])}
