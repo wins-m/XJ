@@ -155,7 +155,6 @@ def check_ic_5d(closeAdj_path, dat, begin_date, end_date, lag=5, ranked=True) ->
 
 
 def get_beta_expo_cnstr(beta_kind, conf, begin_date, end_date, expoL, expoH, beta_args, l_cvg_fill=True):
-
     def cvg_f_fill(fr, w=10, q=.75, ishow=False) -> pd.DataFrame:
         """F-Fill if Low Coverage: 日覆盖率过去w日均值的q倍时填充"""
         beta_covered_stk_num = fr.index.get_level_values(0).value_counts().sort_index()
@@ -333,7 +332,7 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
     optimize_iter_info: pd.DataFrame = pd.DataFrame()
     w_lst = None
 
-    # cur_td = 0
+    cur_td = 0
     # start_time = time.time()
     loop_bar = tqdm(range(len(tradedates)), ncols=90, desc=desc, delay=0.01, position=pos, ascii=False)
     for cur_td in loop_bar:
@@ -356,10 +355,9 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
         wb = ind_cons.loc[td, ls_ib]
         wb /= wb.sum()  # part of index-constituent are not exposed to beta factors; (not) treat them as zero-exposure.
         xf = beta_expo.loc[td].loc[ls_ab].dropna(axis=1)
-        ls_gw = list(wb[wb * 100 > K].index)
+        ls_gw = list(wb[wb * 100 > K].index)  # stocks in index with weight greater than K
         w_overflow = wb.loc[ls_gw] - K / 100
         f_del_overflow = beta_expo.loc[td].dropna(axis=1).loc[ls_gw].T @ w_overflow
-        k = np.ones([len(ls_ab), 1]) * (K / 100)  # (max(K, K1) / 100)
         f_del = beta_expo.dropna(axis=1).loc[td].loc[ls_ib].T @ wb - f_del_overflow
         fl = (f_del + beta_cnstr.loc[f_del.index, 'L']).dropna()
         fh = (f_del + beta_cnstr.loc[f_del.index, 'H']).dropna()
@@ -367,20 +365,25 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
         d_del = df_lst_w.loc[ls_clear].abs().sum().values[0] if len(ls_clear) > 0 else 0
         d = D - d_del
 
-        # Solve optimize problem
-        w = cp.Variable((len(ls_ab), 1), nonneg=True)
-        objective = cp.Maximize(a.values.reshape(1, -1) @ w)
-        constraints = [w <= k,
-                       cp.sum(w) + w_overflow.sum() == 1,
-                       fl.values.reshape(-1, 1) - xf[fl.index].values.T @ w <= 0,
-                       xf[fh.index].values.T @ w - fh.values.reshape(-1, 1) <= 0]
+        # Constraints
+        wN = len(ls_ab)
+        w = cp.Variable((wN, 1))
+        opt_cnstr = OptCnstr()
+        opt_cnstr.uni_bound(w, down=np.zeros([wN, 1]), up=np.ones([wN, 1]) * (K / 100))
+        opt_cnstr.sum_bound(w, e=np.ones([1, wN]), down=None, up=1 - w_overflow.sum())
+        opt_cnstr.sum_bound(w, e=xf[f_del.index].values.T, down=fl.values.reshape(-1, 1), up=fh.values.reshape(-1, 1))
+
         if len(df_lst_w) > 0:  # turnover constraint
             w_lst = df_lst_w.reindex_like(pd.DataFrame(index=ls_ab, columns=df_lst_w.columns)).fillna(0)
             w_lst = w_lst - pd.DataFrame(w_overflow, index=ls_ab, columns=df_lst_w.columns).fillna(0)
             w_lst = w_lst.values
-            constraints.append(cp.norm(w - w_lst, 1) <= d)
+            opt_cnstr.norm_bound(w, w0=w_lst, d=d, L=1)
         else:
             w_lst = np.zeros([len(ls_ab), 1]) if w_lst is None else w_lst  # former holding
+
+        # Solve optimize problem
+        objective = cp.Maximize(a.values.reshape(1, -1) @ w)
+        constraints = opt_cnstr.get_constraints()
         prob = cp.Problem(objective, constraints)
         result = prob.solve(verbose=opt_verbose, solver='ECOS', max_iters=1000)
         if prob.status == 'optimal_inaccurate':
@@ -454,3 +457,70 @@ def tf_historical_result(close_adj, tradedates, begin_date, end_date, portfolio_
 
     tmp.to_excel(tab_path)
     del tmp
+
+
+class OptCnstr(object):
+
+    def __init__(self):
+        self.cnstr = []
+
+    def get_constraints(self) -> list:
+        return self.cnstr
+
+    def risk_bound(self, w, w0, Sigma, up):
+        """
+        组合跟踪误差
+        :param w: N * 1 cvxpy variable
+        :param w0: N * 1 numpy array
+        :param Sigma: N * N numpy array
+        :param up: 1 * 1 numpy array
+        """
+        wd = w - w0
+        self.cnstr.append(wd.T @ Sigma @ wd - up <= 0)
+
+    def norm_bound(self, w, w0, d, L=1):
+        """
+        范数不等式(default L1)
+        :param w: N * 1 cvxpy variable
+        :param w0: N * 1 numpy array
+        :param d: float
+        :param L: L()-norm
+        """
+        self.cnstr.append(cp.norm(w - w0, L) - d <= 0)
+
+    def uni_bound(self, w, down=None, up=None):
+        """
+        每个变量的上下界
+        :param w: N * 1 cvxpy variable
+        :param down: N * 1 numpy array
+        :param up: N * 1 numpy array
+        """
+        if down is not None:
+            self._uni_down_bound(w, down)
+        if up is not None:
+            self._uni_up_bound(w, up)
+
+    def sum_bound(self, w, e, down=None, up=None):
+        """
+        股权重加权和在上下界内
+        :param w: N * 1 cvxpy variable
+        :param e: X * N numpy array
+        :param down: X * 1 numpy array
+        :param up: X * 1 numpy array
+        """
+        if down is not None:
+            self._sum_down_bound(w, e, down)
+        if up is not None:
+            self._sum_up_bound(w, e, up)
+
+    def _uni_down_bound(self, w, bar):
+        self.cnstr.append(bar - w <= 0)
+
+    def _uni_up_bound(self, w, bar):
+        self.cnstr.append(w - bar <= 0)
+
+    def _sum_down_bound(self, w, e, bar):
+        self.cnstr.append(bar - e @ w <= 0)
+
+    def _sum_up_bound(self, w, e, bar):
+        self.cnstr.append(e @ w - bar <= 0)
