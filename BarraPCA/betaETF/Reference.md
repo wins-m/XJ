@@ -1,6 +1,6 @@
 #### Single-period Portfolio Selection
 
-
+Markowitz's mean-variance portfolio selection
 
 #### Online Portfolio Selection
 
@@ -10,13 +10,10 @@ Li, B., & Hoi, S. C. H. (2014). Online portfolio selection: A survey. *ACM Compu
 
 Heaton, J. B., Polson, N. G., & Witte, J. H. (2018). *Deep Portfolio Theory* (arXiv:1605.07230). arXiv. https://doi.org/10.48550/arXiv.1605.07230
 
-##### Follow the Winner
-
-##### Follow the Loser
-
-##### Pattern Matching-based
-
-##### Meta-Learning Algorithms (MLAs)
+- Follow the Winner
+- Follow the Loser
+- Pattern Matching-based
+- Meta-Learning Algorithms (MLAs)
 
 ---
 
@@ -26,23 +23,38 @@ Heaton, J. B., Polson, N. G., & Witte, J. H. (2018). *Deep Portfolio Theory* (ar
 
 ---
 
-*不同条件下的组合优化模型结果分析*. (2020). 渤海证券.
+#### *不同条件下的组合优化模型结果分析*. (2020). 渤海证券.
+
 $$
-\max_{w}{ \alpha^T w - \lambda w^T \Sigma w} \\
+\max_{w\ge0}{ \alpha^T w 
+%- \lambda w^T \Sigma w
+} \\
 \text{s.t.}
 \begin{cases}
 \begin{gather}
-& 0 \le w  \le K  \tag{1}\\
-& \sum{|w_t - w_{t-1}|} \le \delta \tag{2}\\
-& \left(\bold{1}_{\{\text{in bench}\}}\right)^T w \ge B \tag{3}\\
-& -E \le w - w_b \le E \tag{4}\\
-& L \le X_{f} (w - w_b) \le H \tag{5}\\
-& (w - w_b)^T \Sigma (w - w_b) \le \sigma^2 \tag{6}\\
-& \bold{1}^T \bold{1}_{\{w > 0\}} \le N_{max} \tag{7}\\
+& \sum{w} \le 1  \tag{1}\\
+& \left(\bold{1}_{\{\text{in bench}\}}\right)^T w \ge B \tag{2}\\
+& -E \le w - w_b \le E \tag{3}\\
+& -H_0 \le X_{style/barra} (w - w_b) \le H_0 \tag{4}\\
+& -H_1 \le X_{indus} (w - w_b) \le H_1 \tag{5}\\
+& \sum{|w_t - w_{t-1}|} \le D \tag{6}\\
+%& (w - w_b)^T \Sigma (w - w_b) \le \sigma^2 \tag{7}\\
+%& \bold{1}^T \bold{1}_{\{w > 0\}} \le N_{max} \tag{8}\\
 \end{gather}
 \end{cases}
+
+\\
+\text{where }
+\begin{cases}
+B : \text{成分股占比} \in \set{1.00,\ 0.80} \\
+E : \text{个股权重对指数的偏离} \in \set{.015} \\
+H_0 : \text{style/pca因子暴露对指数的偏离} \in \set{0.20,\ 0.30} \\
+H_1 : \text{indus行业暴露对指数的偏离} \in \set{0.05} \\
+D : \text{周度调仓时最大换手率} \in \set{2} \\
+\end{cases}
 $$
-基本限制条件为：
+
+##### 基本限制条件为：
 
 1. lambda 系数为 10
 2. 不设置换手率限制

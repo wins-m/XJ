@@ -9,7 +9,7 @@ import yaml
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
 from supporter.bata_etf import *
 
-OPTIMIZE_TARGET = '/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/BarraPCA/optimize_target.xlsx'
+OPTIMIZE_TARGET = '/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/BarraPCA/optimize_target_v2.xlsx'
 PROCESS_NUM = 4
 mkdir_force = True
 TELLING = False
@@ -65,9 +65,10 @@ def optimize(args):
     end_date = ir1['end_date']
     N = float(ir1['N'])
     opt_verbose = (ir1['opt_verbose'] == 'TRUE')
-    expoH = float(ir1['expoH'])
-    expoL = float(ir1['expoL'])
-    K = float(ir1['K'])
+    H0 = float(ir1['H0'])
+    H1 = float(ir1['H1'])
+    B = float(ir1['B'])
+    E = float(ir1['E'])
     D = float(ir1['D'])
     wei_tole = float(ir1['wei_tole'])
     alpha_name = ir1['alpha_name']
@@ -75,15 +76,15 @@ def optimize(args):
     beta_args = eval(ir1['beta_args'])
     beta_suffix = ir1['beta_suffix']
 
-    suffix = f'{beta_suffix}(H={expoH},L={expoL},K={K})'  # suffix for all result file
+    suffix = f'{beta_suffix}(B={B},E={E},D={D},H0={H0}' + (')' if np.isnan(H1) else f',H1={H1})')  # suffix for all result file
     script_info = {
         'opt_verbose': opt_verbose, 'begin_date': begin_date, 'end_date': end_date, 'mkt_type': mkt_type,
-        'N': N, 'expoH': expoH, 'expoL': expoL, 'D': D, 'K': K, 'wei_tole': wei_tole,
+        'N': N, 'H0': H0, 'H1': H1, 'B': B, 'E': E, 'D': D, 'wei_tole': wei_tole,
         'alpha_name': alpha_name, 'beta_kind': beta_kind, 'alpha_5d_rank_ic': 'NA', 'suffix': suffix,
     }
 
     # %% Load Data
-    beta_expo, beta_cnstr = get_beta_expo_cnstr(beta_kind, conf, begin_date, end_date, expoL, expoH, beta_args)
+    beta_expo, beta_cnstr = get_beta_expo_cnstr(beta_kind, conf, begin_date, end_date, H0, H1, beta_args)
     save_path, dat = get_alpha_dat(alpha_name, mkt_type, conf, begin_date, end_date)
     alpha_5d_rank_ic = check_ic_5d(conf['closeAdj'], dat, begin_date, end_date, lag=5)  # TODO: cal ic once
     script_info['alpha_5d_rank_ic'] = str(alpha_5d_rank_ic)
@@ -93,7 +94,7 @@ def optimize(args):
     tradedates = get_tradedates(conf, begin_date, end_date, kind='tdays_w')
 
     desc = alpha_name + '/' + suffix
-    args = (mkt_type, N, D, K, wei_tole, opt_verbose, desc, pos)
+    args = (mkt_type, N, D, B, E, wei_tole, opt_verbose, desc, pos)
     all_args = tradedates, beta_expo, beta_cnstr, ind_cons, dat, args
     telling = TELLING
     # %% Optimize
