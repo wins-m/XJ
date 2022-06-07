@@ -27,18 +27,18 @@ Heaton, J. B., Polson, N. G., & Witte, J. H. (2018). *Deep Portfolio Theory* (ar
 
 $$
 \max_{w\ge0}{ \alpha^T w 
-%- \lambda w^T \Sigma w
+- \lambda w^T \Sigma w
 } \\
 \text{s.t.}
 \begin{cases}
 \begin{gather}
 & \sum{w} \le 1  \tag{1}\\
 & \left(\bold{1}_{\{\text{in bench}\}}\right)^T w \ge B \tag{2}\\
-& -E \le w - w_b \le E \tag{3}\\
-& -H_0 \le X_{style/barra} (w - w_b) \le H_0 \tag{4}\\
-& -H_1 \le X_{indus} (w - w_b) \le H_1 \tag{5}\\
-& \sum{|w_t - w_{t-1}|} \le D \tag{6}\\
-%& (w - w_b)^T \Sigma (w - w_b) \le \sigma^2 \tag{7}\\
+& | w - w_b | \le E \tag{3}\\
+& \left| X_{style/barra} (w - w_b) \right| \le H_0 \tag{4}\\
+& \left| X_{indus} (w - w_b) \right| \le H_1 \tag{5}\\
+& ||w_t - w_{t-1}|| \le D \tag{6}\\
+& (w - w_b)^T \Sigma (w - w_b) \le S \tag{7}\\
 %& \bold{1}^T \bold{1}_{\{w > 0\}} \le N_{max} \tag{8}\\
 \end{gather}
 \end{cases}
@@ -46,15 +46,17 @@ $$
 \\
 \text{where }
 \begin{cases}
-B : \text{成分股占比} \in \set{1.00,\ 0.80} \\
-E : \text{个股权重对指数的偏离} \in \set{.015} \\
-H_0 : \text{style/pca因子暴露对指数的偏离} \in \set{0.20,\ 0.30} \\
-H_1 : \text{indus行业暴露对指数的偏离} \in \set{0.05} \\
-D : \text{周度调仓时最大换手率} \in \set{2} \\
+B : \text{成分股占比} = {0\%} \\
+E : \text{个股权重对指数的偏离} = \max{\{1\%,\ w_b/2\}} \\
+H_0 : \text{style/pca因子暴露对指数的偏离} = {0.20} \\
+H_1 : \text{indus行业暴露对指数的偏离} = {0.02} \\
+D : \text{周度调仓时最大换手率} = {2} \\
+\lambda : \text{风险厌恶水平} = 0 \\
+S : \text{特异性波动率限制} \in \set{+\infin} \\
 \end{cases}
 $$
 
-##### 基本限制条件为：
+基本限制条件为：
 
 1. lambda 系数为 10
 2. 不设置换手率限制

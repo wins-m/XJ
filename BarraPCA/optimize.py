@@ -8,10 +8,11 @@ import yaml
 
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
 from supporter.bata_etf import *
+from BarraPCA.opt_res_ana import OptRes
 
 OPTIMIZE_TARGET = '/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/BarraPCA/optimize_target_v2.xlsx'
 PROCESS_NUM = 4
-mkdir_force = True
+mkdir_force = False
 TELLING = False
 
 
@@ -65,10 +66,10 @@ def optimize(args):
     end_date = ir1['end_date']
     N = float(ir1['N'])
     opt_verbose = (ir1['opt_verbose'] == 'TRUE')
+    B = float(ir1['B']) / 100
+    E = float(ir1['E']) / 100
     H0 = float(ir1['H0'])
     H1 = float(ir1['H1'])
-    B = float(ir1['B'])
-    E = float(ir1['E'])
     D = float(ir1['D'])
     wei_tole = float(ir1['wei_tole'])
     alpha_name = ir1['alpha_name']
@@ -76,7 +77,8 @@ def optimize(args):
     beta_args = eval(ir1['beta_args'])
     beta_suffix = ir1['beta_suffix']
 
-    suffix = f'{beta_suffix}(B={B},E={E},D={D},H0={H0}' + (')' if np.isnan(H1) else f',H1={H1})')  # suffix for all result file
+    suffix = f"{beta_suffix}(B={ir1['B']},E={ir1['E']},D={ir1['D']},H0={ir1['H0']}" + \
+             (')' if np.isnan(H1) else f",H1={ir1['H1']})")  # suffix for all result file
     script_info = {
         'opt_verbose': opt_verbose, 'begin_date': begin_date, 'end_date': end_date, 'mkt_type': mkt_type,
         'N': N, 'H0': H0, 'H1': H1, 'B': B, 'E': E, 'D': D, 'wei_tole': wei_tole,
@@ -86,8 +88,8 @@ def optimize(args):
     # %% Load Data
     beta_expo, beta_cnstr = get_beta_expo_cnstr(beta_kind, conf, begin_date, end_date, H0, H1, beta_args)
     save_path, dat = get_alpha_dat(alpha_name, mkt_type, conf, begin_date, end_date)
-    alpha_5d_rank_ic = check_ic_5d(conf['closeAdj'], dat, begin_date, end_date, lag=5)  # TODO: cal ic once
-    script_info['alpha_5d_rank_ic'] = str(alpha_5d_rank_ic)
+    # alpha_5d_rank_ic = check_ic_5d(conf['closeAdj'], dat, begin_date, end_date, lag=5)  # TODO: cal ic once
+    # script_info['alpha_5d_rank_ic'] = str(alpha_5d_rank_ic)
     save_path_sub = f'{save_path}{suffix}/'
     io_make_sub_dir(save_path_sub, force=dir_force)
     ind_cons = get_index_constitution(conf['idx_constituent'].format(mkt_type), begin_date, end_date)
@@ -106,16 +108,22 @@ def optimize(args):
 
     optimize_iter_info.T.to_excel(save_path_sub + f'opt_info{suffix}.xlsx')
 
+    # Graphs & Tables:
     tab_path = save_path_sub + 'portfolio_weight_{}.csv'.format(suffix)
-    gra_path = save_path_sub + 'figure_portfolio_size_{}.png'.format(suffix)
-    tf_portfolio_weight(portfolio_weight, tab_path, gra_path, ishow=False)
-
-    close_adj = pd.read_csv(conf['closeAdj'], index_col=0, parse_dates=True)
-
-    tab_path = save_path_sub + 'table_result_wealth_{}.xlsx'.format(suffix)
-    gra_path = save_path_sub + 'figure_result_wealth_{}.png'.format(suffix)
-    tf_historical_result(close_adj, tradedates, begin_date, end_date,
-                         portfolio_weight, ind_cons, mkt_type, gra_path, tab_path)
+    portfolio_weight.to_csv(tab_path)
+    # gra_path = save_path_sub + 'figure_portfolio_size_{}.png'.format(suffix)
+    # tf_portfolio_weight(portfolio_weight, tab_path, gra_path, ishow=False)
+    opt_res = OptRes(ir1, conf)
+    opt_res.tf_historical_result()
+    opt_res.tf_portfolio_weight()
+    print(1)
+    #
+    # close_adj = pd.read_csv(conf['closeAdj'], index_col=0, parse_dates=True)
+    #
+    # tab_path = save_path_sub + 'table_result_wealth_{}.xlsx'.format(suffix)
+    # gra_path = save_path_sub + 'figure_result_wealth_{}.png'.format(suffix)
+    # tf_historical_result(close_adj, tradedates, begin_date, end_date,
+    #                      portfolio_weight, ind_cons, mkt_type, gra_path, tab_path)
 
 
 if __name__ == '__main__':

@@ -64,14 +64,14 @@ def io_make_sub_dir(path, force=False):
     else:
         if os.path.exists(path):
             if os.path.isdir(path) and len(os.listdir(path)) == 0:
-                print(f"Write in empty dir '{path}'")
+                pass;#print(f"Write in empty dir '{path}'")
             else:
                 cmd = input(f"Write in non-empty dir '{path}' ?(y/N)")
                 if cmd != 'y' and cmd != 'Y':
                     raise FileExistsError(path)
         else:
             os.makedirs(path, exist_ok=False)
-    print(f'Save in: {path}')
+    pass;#print(f'Save in: {path}')
 
 
 def get_alpha_dat(alpha_name, mkt_type, conf, begin_date, end_date) -> Tuple[str, pd.DataFrame]:
@@ -98,8 +98,8 @@ def get_alpha_dat(alpha_name, mkt_type, conf, begin_date, end_date) -> Tuple[str
             res = res.apply(lambda x: (x - x.mean()) / x.std(), axis=1)
         else:
             res = res.apply(lambda x: (x - x.mean()) / x.std() + wn(len(x)), axis=1)
-            print("future return + white noise", end='\n\t')
-            print(f"cross-section mu={res.mean(axis=1).mean():.3f} sigma={res.std(axis=1).mean():.3f}")
+            pass;#print("future return + white noise", end='\n\t')
+            pass;#print(f"cross-section mu={res.mean(axis=1).mean():.3f} sigma={res.std(axis=1).mean():.3f}")
 
         return res
 
@@ -121,7 +121,7 @@ def get_alpha_dat(alpha_name, mkt_type, conf, begin_date, end_date) -> Tuple[str
         res = res.shift(1).loc[begin_date: end_date]
         return _alpha_name, res
 
-    print(f"Factor name: {alpha_name}")
+    pass;#print(f"Factor name: {alpha_name}")
     save_suffix = f'OptResWeekly[{mkt_type}]{alpha_name}'
     save_path = f"{conf['factorsres_path']}{save_suffix}/"
     os.makedirs(save_path, exist_ok=True)
@@ -150,7 +150,7 @@ def check_ic_5d(closeAdj_path, dat, begin_date, end_date, lag=5, ranked=True) ->
     close_adj = pd.read_csv(closeAdj_path, index_col=0, parse_dates=True).pct_change()
     close_adj = close_adj.loc[begin_date: end_date]
     dat_ic = cal_ic(fv_l1=dat, ret=close_adj, lag=lag, ranked=ranked).mean()[0]
-    print(f"{lag}-day{' rank ' if ranked else ' '}IC = {dat_ic:.6f}")
+    pass;#print(f"{lag}-day{' rank ' if ranked else ' '}IC = {dat_ic:.6f}")
     return dat_ic
 
 
@@ -171,7 +171,7 @@ def get_beta_expo_cnstr(beta_kind, conf, begin_date, end_date, H0, H1, beta_args
         for td in rep_tds.index:
             td_1 = tds[:td].iloc[-2]
             td1 = tds[td:].iloc[1]
-            print(td.strftime('%Y-%m-%d'), '->', td_1.strftime('%Y-%m-%d'), len(fr.loc[td]), '->', len(fr.loc[td_1]))
+            pass;#print(td.strftime('%Y-%m-%d'), '->', td_1.strftime('%Y-%m-%d'), len(fr.loc[td]), '->', len(fr.loc[td_1]))
             fr = fr.loc[:td_1].append(fr.loc[td_1:td_1].rename(index={td_1: td})).append(fr.loc[td1:])
         return fr
 
@@ -232,7 +232,7 @@ def get_beta_expo_cnstr(beta_kind, conf, begin_date, end_date, H0, H1, beta_args
         def combine_pca_exposure(src, tgt, suf):
             """Run it ONCE to COMBINE principal exposures, when PCA is updated"""
             expo = pd.DataFrame()
-            print(f'\nMerge PCA exposure PN={PN} {suf}')
+            pass;#print(f'\nMerge PCA exposure PN={PN} {suf}')
             for pn in tqdm(range(PN)):
                 kw = f'pc{pn:03d}'
                 df = pd.read_csv(src + f'{kw}.csv', index_col=0, parse_dates=True)
@@ -429,13 +429,13 @@ def tf_portfolio_weight(portfolio_weight, tab_path, gra_path, ishow=False):
     """Table & Graph: Holding weight, holding number"""
     portfolio_weight.sum(axis=1)
     portfolio_weight.to_csv(tab_path)
-    (portfolio_weight > 0).sum(axis=1).plot()
-    plt.tight_layout()
-    plt.savefig(gra_path)  # dat_path + g_file.format(suffix))
-    if ishow:
-        plt.show()
-    else:
-        plt.close()
+    # (portfolio_weight > 0).sum(axis=1).plot()
+    # plt.tight_layout()
+    # plt.savefig(gra_path)  # dat_path + g_file.format(suffix))
+    # if ishow:
+    #     plt.show()
+    # else:
+    #     plt.close()
 
 
 def tf_historical_result(close_adj, tradedates, begin_date, end_date, portfolio_weight, ind_cons, mkt_type, gra_path,
@@ -443,11 +443,12 @@ def tf_historical_result(close_adj, tradedates, begin_date, end_date, portfolio_
     """Table & Graph: wealth curve comparison"""
     df = pd.DataFrame()
 
-    rtn_w2w = close_adj.pct_change(5).loc[tradedates.loc[begin_date: end_date].index]
+    # rtn_w2w = close_adj.pct_change(5).loc[tradedates.loc[begin_date: end_date].index]
+    rtn_w2w = close_adj.loc[tradedates.index].pct_change().shift(-1).loc[begin_date: end_date]
     rtn_portfolio = (portfolio_weight * rtn_w2w.reindex_like(portfolio_weight)).sum(axis=1)
     df['portfolio'] = rtn_portfolio
 
-    ind_cons_w = ind_cons.loc[tradedates.loc[begin_date: end_date].index]
+    ind_cons_w = ind_cons.loc[tradedates.index].loc[begin_date: end_date]
     rtn_ind = (ind_cons_w * rtn_w2w.reindex_like(ind_cons_w)).sum(axis=1)
     df[mkt_type] = rtn_ind
     df['Excess'] = df['portfolio'] - df[mkt_type]

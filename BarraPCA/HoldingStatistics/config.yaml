@@ -1,0 +1,6 @@
+idx_constituent : "/mnt/c/Users/Winst/Documents/data_local/idx_constituent_{}.csv"
+src_path : "./src/"
+tgt_path : "./tgt/"
+tgt_file : 'stat.csv'
+report_date : "2021-12-31"  # "2021-06-30"
+coding : 'GBK'

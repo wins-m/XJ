@@ -1,10 +1,13 @@
 import pandas as pd
 
 
-file0 = "/mnt/c/Users/Winst/Documents/data_local/idx_constituent_CSI500.csv"
-file1 = f"""/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/BarraPCA/betaETF/holding_161017.csv"""
+#file0 = "/mnt/c/Users/Winst/Documents/data_local/idx_constituent_CSI500.csv"
+file0 = "/mnt/c/Users/Winst/Documents/data_local/idx_constituent_CSI300.csv"
+#file1 = f"""/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/BarraPCA/betaETF/holding_161017.csv"""
 #file1 = f"""/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/BarraPCA/betaETF/holding1_161017.csv"""
-
+#file1 = f"""/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/BarraPCA/betaETF/holding_100038.csv"""
+file1 = \
+f"""/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/BarraPCA/betaETF/holding1_100038.csv"""
 df0 = pd.read_csv(
         file0,
         index_col=0,
