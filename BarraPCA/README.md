@@ -362,6 +362,39 @@ after missing-drop (586492, 41)
 ## 组合优化
 
 $$
+\max_{w\ge0}{ \alpha^T w 
+- \lambda w^T \Sigma w
+} \\
+\text{s.t.}
+\begin{cases}
+\begin{gather}
+& \sum{w} \le 1  \tag{1}\\
+& \left(\bold{1}_{\{\text{in bench}\}}\right)^T w \ge B \tag{2}\\
+& | w - w_b | \le E \tag{3}\\
+& \left| X_{style/barra} (w - w_b) \right| \le H_0 \tag{4}\\
+& \left| X_{indus} (w - w_b) \right| \le H_1 \tag{5}\\
+& ||w_t - w_{t-1}|| \le D \tag{6}\\
+& (w - w_b)^T \Sigma (w - w_b) \le S \tag{7}\\
+%& \bold{1}^T \bold{1}_{\{w > 0\}} \le N_{max} \tag{8}\\
+\end{gather}
+\end{cases}
+
+\\
+\text{where }
+\begin{cases}
+\alpha : \text{alpha因子} = \text{FRtn5D(0.0,3.0)} \\
+B : \text{成分占比} = {0\%} \\
+E : \text{权重偏离} = \max{\{1\%,\ w_b/2\}} \\
+H_0 : \text{风格偏离} = {0.20} \\
+H_1 : \text{行业偏离} = {0.02} \\
+D : \text{换手限制} = {2} \\
+\lambda : \text{风险厌恶} = 0 \\
+S : \text{特异波动} = {+\infin} \\
+\end{cases}
+$$
+
+
+$$
 \max_{w} {
 	\sum_{i} {\alpha w} - {1\over2} \gamma w' \Sigma w 
 },

@@ -2,6 +2,7 @@
 (created by swmao on June 2nd)
 
 """
+import matplotlib.pyplot as plt
 import pandas as pd
 import yaml
 import sys
@@ -68,13 +69,20 @@ class OptRes(object):
 
         tmp = self.portfolio_weight.loc['2021-12-31'].dropna().rename('port')
         tmp = pd.concat([tmp, ind_cons_w.loc['2021-12-31'].dropna().rename('cons')], axis=1)
-        tmp = tmp.sort_values('port')
+        tmp = tmp.sort_values(['port', 'cons'], ascending=False)
         tmp['d'] = tmp.iloc[:, 0] - tmp.iloc[:, 1]
         tmp.to_excel(self.path + 'table_holding_diff_20211231' + self.suffix + '.xlsx')
-        tmp['d'].dropna().plot(style='o', title=self.title)
+        #
+        tmp['d'].dropna().reset_index(drop=True).plot(style='o', title=self.title)
         plt.tight_layout()
         plt.savefig(self.path + 'graph_holding_diff_20211231' + self.suffix + '.png')
         plt.close()
+        #
+        tmp['port'].dropna().reset_index(drop=True).plot(title=self.title)
+        plt.tight_layout()
+        plt.savefig(self.path + 'graph_holding_weight_20211231' + self.suffix + '.png')
+        plt.close()
+        #
         del tmp
 
         self.rtn_cumsum = self.rtn.cumsum()

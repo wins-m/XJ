@@ -64,14 +64,14 @@ def io_make_sub_dir(path, force=False):
     else:
         if os.path.exists(path):
             if os.path.isdir(path) and len(os.listdir(path)) == 0:
-                pass;#print(f"Write in empty dir '{path}'")
+                pass;  # print(f"Write in empty dir '{path}'")
             else:
                 cmd = input(f"Write in non-empty dir '{path}' ?(y/N)")
                 if cmd != 'y' and cmd != 'Y':
                     raise FileExistsError(path)
         else:
             os.makedirs(path, exist_ok=False)
-    pass;#print(f'Save in: {path}')
+    pass;  # print(f'Save in: {path}')
 
 
 def get_alpha_dat(alpha_name, mkt_type, conf, begin_date, end_date) -> Tuple[str, pd.DataFrame]:
@@ -98,8 +98,8 @@ def get_alpha_dat(alpha_name, mkt_type, conf, begin_date, end_date) -> Tuple[str
             res = res.apply(lambda x: (x - x.mean()) / x.std(), axis=1)
         else:
             res = res.apply(lambda x: (x - x.mean()) / x.std() + wn(len(x)), axis=1)
-            pass;#print("future return + white noise", end='\n\t')
-            pass;#print(f"cross-section mu={res.mean(axis=1).mean():.3f} sigma={res.std(axis=1).mean():.3f}")
+            pass;  # print("future return + white noise", end='\n\t')
+            pass;  # print(f"cross-section mu={res.mean(axis=1).mean():.3f} sigma={res.std(axis=1).mean():.3f}")
 
         return res
 
@@ -121,7 +121,7 @@ def get_alpha_dat(alpha_name, mkt_type, conf, begin_date, end_date) -> Tuple[str
         res = res.shift(1).loc[begin_date: end_date]
         return _alpha_name, res
 
-    pass;#print(f"Factor name: {alpha_name}")
+    pass;  # print(f"Factor name: {alpha_name}")
     save_suffix = f'OptResWeekly[{mkt_type}]{alpha_name}'
     save_path = f"{conf['factorsres_path']}{save_suffix}/"
     os.makedirs(save_path, exist_ok=True)
@@ -150,7 +150,7 @@ def check_ic_5d(closeAdj_path, dat, begin_date, end_date, lag=5, ranked=True) ->
     close_adj = pd.read_csv(closeAdj_path, index_col=0, parse_dates=True).pct_change()
     close_adj = close_adj.loc[begin_date: end_date]
     dat_ic = cal_ic(fv_l1=dat, ret=close_adj, lag=lag, ranked=ranked).mean()[0]
-    pass;#print(f"{lag}-day{' rank ' if ranked else ' '}IC = {dat_ic:.6f}")
+    pass;  # print(f"{lag}-day{' rank ' if ranked else ' '}IC = {dat_ic:.6f}")
     return dat_ic
 
 
@@ -171,7 +171,7 @@ def get_beta_expo_cnstr(beta_kind, conf, begin_date, end_date, H0, H1, beta_args
         for td in rep_tds.index:
             td_1 = tds[:td].iloc[-2]
             td1 = tds[td:].iloc[1]
-            pass;#print(td.strftime('%Y-%m-%d'), '->', td_1.strftime('%Y-%m-%d'), len(fr.loc[td]), '->', len(fr.loc[td_1]))
+            pass;  # print(td.strftime('%Y-%m-%d'), '->', td_1.strftime('%Y-%m-%d'), len(fr.loc[td]), '->', len(fr.loc[td_1]))
             fr = fr.loc[:td_1].append(fr.loc[td_1:td_1].rename(index={td_1: td})).append(fr.loc[td1:])
         return fr
 
@@ -232,7 +232,7 @@ def get_beta_expo_cnstr(beta_kind, conf, begin_date, end_date, H0, H1, beta_args
         def combine_pca_exposure(src, tgt, suf):
             """Run it ONCE to COMBINE principal exposures, when PCA is updated"""
             expo = pd.DataFrame()
-            pass;#print(f'\nMerge PCA exposure PN={PN} {suf}')
+            pass;  # print(f'\nMerge PCA exposure PN={PN} {suf}')
             for pn in tqdm(range(PN)):
                 kw = f'pc{pn:03d}'
                 df = pd.read_csv(src + f'{kw}.csv', index_col=0, parse_dates=True)
@@ -363,29 +363,40 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
         fl = (f_del + beta_cnstr.loc[f_del.index, 'L']).dropna()
         fh = (f_del + beta_cnstr.loc[f_del.index, 'H']).dropna()
 
-        d_del = df_lst_w.loc[ls_clear].abs().sum().values[0] if len(ls_clear) > 0 else 0
-        d = D - d_del
+        D_offset = df_lst_w.loc[ls_clear].abs().sum().values[0] if len(ls_clear) > 0 else 0
 
         # %% Constraints
         wN = len(ls_ab)
         w = cp.Variable((wN, 1), nonneg=True)
         opt_cnstr = OptCnstr()
-        opt_cnstr.sum_bound(w, e=np.ones([1, wN]), down=None, up=1)  # (1)
-        opt_cnstr.sum_bound(w, e=(1 - pd.Series(wb, index=ls_ab).isna()).values.reshape(1, -1), down=B, up=None)  # (3)
-        tmp = pd.Series(wb, index=ls_ab).fillna(0).values.reshape(-1, 1)
-        opt_cnstr.uni_bound(w, down=tmp - E, up=tmp + E)  # (4)
-        del tmp
-        opt_cnstr.sum_bound(w, e=xf[fl.index].values.T, down=fl.values.reshape(-1, 1), up=fh.values.reshape(-1, 1))  # (5)
 
-        if len(df_lst_w) > 0:  # turnover constraint
+        # (1) sum 1
+        opt_cnstr.sum_bound(w, e=np.ones([1, wN]), down=None, up=1)
+
+        # (2) cons component percentage
+        opt_cnstr.sum_bound(w, e=(1 - pd.Series(wb, index=ls_ab).isna()).values.reshape(1, -1), down=B, up=None)
+
+        # (3) cons weight deviation
+        wb_ls_ab = pd.Series(wb, index=ls_ab).fillna(0)  # cons w, index alpha^beta
+        offset = wb_ls_ab.apply(lambda _: max(E, _ / 2))  # max(E, 0.5w) as offset
+        down = (wb_ls_ab - offset).values.reshape(-1, 1)
+        up = (wb_ls_ab + offset).values.reshape(-1, 1)
+        opt_cnstr.uni_bound(w, down=down, up=up)
+        del wb_ls_ab, offset, down, up
+
+        # (4)(5) beta exposure
+        opt_cnstr.sum_bound(w, e=xf[fl.index].values.T, down=fl.values.reshape(-1, 1), up=fh.values.reshape(-1, 1))
+
+        # (6) turnover constraint
+        if len(df_lst_w) > 0:  # not first optimization
             w_lst = df_lst_w.reindex_like(pd.DataFrame(index=ls_ab, columns=df_lst_w.columns)).fillna(0)
-            # w_lst = w_lst - pd.DataFrame(w_overflow, index=ls_ab, columns=df_lst_w.columns).fillna(0)
             w_lst = w_lst.values
-            opt_cnstr.norm_bound(w, w0=w_lst, d=d, L=1)  # (2)
-        else:
+            d = D - D_offset
+            opt_cnstr.norm_bound(w, w0=w_lst, d=d, L=1)
+        else:  # first iteration, holding 0
             w_lst = np.zeros([len(ls_ab), 1]) if w_lst is None else w_lst  # former holding
 
-        # %% Solve optimize problem
+        # %% Solve
         objective = cp.Maximize(a.values.reshape(1, -1) @ w)
         constraints = opt_cnstr.get_constraints()
         prob = cp.Problem(objective, constraints)
@@ -399,7 +410,7 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
             w1[w1 < wei_tole] = 0
             w1 /= w1.sum()
             df_w = pd.DataFrame(w1, index=ls_ab, columns=[td])
-            turnover = np.abs(w_lst - df_w.values).sum() + d_del
+            turnover = np.abs(w_lst - df_w.values).sum() + D_offset
             hdn = (df_w.values > 0).sum()
             df_lst_w = df_w.replace(0, np.nan).dropna()
         else:
@@ -411,10 +422,11 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
         holding_weight = pd.concat([holding_weight, df_lst_w.T])
 
         # Update optimize iteration information
-        iter_info = {'#alpha^beta': len(ls_ab), '#index^beta': len(ls_ib), '#index': len(stk_index),
-                     'turnover': turnover, 'holding': hdn,
-                     'status': prob.status, 'opt0': result, 'opt1': (a @ w1)[0],  # TODO
-                     }
+        iter_info = {
+            '#alpha^beta': len(ls_ab), '#index^beta': len(ls_ib), '#index': len(stk_index),
+            'turnover': turnover, 'holding': hdn,
+            'status': prob.status, 'opt0': result, 'opt1': (a @ w1)[0],  # TODO
+        }
         iter_info = iter_info | {'index-alpha': sp_info['#i_a'], 'index-beta': sp_info['#i_b'],
                                  'stk_i_a': ', '.join(sp_info['i_a']), 'stk_i_b': ', '.join(sp_info['i_b'])}
         iter_info = iter_info | f_del.to_dict()
