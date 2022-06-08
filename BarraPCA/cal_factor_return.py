@@ -107,7 +107,7 @@ def cal_fac_ret(conf, data_pat, cache_path, panel_path, fval_path, omega_path):
                 fv1 = fv.stack().rename(fn)
                 dat = pd.concat([dat, fv1], axis=1)
             dat.to_hdf(cache_path, key=f'y{year}', complevel=9)  # 缓存一年的barra因子
-        dat = cvg_f_fill(dat, w=10, q=.75, ishow=False)  # f-fill barra exposure
+        dat = cvg_f_fill(dat, w=10, q=.75, ishow=False)  # f-fill barra exposure TODO: no year separation loop for e.g. 2015-01-05
 
         # %%
         indus = industry.stack().reindex_like(dat).rename('indus')

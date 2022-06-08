@@ -137,8 +137,8 @@ barra_factor_value : '/mnt/c/Users/Winst/Documents/data_local/BARRA/barra_fval.h
 barra_fval : '/mnt/c/Users/Winst/Documents/data_local/BARRA/barra_fval_20120104_20220331.csv'  # 历年因子收益合并  TODO: 纯因子收益率计算前，是否需要填充
 factor_covariance : '/mnt/c/Users/Winst/Documents/data_local/BARRA/F_NW_Eigen_VRA[2014-02-10,2022-03-30].csv'
 specific_risk : '/mnt/c/Users/Winst/Documents/data_local/BARRA/D_NW_SM_SH_VRA[2014-02-10,2022-03-30].csv'
-path_risk_mat : '/mnt/c/Users/Winst/Documents/data_local/BARRA/V_VRA_VRA/'
-risk_matrices : '/mnt/c/Users/Winst/Documents/data_local/BARRA/V_VRA_VRA[2014-02-10,2022-03-30].hdf'  # key='TD20211231'
+path_risk_mat : '/mnt/c/Users/Winst/Documents/data_local/BARRA/V_VRA_VRA/'  # key='TD20211231'
+risk_matrices : '/mnt/c/Users/Winst/Documents/data_local/BARRA/V_VRA_VRA[{}].csv'
 
 # FOF
 fund_net_value : '/mnt/c/Users/Winst/Documents/data_local/fund_net_value.h5'  # key: refactor_net_value

@@ -6,9 +6,14 @@
 """
 import os
 import sys
+
+import pandas as pd
+
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
 from supporter.cov_a import *
 from supporter.transformer import cvg_f_fill
+from tqdm import tqdm
+P_NUM = 4
 
 
 def factor_covariance_model(conf):
@@ -59,47 +64,84 @@ def specific_risk_model(conf):
     # self.SigmaSH = Sigma_Shrink
     # self.LambdaVRA, self.SigmaVRA = Lambda_VRA, Sigma_VRA
 
+    # TODO: Plot and Check
+    # tmp = pd.DataFrame()
+    # for k, sr in zip(['SigmaRaw', 'SigmaNW', 'SigmaSM', 'SigmaSH', 'SigmaVRA'],
+    #                  [self.SigmaRaw, self.SigmaNW, self.SigmaSM, self.SigmaSH, self.SigmaVRA]):
+    #     B = (self.u.reindex_like(sr) / sr).rolling(21).std()
+    #     w = (self.mkt_val.reindex_like(B) * (1 - B.isna())).apply(lambda s: s / s.sum(), axis=1)
+    #     tmp = tmp.append((B * w).sum(axis=1).rolling(120).mean().rename(k))
+    #     # tmp = tmp.append((self.u.reindex_like(sr) / sr).rolling(21).std().mean(axis=1).rename(k))
+    # tmp = tmp.T
+    # tmp.plot()
+    # plt.show()
+
 
 def combine_risk_matrices(conf):
     """Combine X F X + Delta as V"""
+    # print('\nV = X F X + Delta ...')
+    if P_NUM == 1:
+        _combine_risk_matrices(conf, '2014-01-01', '2022-12-31')
+    else:
+        from multiprocessing import Pool
+        p = Pool(P_NUM)
+        cnt = 0
+        for year in range(2014, 2022):
+            p.apply_async(_combine_risk_matrices, args=(conf, f'{year}-01-01', f'{year}-12-31', cnt % P_NUM))
+            cnt += 1
+        p.close()
+        p.join()
+
+
+def _combine_risk_matrices(conf, bd='2014-01-01', ed='2022-12-31', pos=0):
     _, X = get_barra_factor_exposure_daily(conf, use_temp=True)  # 注意T0期因子收益对应T+1期个股收益
-    X = cvg_f_fill(X, w=10, q=.75, ishow=False)
-    F = pd.read_csv(conf['factor_covariance'], index_col=[0, 1], parse_dates=[0])
-    D = pd.read_csv(conf['specific_risk'], index_col=0, parse_dates=True)
+    X = cvg_f_fill(X, w=10, q=.75, ishow=False).loc[bd: ed]
+    F = pd.read_csv(conf['factor_covariance'], index_col=[0, 1], parse_dates=[0]).loc[bd: ed]
+    D = pd.read_csv(conf['specific_risk'], index_col=0, parse_dates=True).loc[bd: ed]
 
     td_intersect = keep_index_intersection((X.index.get_level_values(0), F.index.get_level_values(0), D.index))
     path = conf['dat_path_barra'] + 'V_VRA_VRA/'
     os.makedirs(path, exist_ok=True)
-    path += 'V_VRA_VRA[{}].h5'
+    path += '{}.h5'
 
-    print('\nV = X F X + Delta ...')
-    # td = '2015-07-06'
-    for i in range(len(td_intersect)):
+    # td = '2015-01-05'
+    desc = f'[{bd},{ed}]'
+    loop_bar = tqdm(range(len(td_intersect)), ncols=80, desc=desc, delay=0.01, position=pos, ascii=False)
+    for i in loop_bar:  # range(len(td_intersect)):
         td = td_intersect[i]
 
-        x, f, d = X.loc[td], F.loc[td], D.loc[td].dropna()
+        x, f, d = X.loc[td].dropna(how='all', axis=1), F.loc[td].dropna(how='all', axis=1), D.loc[td].dropna()
+        fct_intersect = keep_index_intersection((x.columns, f.index))
+        x, f = x.loc[:, fct_intersect], f.loc[fct_intersect, fct_intersect]
         stk_intersect = keep_index_intersection((x.index, d.index,))
         x, d = x.loc[stk_intersect], d.loc[stk_intersect]
-        fct_intersect = keep_index_intersection((x.dropna(how='all', axis=1).columns, f.index))
-        x, f = x.loc[:, fct_intersect], f.loc[fct_intersect, fct_intersect]
         d = pd.DataFrame(np.diag(d ** 2), index=d.index, columns=d.index)
+        # assert d.isna().sum().sum() == 0
+        # assert x.isna().sum().sum() == 0
+        # assert f.isna().sum().sum() == 0
         v = x @ f @ x.T + d
         v = v.set_index([[td] * len(v), v.index])
 
         key = td.strftime('TD%Y%m%d')
         v.to_hdf(path.format(key), key=key, complevel=9)
-        progressbar(i+1, len(td_intersect), msg=f'\tdate: {td.strftime("%Y-%m-%d")}')
-    print()
+        # progressbar(i+1, len(td_intersect), msg=f'\tdate: {td.strftime("%Y-%m-%d")}')
+    # print()
 
-    print(f'Save in {path}, key like `TD%Y%m%d`')
+    # print(f'Save in {path}, key like `TD%Y%m%d`')
 
 
 def merge_risk_matrices(conf):
-    file = conf['path_risk_mat'] + 'V_VRA_VRA[{}].h5'
-    k = 'TD20160913'
-    assert os.path.exists(file.format(k))
-    df = pd.DataFrame(pd.read_hdf(file.format(k), key=k))
-    pass  # TODO
+    raise Exception('Memory Overload')
+    path = conf['path_risk_mat']
+    res = pd.DataFrame()
+    for filename in tqdm(sorted(os.listdir(path))):
+        k = filename[:-3]
+        df = pd.DataFrame(pd.read_hdf(path + filename.format(k), key=k))
+        res = pd.concat([res, df])
+    tmp = res.index.get_level_values(0)
+    save_name = conf['risk_matrices'].format(f"{tmp[0].strftime('%Y-%m-%d')},{tmp[-1].strftime('%Y-%m-%d')}")
+    res.to_csv(save_name)
+    print(f'Save in `{save_name}`')
 
 
 # %%
@@ -111,22 +153,10 @@ def main():
 
     # %%
     # factor_covariance_model(conf)
-    specific_risk_model(conf)
-    combine_risk_matrices(conf)
+    # specific_risk_model(conf)
+    # combine_risk_matrices(conf)
+    # merge_risk_matrices(conf)
 
 
 if __name__ == '__main__':
     main()
-
-
-# TODO: Plot and Check
-# tmp = pd.DataFrame()
-# for k, sr in zip(['SigmaRaw', 'SigmaNW', 'SigmaSM', 'SigmaSH', 'SigmaVRA'],
-#                  [self.SigmaRaw, self.SigmaNW, self.SigmaSM, self.SigmaSH, self.SigmaVRA]):
-#     B = (self.u.reindex_like(sr) / sr).rolling(21).std()
-#     w = (self.mkt_val.reindex_like(B) * (1 - B.isna())).apply(lambda s: s / s.sum(), axis=1)
-#     tmp = tmp.append((B * w).sum(axis=1).rolling(120).mean().rename(k))
-#     # tmp = tmp.append((self.u.reindex_like(sr) / sr).rolling(21).std().mean(axis=1).rename(k))
-# tmp = tmp.T
-# tmp.plot()
-# plt.show()

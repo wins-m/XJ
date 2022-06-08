@@ -166,22 +166,6 @@
 
 **运行记录**
 
-```sh
-(base) swmao:PyCharmProject/ (main✗) $ python BarraPCA/cal_factor_return.py && python BarraPCA/cov_adj.py
-
- 2022
-Industry Missing 0.09 %
-Return Missing 6.63 %
-before (269146, 42)
-after missing-drop (251291, 42)
- 17%|███████████                                                     | 10/58 [00:04<00:20,  2.35it/s]
-
-
-
-```
-
-
-
 ```zsh
 (base) swmao:PyCharmProject/ (master✗) $ python BarraPCA/cal_factor_return.py                  [8:55:13]
 
@@ -261,6 +245,89 @@ Return Missing 0.08 %
 before (587190, 41)
 after missing-drop (586492, 41)
 100%|███████████████████████████████████████████████████████████████| 243/243 [01:19<00:00,  3.06it/s]
+```
+
+0607: 修改为，先填充Barra暴露（q=0.75，w=10），后计算纯因子收益（即存在相邻日期重复）
+
+```sh
+(base) swmao:PyCharmProject/ (main✗) $ python BarraPCA/cal_factor_return.py && python BarraPCA/cov_adj.py
+
+ 2022
+Industry Missing 0.09 %
+Return Missing 6.63 %
+before (269146, 42)
+after missing-drop (251291, 42)
+100%|████████████████████████████████████████████████████████████████| 58/58 [00:25<00:00,  2.26it/s]
+
+ 2021
+Industry Missing 0.02 %
+Return Missing 8.03 %
+before (1062384, 42)
+after missing-drop (977050, 42)
+100%|██████████████████████████████████████████████████████████████| 243/243 [02:06<00:00,  1.92it/s]
+
+ 2020
+Industry Missing 0.42 %
+Return Missing 7.32 %
+before (951992, 42)
+after missing-drop (882265, 42)
+100%|██████████████████████████████████████████████████████████████| 243/243 [01:54<00:00,  2.12it/s]
+
+ 2019
+Industry Missing 0.48 %
+Return Missing 4.79 %
+before (890251, 42)
+after missing-drop (847561, 42)
+100%|██████████████████████████████████████████████████████████████| 244/244 [01:48<00:00,  2.25it/s]
+
+ 2018
+Industry Missing 0.40 %
+Return Missing 9.14 %
+before (857076, 41)
+after missing-drop (778715, 41)
+100%|██████████████████████████████████████████████████████████████| 243/243 [01:41<00:00,  2.41it/s]
+
+ 2017
+Industry Missing 1.87 %
+Return Missing 14.63 %
+before (799553, 41)
+after missing-drop (682573, 41)
+100%|██████████████████████████████████████████████████████████████| 244/244 [01:29<00:00,  2.72it/s]
+
+ 2016
+Industry Missing 1.34 %
+Return Missing 14.16 %
+before (704632, 41)
+after missing-drop (604838, 41)
+100%|██████████████████████████████████████████████████████████████| 244/244 [01:21<00:00,  3.00it/s]
+
+ 2015
+Industry Missing 0.38 %
+Return Missing 27.80 %
+before (665670, 41)
+after missing-drop (480618, 41)
+100%|██████████████████████████████████████████████████████████████| 244/244 [01:09<00:00,  3.49it/s]
+
+ 2014
+Industry Missing 0.31 %
+Return Missing 11.44 %
+before (620558, 41)
+after missing-drop (549471, 41)
+100%|██████████████████████████████████████████████████████████████| 245/245 [01:17<00:00,  3.15it/s]
+
+ 2013
+Industry Missing 0.12 %
+Return Missing 6.00 %
+before (588055, 41)
+after missing-drop (552646, 41)
+100%|██████████████████████████████████████████████████████████████| 238/238 [01:16<00:00,  3.11it/s]
+
+ 2012
+Industry Missing 0.41 %
+Return Missing 9.71 %
+before (587190, 41)
+after missing-drop (530185, 41)
+100%|██████████████████████████████████████████████████████████████| 243/243 [01:15<00:00,  3.23it/s]
 ```
 
 ## 全市场风格解析
