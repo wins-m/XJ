@@ -41,6 +41,7 @@ from tqdm import tqdm
 import sys
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
 from supporter.request import get_ind_citic_all_tradingdate
+from supporter.transformer import cvg_f_fill
 
 
 # %%
@@ -106,19 +107,17 @@ def cal_fac_ret(conf, data_pat, cache_path, panel_path, fval_path, omega_path):
                 fv1 = fv.stack().rename(fn)
                 dat = pd.concat([dat, fv1], axis=1)
             dat.to_hdf(cache_path, key=f'y{year}', complevel=9)  # 缓存一年的barra因子
-    
+        dat = cvg_f_fill(dat, w=10, q=.75, ishow=False)  # f-fill barra exposure
+
         # %%
         indus = industry.stack().reindex_like(dat).rename('indus')
         print(f'Industry Missing {100 * indus.isna().mean():.2f} %')
-        # indus = indus.dropna()
-        # dat = dat.loc[indus.index]
         indus = pd.get_dummies(indus, prefix='ind')
     
         rtn_ctc = rtn_close_adj.stack().reindex_like(dat).rename('rtn_ctc')  # 21-22年收益率
         print(f'Return Missing {100 * rtn_ctc.isna().mean():.2f} %')  # 缺失情况
     
         panel = pd.concat([rtn_ctc, dat, indus, ], axis=1)
-        # panel.loc['2020-02-03']
         panel['country'] = 1
         print('before', panel.shape)
         panel = panel.dropna()
@@ -126,11 +125,12 @@ def cal_fac_ret(conf, data_pat, cache_path, panel_path, fval_path, omega_path):
 
         factor_style = dat.columns.to_list()
         factor_indus = indus.columns.to_list()
-    
+
         fval = pd.DataFrame()
         all_dates = panel.index.get_level_values(0).unique()
-        date = all_dates[0]
-        # %%
+        # date = all_dates[0]
+
+        # %%  cross-section (daily) WLS
         for date in tqdm(all_dates[:]):
             # %%
             # print(date)

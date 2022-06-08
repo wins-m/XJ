@@ -132,9 +132,13 @@ access_barra : '/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmPr
 dat_path_barra : '/mnt/c/Users/Winst/Documents/data_local/BARRA/'
 barra_exposure : '/mnt/c/Users/Winst/Documents/data_local/BARRA/barra_exposure.h5'  # key= 'y2022'  风格因子暴露，历年原始值
 barra_panel : '/mnt/c/Users/Winst/Documents/data_local/BARRA/barra_panel.h5'  # key= 'y2022'  正交化后的暴露面板
-barra_panel_1222 : '/mnt/c/Users/Winst/Documents/data_local/BARRA/barra_panel_1201_2203.h5'
+barra_panel_1222 : '/mnt/c/Users/Winst/Documents/data_local/BARRA/barra_panel_1201_2203.h5'  # 暴露面板合并
 barra_factor_value : '/mnt/c/Users/Winst/Documents/data_local/BARRA/barra_fval.h5'  # key= 'y2022' 纯因子收益率
-barra_fval : '/mnt/c/Users/Winst/Documents/data_local/BARRA/barra_fval_20120104_20220331.csv'  # 历年因子收益合并
+barra_fval : '/mnt/c/Users/Winst/Documents/data_local/BARRA/barra_fval_20120104_20220331.csv'  # 历年因子收益合并  TODO: 纯因子收益率计算前，是否需要填充
+factor_covariance : '/mnt/c/Users/Winst/Documents/data_local/BARRA/F_NW_Eigen_VRA[2014-02-10,2022-03-30].csv'
+specific_risk : '/mnt/c/Users/Winst/Documents/data_local/BARRA/D_NW_SM_SH_VRA[2014-02-10,2022-03-30].csv'
+path_risk_mat : '/mnt/c/Users/Winst/Documents/data_local/BARRA/V_VRA_VRA/'
+risk_matrices : '/mnt/c/Users/Winst/Documents/data_local/BARRA/V_VRA_VRA[2014-02-10,2022-03-30].hdf'  # key='TD20211231'
 
 # FOF
 fund_net_value : '/mnt/c/Users/Winst/Documents/data_local/fund_net_value.h5'  # key: refactor_net_value

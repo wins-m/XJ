@@ -8,6 +8,7 @@ warnings.simplefilter("ignore")
 # %matplotlib inline
 import matplotlib.pyplot as plt
 import seaborn
+
 seaborn.set_style("darkgrid")
 plt.rc("figure", figsize=(9, 5))
 plt.rc("savefig", dpi=90)
@@ -77,7 +78,7 @@ def cov_newey_west_adj(ret, tau=90, q=2) -> pd.DataFrame:
     v = np.array(gamma0).sum(0)
 
     for i in range(1, q + 1):
-        gamma1 = [weights[i + t] * ret1[t].T @ ret1[t+i] for t in range(T - i)]
+        gamma1 = [weights[i + t] * ret1[t].T @ ret1[t + i] for t in range(T - i)]
         cd = np.array(gamma1).sum(0)
         v += (1 - i / (1 + q)) * (cd + cd.T)
 
@@ -104,10 +105,10 @@ def var_newey_west_adj(ret, tau=90, q=5) -> Tuple[pd.Series, pd.Series]:
 
     # ret1 = np.matrix((ret - (ret * weights).sum()).values)
     ret1 = ret - (ret * weights).sum()
-    gamma0 = (ret1**2 * weights).sum()
+    gamma0 = (ret1 ** 2 * weights).sum()
 
     v = gamma0.copy()
-    for i in range(1, q+1):
+    for i in range(1, q + 1):
         ret_i = ret1 * ret1.shift(i)
         weights_i = .5 ** (np.arange(T - 1, -1, -1) / tau)
         weights_i = (~ret_i.isna()) * weights_i.reshape(-1, 1)  # w on all stocks, w=0 if missing
@@ -134,10 +135,11 @@ def var_struct_mod_adj(U: pd.DataFrame, sigNW: pd.DataFrame, expo: pd.DataFrame,
     # %
     h = U.shape[0]
     sigTilde = (U.quantile(.75) - U.quantile(.25)) / 1.35
-    sigEq = U[(U >= -10*sigTilde) & (U <= 10*sigTilde)].std()
+    sigEq = U[(U >= -10 * sigTilde) & (U <= 10 * sigTilde)].std()
     Z = (sigEq / sigTilde - 1).abs()
 
-    gamma = Z.apply(lambda _: np.nan if np.isnan(_) else min(1., max(0., (h-60)/120)) * min(1., max(0., np.exp(1 - _))))
+    gamma = Z.apply(
+        lambda _: np.nan if np.isnan(_) else min(1., max(0., (h - 60) / 120)) * min(1., max(0., np.exp(1 - _))))
     stk_gamma_eq_1 = gamma.index[gamma == 1]
     stk_has_sigNW = sigNW.index.intersection(stk_gamma_eq_1)
     stk_has_expo = expo.index.intersection(stk_has_sigNW)
@@ -158,7 +160,7 @@ def var_struct_mod_adj(U: pd.DataFrame, sigNW: pd.DataFrame, expo: pd.DataFrame,
     mv_indus = mv @ X[factor_i]
     k = X.shape[1]
     mat_r = np.diag([1.] * k)[:, :-1]
-    mat_r[-1:, -len(factor_i)+1:] = -mv_indus[:-1] / mv_indus[-1]
+    mat_r[-1:, -len(factor_i) + 1:] = -mv_indus[:-1] / mv_indus[-1]
     mat_omega = mat_r @ np.linalg.inv(mat_r.T @ mat_x.T @ mat_v @ mat_x @ mat_r) @ mat_r.T @ mat_x.T @ mat_v
 
     mat_y = Y.values
@@ -171,9 +173,9 @@ def var_struct_mod_adj(U: pd.DataFrame, sigNW: pd.DataFrame, expo: pd.DataFrame,
     return gamma, sigma_hat
 
 
-def var_baysian_shrink(sigSM: pd.Series, mv: pd.Series, gn=10, q=1) -> pd.Series:
-    """Baysian Shrinkage"""
-    mv_group = mv.rank(pct=True, ascending=False).apply(lambda x: (1-x)//(1/gn))  # low-rank: small size
+def var_bayesian_shrink(sigSM: pd.Series, mv: pd.Series, gn=10, q=1) -> pd.Series:
+    """Bayesian Shrinkage"""
+    mv_group = mv.rank(pct=True, ascending=False).apply(lambda x: (1 - x) // (1 / gn))  # low-rank: small size
     # print(mv_group.isna().sum())
     tmp = pd.DataFrame(sigSM.rename('sig_hat'))
     tmp['mv'] = mv
@@ -181,9 +183,11 @@ def var_baysian_shrink(sigSM: pd.Series, mv: pd.Series, gn=10, q=1) -> pd.Series
     tmp = tmp.reset_index()
     tmp = tmp.merge(tmp.groupby('g')['mv'].sum().rename('mv_gsum').reset_index(), on='g', how='left')
     tmp['w'] = tmp['mv'] / tmp['mv_gsum']
-    tmp = tmp.merge((tmp['w'] * tmp['sig_hat']).groupby(tmp['g']).sum().rename('sig_bar').reset_index(), on='g', how='left')
+    tmp = tmp.merge((tmp['w'] * tmp['sig_hat']).groupby(tmp['g']).sum().rename('sig_bar').reset_index(), on='g',
+                    how='left')
     tmp['sig_d'] = tmp['sig_hat'] - tmp['sig_bar']
-    tmp = tmp.merge((tmp['sig_d']**2).groupby(tmp['g']).mean().apply(np.sqrt).rename('D').reset_index(), on='g', how='left')
+    tmp = tmp.merge((tmp['sig_d'] ** 2).groupby(tmp['g']).mean().apply(np.sqrt).rename('D').reset_index(), on='g',
+                    how='left')
     tmp['v'] = tmp['sig_d'].abs() * q / (tmp['D'] + tmp['sig_d'].abs() * q)
     tmp['sig_sh'] = tmp['v'] * tmp['sig_bar'] + (1 - tmp['v']) * tmp['sig_hat']
     tmp = tmp.set_index('index')
@@ -242,11 +246,20 @@ def specific_return_yxf(Y: pd.DataFrame, X: pd.DataFrame, F: pd.DataFrame) -> pd
         Y0.append((X.loc[td].fillna(0) @ F.loc[td].fillna(0)).rename(td))
         cnt += 1
         progressbar(cnt, F.shape[0], msg=f'\tdate: {td.strftime("%Y-%m-%d")}')
+    print()
+
     Y1 = pd.DataFrame(Y0)
     U = Y.reindex_like(Y1) - Y1  # T*N specific returns
     # U.isna().sum().plot.hist(bins=100, title='Missing U=Y-XF')
     # plt.show()
     return U
+
+
+def keep_index_intersection(idx_ls):
+    idx_intersect = None
+    for x in idx_ls:
+        idx_intersect = x if idx_intersect is None else idx_intersect.intersection(x)
+    return idx_intersect
 
 
 class MFM(object):
@@ -261,6 +274,7 @@ class MFM(object):
     2022-03-31        NA        NA  ...               NA               NA
 
     """
+
     def __init__(self, fr: pd.DataFrame = None):
         self.factor_ret = fr
         self.sorted_dates = pd.to_datetime(fr.index.to_series())
@@ -283,17 +297,18 @@ class MFM(object):
             raise Exception('No factor return value')
 
         # Newey_West_cov = {}
-        print('\n\nNewey West Adjust...')
+        print('\nNewey West Adjust...')
         for t in range(h, self.T):
             td = self.sorted_dates[t].strftime('%Y-%m-%d')
             try:
                 # cov = cov_newey_west_adj(self.factor_ret[t - h:t], tau=tau, q=q)
                 # self.Newey_West_adj_cov = self.Newey_West_adj_cov.append(frame1d_2d(cov, td))
-                self.Newey_West_adj_cov[td] = cov_newey_west_adj(self.factor_ret[t-h:t], tau=tau, q=q)
+                self.Newey_West_adj_cov[td] = cov_newey_west_adj(self.factor_ret[t - h:t], tau=tau, q=q)
             except:
                 self.Newey_West_adj_cov[td] = (pd.DataFrame())
 
-            progressbar(cur=t-h, total=self.T-h, msg=f'\tdate: {self.sorted_dates[t-1].strftime("%Y-%m-%d")}')
+            progressbar(cur=t - h + 1, total=self.T - h, msg=f'\tdate: {self.sorted_dates[t - 1].strftime("%Y-%m-%d")}')
+        print()
 
         return self.Newey_West_adj_cov
 
@@ -308,7 +323,7 @@ class MFM(object):
         if len(self.Newey_West_adj_cov) == 0:
             raise Exception('run newey_west_adj_by_time first for F_NW')
 
-        print('\n\nEigen-value Risk Adjust...')
+        print('\nEigen-value Risk Adjust...')
         cnt = 0
         td = '2019-03-19'
         for td in self.Newey_West_adj_cov.keys():
@@ -320,6 +335,7 @@ class MFM(object):
 
             cnt += 1
             progressbar(cnt, len(self.Newey_West_adj_cov), f'\tdate: {td}')
+        print()
 
         return self.eigen_risk_adj_cov
 
@@ -342,45 +358,59 @@ class MFM(object):
             if len(f_var_i) == 0:
                 f_var_i = np.array(K * [np.nan])
             factor_var.append(f_var_i)
+        print()
 
         factor_var = np.array(factor_var)
-        B2 = (self.factor_ret.loc[tradedates]**2 / factor_var).mean(axis=1)
+        B2 = (self.factor_ret.loc[tradedates] ** 2 / factor_var).mean(axis=1)
 
-        weights = .5**(np.arange(h-1, -1, -1) / tau)
+        weights = .5 ** (np.arange(h - 1, -1, -1) / tau)
         weights /= weights.sum()
         # lamb2 = {}
-        print('\n\nVolatility Regime Adjustment...')
+        print('\nVolatility Regime Adjustment...')
         cnt = 0
-        for td0, td1 in zip(tradedates[:-h], tradedates[h-1:]):
+        for td0, td1 in zip(tradedates[:-h], tradedates[h - 1:]):
             # lamb2[td1] = B2.loc[td0: td1] @ weights
             lamb2 = B2.loc[td0: td1] @ weights
             self.vol_regime_adj_cov[td1] = self.eigen_risk_adj_cov[td1] * lamb2
             cnt += 1
             progressbar(cnt, len(self.eigen_risk_adj_cov) - h, f'\tdate: {td1}')
+        print()
 
         return self.vol_regime_adj_cov
 
-    def save_vol_regime_adj_cov(self, path):
-        """存储"""
+    def save_factor_covariance(self, path, level='VRA'):
+        """Save as ${path}/F_NW_Eigen_VRA[yyyy-mm-dd,yyyy-mm-dd].csv"""
+
         def frame1d_2d(df: pd.DataFrame, td: str) -> pd.DataFrame:
             df['names'] = df.index
             df['tradingdate'] = td
             df = df.set_index(['tradingdate', 'names'])
             return df
 
-        def dict2frame(cov: Dict[str, pd.DataFrame]) -> pd.DataFrame:
+        def dict2frame(_cov: Dict[str, pd.DataFrame]) -> pd.DataFrame:
             """字典形式存储的换到Frame"""
-            tmp = pd.DataFrame()
-            for td in cov.keys():
-                df = cov[td]
-                df = frame1d_2d(df, td)
-                tmp = tmp.append(df)
-            return tmp
+            res = pd.DataFrame()
+            for td in _cov.keys():
+                res = res.append(frame1d_2d(_cov[td], td))
+            return res
 
-        if len(self.vol_regime_adj_cov) == 0:
-            raise Exception('run vol_regime_adj_by_time first for F_VRA')
-        cov = dict2frame(self.vol_regime_adj_cov)
-        file_name = f"F_NW_Eigen_VRA[{','.join(list(cov.index.get_level_values(0)[[0, -1]]))}].csv"
+        if level == 'NW':
+            cov_d = self.Newey_West_adj_cov
+            file_name = "F_NW[{}].csv"
+        elif level == 'Eigen':
+            cov_d = self.eigen_risk_adj_cov
+            file_name = "F_NW_Eigen[{}].csv"
+        elif level == 'VRA':
+            cov_d = self.vol_regime_adj_cov
+            file_name = "F_NW_Eigen_VRA[{}].csv"
+        else:
+            raise Exception('save_factor_covariance arg: level not in {`NW`, `Eigen`, `VRA`}')
+
+        if len(cov_d) == 0:
+            raise Exception('run *_adj_by_time first for factor_covariance_*')
+        cov = dict2frame(cov_d)
+        file_name = file_name.format(','.join(list(cov.index.get_level_values(0)[[0, -1]])))
+        print(f'\nSave as `{file_name}`')
         cov.to_csv(path + '/' + file_name)
 
 
@@ -406,7 +436,7 @@ class SRR(object):
         self.SigmaVRA: pd.DataFrame = pd.DataFrame()
 
     def specific_return_by_time(self):
-        print('\n\nSpecific Return...')
+        print('\nSpecific Return...')
         self.u = specific_return_yxf(Y=self.stk_rtn, X=self.exposure, F=self.fct_rtn)
         return self.u
 
@@ -423,17 +453,17 @@ class SRR(object):
             raise Exception('No specific return value')
 
         # Newey_West_cov = {}
-        print('\n\nNewey West Adjust...')
+        print('\nNewey West Adjust...')
         SigmaRaw = []
         SigmaNW = []
         t = h
         for t in range(h, self.T):
             td = self.sorted_dates[t].strftime('%Y-%m-%d')
             try:
-                u0 = self.u.iloc[t-h:t]
+                u0 = self.u.iloc[t - h:t]
                 # u0.count().plot.hist(bins=100, title=f'{u0.index[0].strftime("%Y-%m-%d")},{td}')
                 # plt.show()
-                u1 = u0[u0.columns[u0.count() > h*NA_bar]]
+                u1 = u0[u0.columns[u0.count() > h * NA_bar]]
                 sigma_raw, sigma_nw = var_newey_west_adj(ret=u1, tau=tau, q=q)
                 SigmaRaw.append(sigma_raw.rename(td))
                 SigmaNW.append(sigma_nw.rename(td))
@@ -441,7 +471,8 @@ class SRR(object):
                 SigmaRaw.append(pd.Series([]).rename(td))
                 SigmaNW.append(pd.Series([]).rename(td))
 
-            progressbar(cur=t-h+1, total=self.T-h, msg=f'\tdate: {td}')
+            progressbar(cur=t - h + 1, total=self.T - h, msg=f'\tdate: {td}')
+        print()
 
         self.SigmaRaw = pd.DataFrame(SigmaRaw)
         self.SigmaNW = pd.DataFrame(SigmaNW)
@@ -453,7 +484,7 @@ class SRR(object):
         if len(self.SigmaNW) == 0:
             raise Exception('No Newey-West Adjusted Sigma SigmaNW')
 
-        print('\n\nStructural Model Adjust...')
+        print('\nStructural Model Adjust...')
         GammaSM = []
         SigmaSM = []
         cnt = 0
@@ -474,19 +505,20 @@ class SRR(object):
                 GammaSM.append(pd.Series([]).rename(td))
                 SigmaSM.append(pd.Series([]).rename(td))
             cnt += 1
-            progressbar(cur=cnt, total=self.T-h, msg=f'\tdate: {td.strftime("%Y-%m-%d")}')
+            progressbar(cur=cnt, total=self.T - h, msg=f'\tdate: {td.strftime("%Y-%m-%d")}')
+        print()
 
         self.SigmaSM = pd.DataFrame(SigmaSM)
         self.GammaSM = pd.DataFrame(GammaSM)
 
         return self.GammaSM, self.SigmaSM
 
-    def baysian_shrink_by_time(self, q=1, gn=10):
+    def bayesian_shrink_by_time(self, q=1, gn=10):
         T = len(self.SigmaSM)
         if T == 0:
             raise Exception('No Newey-West Adjusted Sigma SigmaNW')
 
-        print('\n\nBaysian Shrink Adjust...')
+        print('\nBayesian Shrink Adjust...')
         cnt = 0
         SigmaSH = []
         # td = self.SigmaSM.index[-1]
@@ -496,11 +528,12 @@ class SRR(object):
             mv: pd.Series = MV[sigSM.index]  # TODO: why MV=NA?
             # print(mv.isna().sum())
             try:
-                SigmaSH.append(var_baysian_shrink(sigSM=sigSM, mv=mv, q=q, gn=gn).rename(td))
+                SigmaSH.append(var_bayesian_shrink(sigSM=sigSM, mv=mv, q=q, gn=gn).rename(td))
             except:
                 SigmaSH.append(pd.Series([]).rename(td))
             cnt += 1
             progressbar(cur=cnt, total=T, msg=f'\tdate: {td.strftime("%Y-%m-%d")}')
+        print()
 
         self.SigmaSH = pd.DataFrame(SigmaSH)
         return self.SigmaSH
@@ -517,7 +550,7 @@ class SRR(object):
         Lambda = pd.DataFrame()
         SigmaVRA = pd.DataFrame()
         cnt = 0
-        print('\n\nVolatility Regime Adjustment...')
+        print('\nVolatility Regime Adjustment...')
         for td0, td1 in zip(tradedates[:-h], tradedates[h - 1:]):
             # lamb2[td1] = B2.loc[td0: td1] @ weights
             lamb = np.sqrt(B2.loc[td0: td1] @ weights)
@@ -525,21 +558,52 @@ class SRR(object):
             SigmaVRA[td1] = self.SigmaSH.loc[td1] * lamb
             cnt += 1
             progressbar(cnt, len(tradedates) - h, f'\tdate: {td1.strftime("%Y-%m-%d")}')
+        print()
+
         self.LambdaVRA = Lambda.T
         self.SigmaVRA = SigmaVRA.T
         return self.LambdaVRA, self.SigmaVRA
 
+    def save_vol_regime_adj_risk(self, path, level='VRA'):
+        """Save as ${path}/D_NW_SM_SH_VRA[yyyy-mm-dd,yyyy-mm-dd].csv"""
+
+        if level == 'Raw':
+            sig = self.SigmaRaw
+            file_name = "D_Raw[{}].csv"
+        elif level == 'NW':
+            sig = self.SigmaNW
+            file_name = "D_NW[{}].csv"
+        elif level == 'SM':
+            sig = self.SigmaSM
+            file_name = "D_NW_SM[{}].csv"
+        elif level == 'SH':
+            sig = self.SigmaSH
+            file_name = "D_NW_SM_SH[{}].csv"
+        elif level == 'VRA':
+            sig = self.SigmaVRA
+            file_name = "D_NW_SM_SH_VRA[{}].csv"
+        else:
+            raise Exception('level not in {`Raw`, `NW`, `SM`, `SH`, `VRA`}')
+
+        if len(sig) == 0:
+            raise Exception('run *_adj_by_time first for specific_risk_*')
+        file_name = file_name.format(f"{sig.index[0].strftime('%Y-%m-%d')},{sig.index[-1].strftime('%Y-%m-%d')}")
+        print(f'Save as {file_name}')
+        sig.to_csv(path + '/' + file_name)
+
     def cal_volatility_cross_section(self):
+        """TODO"""
         sr_mv = (self.mkt_val.reindex_like(self.u) * (1 - self.u.isna())).apply(lambda s: s / s.sum(), axis=1)
-        sr_mv @ self.u**2
+        sr_mv @ self.u ** 2
         pass
 
     def plot_structural_model_gamma(self):
-        if len(self.GammaSM) == 0:
-            raise Exception('No Structural Model Gamma')
-        g = self.GammaSM.copy()
+        g = self.GammaSM
+        if len(g) == 0:
+            raise Exception('run *_adj_by_time first for specific_risk_*')
         ratio = (g == 1).sum(axis=1) / g.count(axis=1)
         ratio.plot(title='ratio of good-quality specific return (with $\gamma=1$)')
+        plt.tight_layout()
         plt.show()
 
 

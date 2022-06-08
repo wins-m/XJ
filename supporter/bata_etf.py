@@ -155,25 +155,7 @@ def check_ic_5d(closeAdj_path, dat, begin_date, end_date, lag=5, ranked=True) ->
 
 
 def get_beta_expo_cnstr(beta_kind, conf, begin_date, end_date, H0, H1, beta_args, l_cvg_fill=True):
-    def cvg_f_fill(fr, w=10, q=.75, ishow=False) -> pd.DataFrame:
-        """F-Fill if Low Coverage: 日覆盖率过去w日均值的q倍时填充"""
-        beta_covered_stk_num = fr.index.get_level_values(0).value_counts().sort_index()
-        if ishow:
-            beta_covered_stk_num.plot()
-            plt.tight_layout()
-            plt.show()
-        mask_l_cvg = beta_covered_stk_num < (beta_covered_stk_num.shift(1).rolling(w).mean() * q)
-        rep_tds = beta_covered_stk_num[mask_l_cvg]
-        # print(rep_tds)
-        tds = fr.index.get_level_values(0).unique()
-        tds = pd.Series(tds, index=tds)
-        # td = rep_tds.index[0]
-        for td in rep_tds.index:
-            td_1 = tds[:td].iloc[-2]
-            td1 = tds[td:].iloc[1]
-            pass;  # print(td.strftime('%Y-%m-%d'), '->', td_1.strftime('%Y-%m-%d'), len(fr.loc[td]), '->', len(fr.loc[td_1]))
-            fr = fr.loc[:td_1].append(fr.loc[td_1:td_1].rename(index={td_1: td})).append(fr.loc[td1:])
-        return fr
+    from supporter.transformer import cvg_f_fill
 
     def get_barra_exposure() -> pd.DataFrame:
         """

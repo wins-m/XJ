@@ -163,3 +163,29 @@ def get_neutralize_sector(fval: pd.DataFrame, indus: pd.DataFrame) -> pd.DataFra
     newfactor[factoro.reindex_like(newfactor).isnull()] = np.nan
 
     return newfactor
+
+
+def cvg_f_fill(fr, w=10, q=.75, ishow=False, notify=False) -> pd.DataFrame:
+    """F-Fill if Low Coverage: 日覆盖率低于过去w日均值的q倍时填充"""
+    beta_covered_stk_num = fr.index.get_level_values(0).value_counts().sort_index()
+    mask_l_cvg = beta_covered_stk_num < (beta_covered_stk_num.shift(1).rolling(w).mean() * q)
+    rep_tds = beta_covered_stk_num[mask_l_cvg]
+    # print(rep_tds)
+    tds = fr.index.get_level_values(0).unique()
+    tds = pd.Series(tds, index=tds)
+    # td = rep_tds.index[0]
+    for td in rep_tds.index:
+        td_1 = tds[:td].iloc[-2]
+        td1 = tds[td:].iloc[1]
+        if notify:
+            print(td.strftime('%Y-%m-%d'), '->', td_1.strftime('%Y-%m-%d'), len(fr.loc[td]), '->', len(fr.loc[td_1]))
+        fr = fr.loc[:td_1].append(fr.loc[td_1:td_1].rename(index={td_1: td})).append(fr.loc[td1:])
+    if ishow:
+        from matplotlib import pyplot as plt
+        plt.plot(beta_covered_stk_num)
+        plt.plot(fr.index.get_level_values(0).value_counts().sort_index())
+        plt.tight_layout()
+        plt.title(f'F-Fill Coverage Lower than {q} * (past {w}d mean)')
+        plt.show()
+        plt.close()
+    return fr

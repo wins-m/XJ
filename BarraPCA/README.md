@@ -2,7 +2,7 @@
 
 ## BARRA模型
 
-### 截面WLS
+### 算法：截面WLS
 
 假设资产收益由共同因子驱动：
 
@@ -100,7 +100,7 @@
     \bold{F}_{K \times 1} = \bold{\Omega}_{K \times N} \bold{Y}_{N \times 1}
     $$
 
-### 风格因子`get_barra.py`
+### 数据：风格因子 `get_barra.py`
 
 获取数据库中的因子 来源： [聚宽说明](https://www.joinquant.com/help/api/help#JQData:ALPHA%E7%89%B9%E8%89%B2%E5%9B%A0%E5%AD%90) BARRA CNE5 已进行去极值、标准化
 
@@ -134,7 +134,7 @@
 - 对风格因子去极值，去极值方法同上面去极值描述
 
 
-### 纯因子收益率计算（国家+风格+行业）`cal_factor_return.py`
+### 计算：纯因子收益率（国家+风格+行业）`cal_factor_return.py`
 
 - 计算纯因子收益率：T-1期结束时的风格暴露，对应T期的资产收益，得到T-1期的纯因子收益（解释T期的资产）
 
@@ -165,6 +165,22 @@
     - 历年合并为`barra_fval_20120104_20220331.csv`
 
 **运行记录**
+
+```sh
+(base) swmao:PyCharmProject/ (main✗) $ python BarraPCA/cal_factor_return.py && python BarraPCA/cov_adj.py
+
+ 2022
+Industry Missing 0.09 %
+Return Missing 6.63 %
+before (269146, 42)
+after missing-drop (251291, 42)
+ 17%|███████████                                                     | 10/58 [00:04<00:20,  2.35it/s]
+
+
+
+```
+
+
 
 ```zsh
 (base) swmao:PyCharmProject/ (master✗) $ python BarraPCA/cal_factor_return.py                  [8:55:13]
@@ -361,6 +377,15 @@ after missing-drop (586492, 41)
 
 ## 组合优化
 
+alpha: 未来因子 收益vs约束
+
+- T+1收盘到T+6收盘为alpha
+- IC > 0 for delay = 1..5
+- alpha和因子暴露无缺失作为可选股池
+
+Beta: Barra.style & PCA因子暴露，截面标准化
+
+**version 1**
 $$
 \max_{w\ge0}{ \alpha^T w 
 - \lambda w^T \Sigma w
@@ -393,7 +418,7 @@ S : \text{特异波动} = {+\infin} \\
 \end{cases}
 $$
 
-
+**version 0**
 $$
 \max_{w} {
 	\sum_{i} {\alpha w} - {1\over2} \gamma w' \Sigma w 
@@ -423,63 +448,19 @@ $$
 prob.solve(verbose=False, solver='ECOS', abstol='1e-6')
 ```
 
-求解器 
+求解器 [ECOS](https://github.com/embotech/ecos/wiki) [see.this.paper](https://web.stanford.edu/~boyd/papers/ecos.html)
 
-[ECOS](https://github.com/embotech/ecos/wiki) [see.this.paper](https://web.stanford.edu/~boyd/papers/ecos.html)
-
-### $\gamma=0$ 不惩罚风险项
-
-- 最大化组合期望收益
-- 风格因子切换的风险和个股异质性风险通过超额暴露和个股权重的边界条件
-- CSI300
-
-- CSI500
-
-
-富国500 300
-
-#### 测试
-
-> 1. 用个未来数据因子，比如未来三天收益，去做优化，看看能不能随着条件放宽，收益一点点变高
-> 2. 解决一下优化器无解的情况
-> 3. 还有个小事就是测一下那个apm自己回测什么样吧，那个跃起是不是因为这个因子
-
-- manipulate index
-    - '2016-10-14'
-    - 20 from CSI500 do not have exposure
-
-##### 未来因子 收益vs约束
-
-- T+1收盘到T+6收盘为alpha；
-- alpha和因子暴露无缺失作为可选股池；
-- Barra.style & PCA因子暴露，截面标准化；
-
-**表现**
-
-- 相对指数的超额暴露控制为0（Barra+PCA）
-    - 单只个股最大权重 K=1% 5% 30%，差别不大
-- 相对指数的超额暴露放宽到[-.1, .1]（Barra+PCA）
-
-##### 优化器无解
+优化器无解
 
 - 原因1：约束过紧。具体为，组合内个股最大权重$K$小于指数内成分股权重，无法模拟指数
     - 个股最大权重对指数膨胀，取为指数成分股权重最大值（向上取整%）
-    
+
 - 原因2：迭代次数不够。ECOS到达最大迭代次数`max_iters=100`；改为，最大1000次，若未最优，则10000次
 
 - 原因3：因子暴露缺失严重，覆盖指数成分股不足（不影响“未来因子”）
 
 
-##### apm回测
-
-- IC
-
-- 日度调仓`factor_apm_n_NA_ew_10g_ctc_1hd(测试)`
-
-- 周度调仓`factor_apm_n_NA_ew_10g_ctc_5hd(测试)`
-
-
-### $\gamma \neq 0$ 风险矩阵估计
+## 风险矩阵估计
 
 $$
 r_n = f_c + \sum_{i}{ X_{n,i} f_i} + \sum_{s}{X_{n, s} f_s} + \sum_{p}{X_{n, p} f_p} + u_n
@@ -495,14 +476,14 @@ V = X^T F X + \Delta
 $$
 对T期，只能用T-1期及以前的纯因子收益估计。
 
-#### Step1：共同因子协方差矩阵 $F$
+### Step1：共同因子协方差矩阵 $F$
 
 ```python
 mod = MFM(fr=pure_factor_return)
 mod.newey_west_adj_by_time()
 mod.eigen_risk_adj_by_time()
 mod.vol_regime_adj_by_time()
-mod.save_vol_regime_adj_cov(conf['dat_path_barra'])
+mod.save_factor_covariance(conf['dat_path_barra'])
 ```
 
 半衰指数权平均EWMA：过去252日的因子收益协方差
@@ -521,7 +502,7 @@ F^{Raw}_{k,l}
 \lambda = 0.5^{1/90}, \  h=252
 $$
 
-##### 风险Newey-West调整
+#### 风险Newey-West调整
 
 $$
 F^{NW} =
@@ -556,9 +537,7 @@ C_{kl, +\Delta}^{(d)}
 \text{where} \quad D=2,\ h=252,\ \lambda = 0.5^{1/90}
 $$
 
-> 只能调整成月度？——不×21
-
-##### 特征值调整 Eigenfactor Risk Adjustment
+#### 特征值调整 Eigenfactor Risk Adjustment
 
 $$
 U_0 D_0 U_0^T = F^{NW}
@@ -578,7 +557,7 @@ $$
 - 特征因子协方差“去偏” $\widetilde{D}_0 = \gamma^2 D_0$
 - 因子协方差“去偏”调整 $F^{Eigen} = U_0 \widetilde{D}_0 U_0^T$
 
-##### 波动率偏误调整 Volatility Regime Adjustment
+#### 波动率偏误调整 Volatility Regime Adjustment
 
 $$
 F^{VRA} = \lambda_F^2 F^{Eigen}
@@ -590,7 +569,18 @@ $$
     - $r_{t+q}$：时刻$t$至$t+q$时间段（去21天）内资产收益率
     - $\sigma_t$：当前时刻$t$的预测风险
 
-#### Step2：特异风险方差矩阵 $\Delta$
+### Step2：特异风险方差矩阵 $\Delta$
+
+```python
+self = SRR(fr=factor_return, sr=asset_return, expo=factor_exposure, mv=market_value)
+Ret_U = self.specific_return_by_time()  # Specific Risk
+Raw_var, Newey_West_adj_var = self.newey_west_adj_by_time()  # New-West Adjustment
+Gamma_STR, Sigma_STR = self.struct_mod_adj_by_time()  # Structural Model Adjustment
+Sigma_Shrink = self.bayesian_shrink_by_time()  # Bayesian Shrinkage Adjustment
+Lambda_VRA, Sigma_VRA = self.vol_regime_adj_by_time()  # Volatility Regime Adjustment
+self.save_vol_regime_adj_risk(conf['dat_path_barra'])
+
+```
 
 横截面回归，不由公共因子解释的残差序列
 $$
@@ -601,7 +591,7 @@ $$
 
 ![image-20220505155938140](https://s2.loli.net/2022/05/05/Q2uW8s3FrPRzp6Z.png)
 
-##### 特质风险（收益）Newey-West 方差
+#### 特质风险（收益）Newey-West 方差
 
 EWM方差进行siNewey-West 调整（h=252, tau=90, d=5）
 $$
@@ -649,7 +639,7 @@ C_{n, +\Delta}^{(d)}
 \text{where} \quad D=5,\ h=252,\ \lambda = 0.5^{1/90}
 $$
 
-##### 结构化模型调整 Structural Model
+#### 结构化模型调整 Structural Model
 
 个股特质收益异常值：具有相同特征的股S票可能具有相同的特质波动
 $$
@@ -683,7 +673,7 @@ $$
 
 > 非常接近1，似乎无需进行调整？
 
-##### 贝叶斯压缩调整 Bayesian Shrinkage
+#### 贝叶斯压缩调整 Bayesian Shrinkage
 
 时序处理得到特异风险，高估历史高波动率股票未来风险，低估历史低波动率股票未来风险
 $$
@@ -704,7 +694,7 @@ $$
 
 <center>图：不同波动率分组下偏误统计量</center>
 
-##### 波动率偏误调整  Volatility Regime Adjustment
+### 波动率偏误调整  Volatility Regime Adjustment
 
 $$
 \sigma_{n}^{VRA} =  \lambda_S \sigma^{SH}_{n} \\
@@ -742,5 +732,32 @@ Menchero, J., Orr, D. J., & Wang, J. (2011). *The Barra US Equity Model (USE4)*.
 Orr, D. J., Mashtaler, I., & Nagy, A. (2012). *The Barra China Equity Model (CNE5)*. 59.
 
 *Research Notes: The Barra Europe Equity Model (EUE3)*. (2009).
+
+*Barra系列（三）：风险模型之共同风险*. (不详). 知乎专栏. 取读于 2022年4月28日, 从 https://zhuanlan.zhihu.com/p/69497933
+
+*Barra系列（四）：风险模型之异质风险*. (不详). 知乎专栏. 取读于 2022年4月28日, 从 https://zhuanlan.zhihu.com/p/73794358
+
+#### Single-period Portfolio Selection
+
+Markowitz's mean-variance portfolio selection
+
+#### Online Portfolio Selection
+
+Li, B., & Hoi, S. C. H. (2014). Online portfolio selection: A survey. *ACM Computing Surveys*, *46*(3), 35:1-35:36. https://doi.org/10.1145/2512962
+
+#### Deep Portfolio Selection
+
+Heaton, J. B., Polson, N. G., & Witte, J. H. (2018). *Deep Portfolio Theory* (arXiv:1605.07230). arXiv. https://doi.org/10.48550/arXiv.1605.07230
+
+- Follow the Winner
+- Follow the Loser
+- Pattern Matching-based
+- Meta-Learning Algorithms (MLAs)
+
+[量化攻城狮-组合优化专题](https://mp.weixin.qq.com/s/xcT71gfa924bYe5ETNOTdQ)
+
+[量化攻城狮-再聊组合优化的约束条件](https://mp.weixin.qq.com/s/KKbmLkOgdSPi0UaqHVDiRw)
+
+*不同条件下的组合优化模型结果分析*. (2020). 渤海证券.
 
 [toc]
