@@ -250,7 +250,7 @@ after missing-drop (586492, 41)
 0607: 修改为，先填充Barra暴露（q=0.75，w=10），后计算纯因子收益（即存在相邻日期重复）
 
 ```sh
-(base) swmao:PyCharmProject/ (main✗) $ python BarraPCA/cal_factor_return.py && python BarraPCA/cov_adj.py
+(base) swmao:PyCharmProject/ (main✗) $ python BarraPCA/cal_factor_return.py && python BarraPCA/cov_adjust.py
 
  2022
 Industry Missing 0.09 %
