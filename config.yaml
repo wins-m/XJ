@@ -138,7 +138,7 @@ barra_fval : '/mnt/c/Users/Winst/Documents/data_local/BARRA/barra_fval_20120104_
 factor_covariance : '/mnt/c/Users/Winst/Documents/data_local/BARRA/F_NW_Eigen_VRA[2014-02-10,2022-03-30].csv'
 specific_risk : '/mnt/c/Users/Winst/Documents/data_local/BARRA/D_NW_SM_SH_VRA[2014-02-10,2022-03-30].csv'
 path_risk_mat : '/mnt/c/Users/Winst/Documents/data_local/BARRA/V_VRA_VRA/'  # key='TD20211231'
-risk_matrices : '/mnt/c/Users/Winst/Documents/data_local/BARRA/V_VRA_VRA[{}].csv'
+risk_matrix : '/mnt/c/Users/Winst/Documents/data_local/BARRA/V_VRA_VRA/{}.h5'
 
 # FOF
 fund_net_value : '/mnt/c/Users/Winst/Documents/data_local/fund_net_value.h5'  # key: refactor_net_value

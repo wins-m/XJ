@@ -289,134 +289,15 @@ def get_tradedates(conf, begin_date, end_date, kind) -> pd.Series:
     return tradedates
 
 
-def get_accessible_stk(i: set, a: set, b: set) -> Tuple[list, list, dict]:
-    i_a = i.difference(a)
-    i_b = i.difference(b)
-    res = {'#i_b': len(i_b), '#i_a': len(i_a),
-           'i_a': list(i_a), 'i_b': list(i_b)}
-    ab = list(a.intersection(b))
-    ib = list(i.intersection(b))
-    return ab, ib, res
-
-
-def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    # %%
-    tradedates, beta_expo, beta_cnstr, ind_cons, dat, args = all_args
-    mkt_type, N, D, B, E, wei_tole, opt_verbose, desc, pos = args
-
-    def get_stk_alpha(dat_td) -> set:
-        if N < np.inf:
-            res = set(dat_td.rank(ascending=False).sort_values().index[:N])
-        else:
-            res = set(dat_td.dropna().index)
-        return res
-
-    holding_weight: pd.DataFrame = pd.DataFrame()
-    df_lst_w: pd.DataFrame = pd.DataFrame()
-    optimize_iter_info: pd.DataFrame = pd.DataFrame()
-    w_lst = None
-
-    cur_td = 0
-    # start_time = time.time()
-    loop_bar = tqdm(range(len(tradedates)), ncols=99, desc=desc, delay=0.01, position=pos, ascii=False)
-    # %%
-    for cur_td in loop_bar:
-        # %%
-        td = tradedates.iloc[cur_td].strftime('%Y-%m-%d')
-
-        # asset pool accessible
-        stk_alpha = get_stk_alpha(dat.loc[td])
-        stk_index = set(ind_cons.loc[td].dropna().index)
-        stk_beta = set(beta_expo.loc[td].index)
-        ls_ab, ls_ib, sp_info = get_accessible_stk(i=stk_index, a=stk_alpha, b=stk_beta)
-        ls_clear = list(set(df_lst_w.index).difference(ls_ab))  # 上期持有 组合资产未覆盖
-        if telling:
-            print(f"\n\t{mkt_type} - alpha({len(stk_alpha)}) = {sp_info['#i_a']} [{','.join(sp_info['i_a'])}]")
-            print(f"\t{mkt_type} - beta({len(stk_beta)}) = {sp_info['#i_b']} [{','.join(sp_info['i_b'])}]")
-            print(f'\talpha exposed ({len(ls_ab)}/{len(stk_alpha)})')
-            print(f'\t{mkt_type.lower()} exposed ({len(ls_ib)}/{len(stk_index)})')
-            print(f'\tformer holdings not exposed ({len(ls_clear)}/{len(df_lst_w)}) [{",".join(ls_clear)}]')
-
-        a = dat.loc[td, ls_ab]  # alpha
-        wb = ind_cons.loc[td, ls_ib]
-        wb /= wb.sum()  # part of index-constituent are not exposed to beta factors; (not) treat them as zero-exposure.
-        xf = beta_expo.loc[td].loc[ls_ab].dropna(axis=1)
-        f_del = beta_expo.dropna(axis=1).loc[td].loc[ls_ib].T @ wb  # - f_del_overflow
-        fl = (f_del + beta_cnstr.loc[f_del.index, 'L']).dropna()
-        fh = (f_del + beta_cnstr.loc[f_del.index, 'H']).dropna()
-
-        D_offset = df_lst_w.loc[ls_clear].abs().sum().values[0] if len(ls_clear) > 0 else 0
-
-        # %% Constraints
-        wN = len(ls_ab)
-        w = cp.Variable((wN, 1), nonneg=True)
-        opt_cnstr = OptCnstr()
-
-        # (1) sum 1
-        opt_cnstr.sum_bound(w, e=np.ones([1, wN]), down=None, up=1)
-
-        # (2) cons component percentage
-        opt_cnstr.sum_bound(w, e=(1 - pd.Series(wb, index=ls_ab).isna()).values.reshape(1, -1), down=B, up=None)
-
-        # (3) cons weight deviation
-        wb_ls_ab = pd.Series(wb, index=ls_ab).fillna(0)  # cons w, index alpha^beta
-        offset = wb_ls_ab.apply(lambda _: max(E, _ / 2))  # max(E, 0.5w) as offset
-        down = (wb_ls_ab - offset).values.reshape(-1, 1)
-        up = (wb_ls_ab + offset).values.reshape(-1, 1)
-        opt_cnstr.uni_bound(w, down=down, up=up)
-        del wb_ls_ab, offset, down, up
-
-        # (4)(5) beta exposure
-        opt_cnstr.sum_bound(w, e=xf[fl.index].values.T, down=fl.values.reshape(-1, 1), up=fh.values.reshape(-1, 1))
-
-        # (6) turnover constraint
-        if len(df_lst_w) > 0:  # not first optimization
-            w_lst = df_lst_w.reindex_like(pd.DataFrame(index=ls_ab, columns=df_lst_w.columns)).fillna(0)
-            w_lst = w_lst.values
-            d = D - D_offset
-            opt_cnstr.norm_bound(w, w0=w_lst, d=d, L=1)
-        else:  # first iteration, holding 0
-            w_lst = np.zeros([len(ls_ab), 1]) if w_lst is None else w_lst  # former holding
-
-        # %% Solve
-        objective = cp.Maximize(a.values.reshape(1, -1) @ w)
-        constraints = opt_cnstr.get_constraints()
-        prob = cp.Problem(objective, constraints)
-        result = prob.solve(verbose=opt_verbose, solver='ECOS', max_iters=1000)
-        # result = prob.solve(verbose=True, solver='ECOS', max_iters=1000)
-        if prob.status == 'optimal_inaccurate':
-            result = prob.solve(verbose=opt_verbose, solver='ECOS', max_iters=10000)
-
-        if prob.status == 'optimal':
-            w1 = w.value.copy()
-            w1[w1 < wei_tole] = 0
-            w1 /= w1.sum()
-            df_w = pd.DataFrame(w1, index=ls_ab, columns=[td])
-            turnover = np.abs(w_lst - df_w.values).sum() + D_offset
-            hdn = (df_w.values > 0).sum()
-            df_lst_w = df_w.replace(0, np.nan).dropna()
-        else:
-            raise Exception(f'{prob.status} problem')
-            # turnover = 0
-            # print(f'.{prob.status} problem, portfolio ingredient unchanged')
-            # if len(lst_w) > 0:
-            #     lst_w.columns = [td]
-        holding_weight = pd.concat([holding_weight, df_lst_w.T])
-
-        # Update optimize iteration information
-        iter_info = {
-            '#alpha^beta': len(ls_ab), '#index^beta': len(ls_ib), '#index': len(stk_index),
-            'turnover': turnover, 'holding': hdn,
-            'status': prob.status, 'opt0': result, 'opt1': (a @ w1)[0],  # TODO
-        }
-        iter_info = iter_info | {'index-alpha': sp_info['#i_a'], 'index-beta': sp_info['#i_b'],
-                                 'stk_i_a': ', '.join(sp_info['i_a']), 'stk_i_b': ', '.join(sp_info['i_b'])}
-        iter_info = iter_info | f_del.to_dict()
-        optimize_iter_info[td] = pd.Series(iter_info)
-        # progressbar(cur_td + 1, len(tradedates), msg=f' {td} turnover={turnover:.3f} #stk={hdn}', stt=start_time)
-
-    # %%
-    return holding_weight, optimize_iter_info
+def get_accessible_stk(i: set, a: set, b: set, s: set = None) -> Tuple[list, list, dict]:
+    bs = b.intersection(s) if s else b  # beta (and sigma)
+    i_a = i.difference(a)  # idx cons w/o alpha
+    i_b = i.difference(bs)  # idx cons w/o beta (and sigma)
+    info = {'#i_a': len(i_a), 'i_a': list(i_a),
+            '#i_b(s)': len(i_b), 'i_b(s)': list(i_b)}
+    pool = list(a.intersection(bs))  # accessible asset pool
+    base = list(i.intersection(bs))  # index component with beta (and sigma)
+    return pool, base, info
 
 
 def tf_portfolio_weight(portfolio_weight, tab_path, gra_path, ishow=False):
@@ -458,9 +339,13 @@ def tf_historical_result(close_adj, tradedates, begin_date, end_date, portfolio_
 
 
 class OptCnstr(object):
+    """Manage constraints in optimization problem"""
 
     def __init__(self):
         self.cnstr = []
+
+    def add_constraints(self, o):
+        self.cnstr.append(o)
 
     def get_constraints(self) -> list:
         return self.cnstr
@@ -522,3 +407,30 @@ class OptCnstr(object):
 
     def _sum_up_bound(self, w, e, bar):
         self.cnstr.append(e @ w - bar <= 0)
+
+
+def get_risk_matrix(path, td, max_backward=7, notify=False) -> pd.DataFrame:
+    """stock risk matrix on ${td}"""
+    if path is None:
+        return pd.DataFrame()
+
+    def _get_mat(_tdd):
+        k = f"TD{_tdd.strftime('%Y%m%d')}"
+        p = path.format(k)
+        if os.path.exists(p):
+            return pd.DataFrame(pd.read_hdf(p, key=k))
+        else:
+            return pd.DataFrame()
+
+    tdd = td0 = pd.to_datetime(td)
+    df = _get_mat(tdd)
+    cnt = 0
+    while (len(df) < 100) and (cnt < max_backward):
+        from datetime import timedelta
+        tdd -= timedelta(1)
+        df = _get_mat(tdd)
+        cnt += 1
+    if notify and (tdd != td0):
+        print(f"replace insufficient risk matrix {td0.strftime('%Y-%m-%d')} <- {tdd.strftime('%Y-%m-%d')}")
+
+    return df.loc[tdd]

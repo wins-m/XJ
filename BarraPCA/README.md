@@ -455,7 +455,7 @@ Beta: Barra.style & PCA因子暴露，截面标准化
 **version 1**
 $$
 \max_{w\ge0}{ \alpha^T w 
-- \lambda w^T \Sigma w
+- \lambda (w-w_b)^T \Sigma (w-w_b)
 } \\
 \text{s.t.}
 \begin{cases}
