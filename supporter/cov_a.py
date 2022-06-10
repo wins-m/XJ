@@ -301,9 +301,11 @@ class MFM(object):
         for t in range(h, self.T):
             td = self.sorted_dates[t].strftime('%Y-%m-%d')
             try:
-                # cov = cov_newey_west_adj(self.factor_ret[t - h:t], tau=tau, q=q)
+                ret = self.factor_ret[t - h:t]
+                # ret.count()  TODO: check factor return missing
+                cov = cov_newey_west_adj(ret=ret, tau=tau, q=q)
                 # self.Newey_West_adj_cov = self.Newey_West_adj_cov.append(frame1d_2d(cov, td))
-                self.Newey_West_adj_cov[td] = cov_newey_west_adj(self.factor_ret[t - h:t], tau=tau, q=q)
+                self.Newey_West_adj_cov[td] = cov
             except:
                 self.Newey_West_adj_cov[td] = (pd.DataFrame())
 

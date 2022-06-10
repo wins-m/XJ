@@ -2,7 +2,7 @@
 
 ## BARRA模型
 
-### 算法：截面WLS
+### 模型：截面WLS
 
 假设资产收益由共同因子驱动：
 
@@ -104,6 +104,9 @@
 
 获取数据库中的因子 来源： [聚宽说明](https://www.joinquant.com/help/api/help#JQData:ALPHA%E7%89%B9%E8%89%B2%E5%9B%A0%E5%AD%90) BARRA CNE5 已进行去极值、标准化
 
+- 更新时间：2005年至今，下一自然日5:00、8:00更新
+- 复权方式：后复权
+
 | 因子 code             | 因子名称  | 简介                               |
 |:--------------------|:------|:---------------------------------|
 | size                | 市值    | 捕捉大盘股和小盘股之间的收益差异                 |
@@ -134,35 +137,34 @@
 - 对风格因子去极值，去极值方法同上面去极值描述
 
 
-### 计算：纯因子收益率（国家+风格+行业）`cal_factor_return.py`
-
-- 计算纯因子收益率：T-1期结束时的风格暴露，对应T期的资产收益，得到T-1期的纯因子收益（解释T期的资产）
+### 纯因子收益率计算（国家+风格+行业）`cal_factor_return.py`
+- 计算纯因子收益率：T-1期结束时的风格暴露，对应T期的资产收益，得到T期的纯因子收益预测（解释T期的资产收益）
 
 - 时间范围：2012-01-01 ~ 2022-03-31
 
 - 缓存/结果地址：
-  - `/mnt/c/Users/Winst/Documents/data_local/BARRA/`
-  
+    - `/mnt/c/Users/Winst/Documents/data_local/BARRA/`
+    
 - Y: 全市场 ctc收益率（昨日Close买，今日Close卖）
-  - 去除：上市 120 交易日内；昨日、今日停牌；昨日涨停、今日跌停
-  
+    - 去除：上市 120 交易日内；昨日、今日停牌；~~昨日涨停、今日跌停~~
+    
 - X: 国家(1) 风格(10) 行业(29/30)
-  - 风格因子，历年原始值存在`barra_exposure.h5`（key形如 `y2022`）
-  - 风格因子日截面，对行业正交（size）or 对行业和size正交（其他9个）
-  - 行业选用中信一级`indus_citic`29或30个 2019.12.2开始30个（新增“综合金融”）
-  - 正交化后的面板存在`barra_panel.h5`（key形如 `y2022`）
-  
+    - 风格因子，历年原始值存在`barra_exposure.h5`（key形如 `y2022`）
+    - 风格因子日截面，对行业正交（size）or 对行业和size正交（其他9个）
+    - 行业选用中信一级`indus_citic`29或30个 2019.12.2开始30个（新增“综合金融”）
+    - 正交化后的面板存在`barra_panel.h5`（key形如 `y2022`）
+    
 - WLS（Menchero & Lee, 2015)
     $$
-    \bold{\Omega} = \bold{R} (\bold{R}^T \bold{X}^T \bold{V} 
+    \bold{\Omega} = \bold{R} (\bold{R}^T \bold{X}^T \bold{V}
     \bold{X} \bold{R})^{-1} \bold{R}^T \bold{X}^T \bold{V} \\
     
     \bold{F}_{K \times 1} = \bold{\Omega}_{K \times N} \bold{Y}_{N \times 1}
     $$
-    
     - 纯因子构成存在`barra_omega.h5`（key形如`d20220101`）
     - 纯因子收益率存在`barra_fval.h5`（key形如 `y2022`）
     - 历年合并为`barra_fval_20120104_20220331.csv`
+
 
 **运行记录**
 
@@ -454,17 +456,20 @@ Beta: Barra.style & PCA因子暴露，截面标准化
 
 **version 1**
 $$
-\max_{w\ge0}{ \alpha^T w 
-- \lambda (w-w_b)^T \Sigma (w-w_b)
-} \\
+\max_{w \ge 0}{ 
+	\alpha^T w - \lambda \left[
+        x^T X_f F X_f^T x + x^T D x
+    \right]
+}, \text{ where } x = w-w_b 
+\\
 \text{s.t.}
 \begin{cases}
 \begin{gather}
 & \sum{w} \le 1  \tag{1}\\
 & \left(\bold{1}_{\{\text{in bench}\}}\right)^T w \ge B \tag{2}\\
 & | w - w_b | \le E \tag{3}\\
-& \left| X_{style/barra} (w - w_b) \right| \le H_0 \tag{4}\\
-& \left| X_{indus} (w - w_b) \right| \le H_1 \tag{5}\\
+& \left| X_{f=style/barra} (w - w_b) \right| \le H_0 \tag{4}\\
+& \left| X_{f=indus} (w - w_b) \right| \le H_1 \tag{5}\\
 & ||w_t - w_{t-1}|| \le D \tag{6}\\
 & (w - w_b)^T \Sigma (w - w_b) \le S \tag{7}\\
 %& \bold{1}^T \bold{1}_{\{w > 0\}} \le N_{max} \tag{8}\\

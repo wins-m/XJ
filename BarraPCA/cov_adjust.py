@@ -10,8 +10,8 @@ sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmP
 from supporter.cov_a import *
 from supporter.transformer import cvg_f_fill
 from tqdm import tqdm
-R_MFM = False
-R_SRR = False
+R_MFM = True
+R_SRR = True
 R_MERGE = False
 P_NUM = 4  # suggest 1 or 4
 
@@ -134,7 +134,6 @@ def _combine_risk_matrices(conf, bd='2014-01-01', ed='2022-12-31', pos=0):
     # print(f'Save in {path}, key like `TD%Y%m%d`')
 
 
-# %%
 def main():
     # %%
     import yaml
@@ -150,6 +149,7 @@ def main():
         combine_risk_matrices(conf)
 
 
+# %%
 if __name__ == '__main__':
     main()
 
