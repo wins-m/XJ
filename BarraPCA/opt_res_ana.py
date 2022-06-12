@@ -98,8 +98,9 @@ class OptRes(object):
     def _get_path(self):
         res_path = self.conf['factorsres_path']
         ir1 = self.info
-        self.suffix = f"{ir1['beta_suffix']}(B={ir1['B']},E={ir1['E']},D={ir1['D']},H0={ir1['H0']}" + \
-                      (')' if np.isnan(float(ir1['H1'])) else f",H1={ir1['H1']})")  # suffix for all result file
+        self.suffix = info2suffix(ir1)
+        # self.suffix = f"{ir1['beta_suffix']}(B={ir1['B']},E={ir1['E']},D={ir1['D']},H0={ir1['H0']}" + \
+        #               (')' if np.isnan(float(ir1['H1'])) else f",H1={ir1['H1']})")  # suffix for all result file
         self.path = res_path + f"OptResWeekly[{ir1['mkt_type']}]" + ir1['alpha_name'] + '/' + self.suffix + '/'
         self.title = self.info['alpha_name'] + ': ' + self.suffix
 
@@ -118,7 +119,6 @@ def func(args):
     print(self.title, msg)
 
 
-# %%
 def opt_res_ana():
     # %% Configs:
     conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/config.yaml'
@@ -126,10 +126,10 @@ def opt_res_ana():
     optimize_target: pd.DataFrame = pd.read_excel(OPTIMIZE_TARGET, index_col=0, dtype=object).loc[1:1]
     print(optimize_target)
 
+    ir1 = optimize_target.iloc[0]
     # %%
     p = Pool(7)
     cnt = 0
-    ir1 = optimize_target.iloc[0]
     for ir in optimize_target.iterrows():
         cnt += 1
         msg = f'({cnt}/{len(optimize_target)})'

@@ -1,6 +1,6 @@
 """
 (created by swmao on May 23rd)
-
+supporter for BarraPCA/optimize.py
 
 """
 import os
@@ -434,3 +434,39 @@ def get_risk_matrix(path, td, max_backward=7, notify=False) -> pd.DataFrame:
         print(f"replace insufficient risk matrix {td0.strftime('%Y-%m-%d')} <- {tdd.strftime('%Y-%m-%d')}")
 
     return df.loc[tdd]
+
+
+def get_factor_covariance(path_F, td=None) -> pd.DataFrame:
+    """
+    mat F: Sigma = X F X - D
+    :param path_F: .../F_NW_Eigen_VRA[yyyy-mm-dd,yyyy-mm-dd].csv
+    :param td: default None for full matrices; one tradedate mat when datetime or '%Y-%m-%d'
+    :return: factor covariance matrix or matrices
+    """
+    df = pd.read_csv(path_F, index_col=[0, 1], parse_dates=[0])
+    if td is None:
+        return df
+    else:
+        return df.loc[td]
+
+
+def get_specific_risk(path_D, td=None) -> pd.DataFrame:
+    """
+    mat D: Sigma = X F X - D
+    :param path_D: .../D_NW_SM_SH_VRA[yyyy-mm-dd,yyyy-mm-dd].csv
+    :param td: yyyy-mm-dd or None for whole
+    :return: dataframe of diag item of D
+    """
+    df = pd.read_csv(path_D, index_col=0, parse_dates=True)
+    if td is None:
+        return df
+    else:
+        return df.loc[td:td]
+
+
+def info2suffix(ir1: pd.Series) -> str:
+    """suffix for all result file"""
+    return f"{ir1['beta_suffix']}(B={ir1['B']},E={ir1['E']},D={ir1['D']},H0={ir1['H0']}" + \
+           ('' if np.isnan(float(ir1['H1'])) else f",H1={ir1['H1']}") + \
+           (f",G={ir1['G']}" if float(ir1['G']) > 0 else '') + \
+           (f",S={ir1['S']}" if float(ir1['S']) < np.inf else '') + ')'
