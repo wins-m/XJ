@@ -436,32 +436,44 @@ def get_risk_matrix(path, td, max_backward=7, notify=False) -> pd.DataFrame:
     return df.loc[tdd]
 
 
-def get_factor_covariance(path_F, td=None) -> pd.DataFrame:
+def get_factor_covariance(path_F, bd=None, ed=None, fw=0) -> pd.DataFrame:
     """
     mat F: Sigma = X F X - D
     :param path_F: .../F_NW_Eigen_VRA[yyyy-mm-dd,yyyy-mm-dd].csv
-    :param td: default None for full matrices; one tradedate mat when datetime or '%Y-%m-%d'
-    :return: factor covariance matrix or matrices
+    :param bd: begin date
+    :param ed: end date
+    :param fw:
+    :return: factor covariance matrix or matrices, like
     """
     df = pd.read_csv(path_F, index_col=[0, 1], parse_dates=[0])
-    if td is None:
-        return df
-    else:
-        return df.loc[td]
+    if fw > 0:
+        df = df.groupby(['names']).shift(fw)
+        # df = df.dropna(how='all')
+        df = df.loc[df.index.get_level_values(0).unique()[fw]:]
+        # df.index.get_level_values(0).value_counts().sort_index().plot()
+        # plt.tight_layout()
+        # plt.show()
+    df = df.loc[bd:] if bd is not None else df
+    df = df.loc[:ed] if ed is not None else df
+
+    return df
 
 
-def get_specific_risk(path_D, td=None) -> pd.DataFrame:
+def get_specific_risk(path_D, bd=None, ed=None, fw=0) -> pd.DataFrame:
     """
     mat D: Sigma = X F X - D
     :param path_D: .../D_NW_SM_SH_VRA[yyyy-mm-dd,yyyy-mm-dd].csv
-    :param td: yyyy-mm-dd or None for whole
+    :param bd:
+    :param ed:
+    :param fw:
     :return: dataframe of diag item of D
+
     """
     df = pd.read_csv(path_D, index_col=0, parse_dates=True)
-    if td is None:
-        return df
-    else:
-        return df.loc[td:td]
+    df = df.shift(fw).iloc[fw:] if fw > 0 else df
+    df = df.loc[bd:] if bd is not None else df
+    df = df.loc[:ed] if ed is not None else df
+    return df
 
 
 def info2suffix(ir1: pd.Series) -> str:

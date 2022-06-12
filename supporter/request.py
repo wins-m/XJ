@@ -67,7 +67,7 @@ def get_hold_return(conf: dict, ret_kind='ctc', bd=None, ed=None, stk_pool='NA')
 
 
 def get_ind_citic_all_tradingdate(conf: dict, begin_date, end_date) -> pd.DataFrame:
-    """Get citic industry label, index is all tradingdate from begine_date to end_date"""
+    """Get citic industry label, index is all tradingdate from begin_date to end_date"""
     bd, begin_date, ed = pd.to_datetime(begin_date) - timedelta(60), pd.to_datetime(begin_date), pd.to_datetime(end_date)
     ind_citic = pd.read_csv(conf['ind_citic'], index_col=0, parse_dates=True, dtype=object).loc[bd:ed]
     tdays_d = pd.read_csv(conf['tdays_d'], header=None, index_col=0, parse_dates=True).loc[bd:ed]

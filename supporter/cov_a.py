@@ -264,14 +264,14 @@ def keep_index_intersection(idx_ls):
 
 class MFM(object):
     """
-    纯因子方差调整
-    fr: DataFrame 形如（最新日的因子收益率未知）
-                 country      size  ...  ind_CI005028.WI  ind_CI005029.WI
-    2022-03-25 -0.000808 -0.000332  ...         0.014670        -0.001120
-    2022-03-28 -0.006781  0.001878  ...        -0.003114        -0.001607
-    2022-03-29  0.013088  0.005239  ...        -0.002646         0.002034
-    2022-03-30  0.001433 -0.007067  ...        -0.000453         0.006430
-    2022-03-31        NA        NA  ...               NA               NA
+    Barra Multi-Factor Risk Model.
+    Input: DataFrame like
+                     country      size  ...  ind_CI005028.WI  ind_CI005029.WI
+        2022-03-25 -0.000808 -0.000332  ...         0.014670        -0.001120
+        2022-03-28 -0.006781  0.001878  ...        -0.003114        -0.001607
+        2022-03-29  0.013088  0.005239  ...        -0.002646         0.002034
+        2022-03-30  0.001433 -0.007067  ...        -0.000453         0.006430
+        2022-03-31        NA        NA  ...               NA               NA
 
     """
 
@@ -607,5 +607,4 @@ class SRR(object):
         ratio.plot(title='ratio of good-quality specific return (with $\gamma=1$)')
         plt.tight_layout()
         plt.show()
-
 

@@ -664,7 +664,7 @@ $$
 
 #### 特质风险（收益）Newey-West 方差
 
-EWM方差进行siNewey-West 调整（h=252, tau=90, d=5）
+EWM方差进行 Newey-West 调整（h=252, tau=90, d=5）
 $$
 (\sigma^{Raw}_{n})^2
 = cov(u_n)_t 
@@ -765,7 +765,7 @@ $$
 
 <center>图：不同波动率分组下偏误统计量</center>
 
-### 波动率偏误调整  Volatility Regime Adjustment
+#### 波动率偏误调整  Volatility Regime Adjustment
 
 $$
 \sigma_{n}^{VRA} =  \lambda_S \sigma^{SH}_{n} \\

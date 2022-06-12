@@ -75,12 +75,12 @@ class OptRes(object):
         #
         tmp['d'].dropna().reset_index(drop=True).plot(style='o', title=self.title)
         plt.tight_layout()
-        plt.savefig(self.path + 'graph_holding_diff_20211231' + self.suffix + '.png')
+        plt.savefig(self.path + 'figure_holding_diff_20211231_' + self.suffix + '.png')
         plt.close()
         #
         tmp['port'].dropna().reset_index(drop=True).plot(title=self.title)
         plt.tight_layout()
-        plt.savefig(self.path + 'graph_holding_weight_20211231' + self.suffix + '.png')
+        plt.savefig(self.path + 'figure_holding_weight_20211231_' + self.suffix + '.png')
         plt.close()
         #
         del tmp

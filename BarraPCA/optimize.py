@@ -2,17 +2,24 @@
 (created by swmao on April 22nd)
 
 """
+import os
 import sys
-from multiprocessing import Pool, RLock, freeze_support
+import time
 import yaml
-
+import pandas as pd
+import numpy as np
+from tqdm import tqdm
+from typing import Tuple
+import cvxpy as cp
+from multiprocessing import Pool, RLock, freeze_support
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
-from supporter.bata_etf import *
+from supporter.bata_etf import second2clock, info2suffix, get_tradedates, get_beta_expo_cnstr, get_index_constitution, \
+    get_factor_covariance, get_specific_risk, get_alpha_dat, io_make_sub_dir, get_accessible_stk, OptCnstr
 from BarraPCA.opt_res_ana import OptRes
 
 OPTIMIZE_TARGET = '/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/BarraPCA/optimize_target_v2.xlsx'
 PROCESS_NUM = 4
-mkdir_force = False
+mkdir_force = True
 TELLING = False
 
 
@@ -29,6 +36,7 @@ def main():
 
     # Run optimize:
     ir1 = optimize_target.iloc[0]
+    args = (conf, ir1, mkdir_force, 0)
     # %%
     if PROCESS_NUM > 1:
         print(f'father process {os.getpid()}')
@@ -42,12 +50,10 @@ def main():
         p.close()
         p.join()
     else:
-        cnt = 0
         for ir in optimize_target.iterrows():
             ir1 = ir[1]
-            args = (conf, ir1, mkdir_force, cnt % PROCESS_NUM)
+            args = (conf, ir1, mkdir_force, 0)
             optimize(args)
-            cnt += 1
 
     # Exit:
     print(f'\nTime used: {second2clock(round(time.time() - t0))}')
@@ -87,8 +93,8 @@ def optimize(args):
     tradedates = get_tradedates(conf, begin_date, end_date, kind='tdays_w')
     beta_expo, beta_cnstr = get_beta_expo_cnstr(beta_kind, conf, begin_date, end_date, H0, H1, beta_args)
     ind_cons = get_index_constitution(conf['idx_constituent'].format(mkt_type), begin_date, end_date)
-    fct_cov = get_factor_covariance(path_F=conf['factor_covariance'], td=None).loc[begin_date: end_date]
-    stk_rsk = get_specific_risk(path_D=conf['specific_risk'], td=None).loc[begin_date: end_date]
+    fct_cov = get_factor_covariance(path_F=conf['factor_covariance'], bd=begin_date, ed=end_date, fw=1)
+    stk_rsk = get_specific_risk(path_D=conf['specific_risk'], bd=begin_date, ed=end_date, fw=1)
     save_path, alpha = get_alpha_dat(alpha_name, mkt_type, conf, begin_date, end_date)
 
     # alpha_5d_rank_ic = check_ic_5d(conf['closeAdj'], dat, begin_date, end_date, lag=5)  # cal ic
@@ -106,7 +112,7 @@ def optimize(args):
     # Save:
     with open(save_path_sub + 'config_optimize.yaml', 'w', encoding='utf-8') as f:
         yaml.safe_dump(script_info, f)
-    optimize_iter_info.T.to_excel(save_path_sub + f'opt_info{suffix}.xlsx')
+    optimize_iter_info.T.to_excel(save_path_sub + f'opt_info_{suffix}.xlsx')
     portfolio_weight.to_csv(save_path_sub + 'portfolio_weight_{}.csv'.format(suffix))
     # Graphs & Tables:
     opt_res = OptRes(ir1, conf)
@@ -274,6 +280,7 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
         iter_info = iter_info | f_del.to_dict()
         optimize_iter_info[td] = pd.Series(iter_info)
         # progressbar(cur_td + 1, len(tradedates), msg=f' {td} turnover={turnover:.3f} #stk={hdn}', stt=start_time)
+    print()
 
     return holding_weight, optimize_iter_info
 

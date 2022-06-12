@@ -56,9 +56,10 @@ def cal_fac_ret(conf, data_pat, cache_path, panel_path, fval_path, omega_path):
     """计算纯因子收益率，缓存过程文件，分年循环"""
     # %%
     industry: pd.DataFrame = get_ind_citic_all_tradingdate(conf, '2012-01-01', '2099-12-31')
+
+    # Stock Returns, without ST, new-IPO
     close_adj = pd.read_csv(conf['closeAdj'], dtype='float', index_col=0, parse_dates=True)
 
-    # 停用股（排除干扰）
     a_list_tradeable = conf['a_list_tradeable']  # "/mnt/c/Users/Winst/Documents/data_local/a_list_tradeable.hdf"
     t_ipo = pd.DataFrame(pd.read_hdf(a_list_tradeable, key='ipo'))
     t_suspend = pd.DataFrame(pd.read_hdf(a_list_tradeable, key='suspend'))
