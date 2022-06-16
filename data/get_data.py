@@ -93,15 +93,16 @@ def adjust_idx_constituent_weight(mv_path: str, idx_constituent_path: list):
     """Fill idx_constituent weight with free market share"""
     print(f'\nAdjust idx constituent, {len(idx_constituent_path)} files ...')
     mv = pd.read_csv(mv_path, index_col=0, parse_dates=True)
-    for ic_path in idx_constituent_path:
-        idx_w = pd.read_csv(ic_path, index_col=0, parse_dates=True)
+    for ind_cons_path in idx_constituent_path:
+        idx_w = pd.read_csv(ind_cons_path, index_col=0, parse_dates=True)
+        idx_w = idx_w.loc[idx_w.index.intersection(mv.index)]
         idx_w = idx_w * mv.reindex_like(idx_w)
         # mkt_freeshares could still be missing
         tmp = idx_w.count(axis=1).value_counts()
-        print(f" {tmp.iloc[1:].sum() / tmp.sum() * 100:.2f}% insufficient days: {ic_path.rsplit('/', maxsplit=1)[-1]}")
+        print(f" {tmp.iloc[1:].sum() / tmp.sum() * 100:.2f}% insufficient days: {ind_cons_path.rsplit('/', maxsplit=1)[-1]}")
         idx_w = idx_w.apply(lambda s: s / s.sum(), axis=1)
         idx_w *= 100
-        idx_w.to_csv(ic_path)
+        idx_w.to_csv(ind_cons_path)
     print('Finished.')
 
 
@@ -134,7 +135,8 @@ def transfer_data(mysql_engine, data_path, access_target, force_update=False):
     save_factor_panel(grid, engine_list, data_path)
 
     # force adjust idx_constituent table
-    mask = (grid['TABLE'] == 'idx_constituent') & (grid['VAL'] == '1 AS fv')
+    mask = grid['CSV'].apply(lambda x: 'idx_constituent' in x and 'depreciated' not in x)
+    # mask = (grid['TABLE'] == 'idx_constituent') & (grid['VAL'] == '1 AS fv')
     if mask.sum() > 0:
         if 'stk_marketvalue' not in grid['TABLE'].values:  # force update free market share
             save_factor_panel(grid_mv, engine_list, data_path)

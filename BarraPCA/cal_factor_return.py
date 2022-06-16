@@ -24,6 +24,7 @@
     - 历年合并为`barra_fval_20120104_20220331.csv`
 
 """
+import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
@@ -72,8 +73,42 @@ def cal_fac_ret(conf, data_pat, cache_path, panel_path, fval_path, omega_path):
     rtn_close_adj = rtn_close_adj.shift(-1)  # T期的资产收益由T-1期因子暴露解释
     # rtn_closeAdj.loc['2020-01-01':'2020-12-31'].count(axis=1).plot()
 
+    # %% TODO: stat of return
+    rtn = rtn_close_adj
+    rtn[rtn > 0.11] = np.nan
+    rtn[rtn < -0.11] = np.nan
+
+    # rtn.loc['2020-08-27':'2020-09-08', '002711.SZ']  # r=618%
+    # np.sum(np.matrix(rtn > 0.11))  # 5061
+    # np.sum(np.matrix(rtn < -0.11))  # 1729
+
+    cross_section_sd = rtn.loc['2013-01-01': '2022-03-31'].std(axis=1)
+    cross_section_sd.plot()
+    plt.title('cross-section standard deviation of daily return')
+    plt.tight_layout()
+    plt.show()
+
+    cross_section_sd.describe()
+
+    # # %%
+    # year = 2012
+    # for year in range(2012, 2022):
+    #     rtn = rtn_close_adj.loc[f'{year}-01-01': f'{year}-12-31']
+    #     rtn = rtn.loc[:, rtn.count() > 60]
+    #     front = pd.DataFrame()
+    #     front['r'] = rtn.mean()
+    #     front['$\sigma$'] = rtn.std()
+    #     front = front.set_index('r')
+    #     front.plot(style='.')
+    #     plt.ylabel('$\sigma$, standard deviation of daily return')
+    #     plt.xlabel('r, mean of daily return')
+    #     plt.title(f'{year} stock efficient frontier')
+    #     plt.tight_layout()
+    #     plt.show()
+
     # %%
     # year = 2015
+    year = 2021
     for year in range(2022, 2011, -1):
         # %%
         print('\n', year)
@@ -103,6 +138,8 @@ def cal_fac_ret(conf, data_pat, cache_path, panel_path, fval_path, omega_path):
 
         rtn_ctc = rtn_close_adj.stack().reindex_like(dat).rename('rtn_ctc')  # 21-22年收益率
         print(f'Return Missing {100 * rtn_ctc.isna().mean():.2f} %')  # 缺失情况
+        #
+        rtn_ctc.unstack().cov()
 
         panel = pd.concat([rtn_ctc, dat, indus, ], axis=1)
         panel['country'] = 1
@@ -127,7 +164,7 @@ def cal_fac_ret(conf, data_pat, cache_path, panel_path, fval_path, omega_path):
         all_dates = panel.index.get_level_values(0).unique()
 
         # %%  cross-section (daily) WLS
-        # td = pd.to_datetime('2015-07-09')
+        td = all_dates[0]
         for td in tqdm(all_dates[:]):
             # %%
             pan = panel.loc[td].copy()

@@ -16,12 +16,10 @@ sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmP
 
 # %matplotlib inline
 import warnings
-
 warnings.simplefilter("ignore")
-import matplotlib.pyplot as plt
 import seaborn
-
 seaborn.set_style("darkgrid")
+import matplotlib.pyplot as plt
 plt.rc("figure", figsize=(9, 5))
 plt.rc("font", size=12)
 plt.rcParams['axes.autolimit_mode'] = 'round_numbers'
@@ -482,3 +480,95 @@ def info2suffix(ir1: pd.Series) -> str:
            ('' if np.isnan(float(ir1['H1'])) else f",H1={ir1['H1']}") + \
            (f",G={ir1['G']}" if float(ir1['G']) > 0 else '') + \
            (f",S={ir1['S']}" if float(ir1['S']) < np.inf else '') + ')'
+
+
+class PortfolioOptimizer(object):
+
+    def __init__(self, conf: dict, OPTIMIZE_TARGET: str, notify=False, mkdir_force=False):
+        self.init_time = time.time()
+        self.conf: dict = conf
+        self.notify: bool = notify
+        self.mkdir_force = mkdir_force
+        self.opt_tgt: pd.DataFrame = pd.DataFrame()
+
+        self.load_optimize_target(src=OPTIMIZE_TARGET)
+
+    def load_optimize_target(self, src: str):
+        self.opt_tgt = pd.read_excel(src, index_col=0, dtype=object).loc[1:1]
+        if not self.notify:
+            print(self.opt_tgt)
+
+    def begin_optimize(self, p_num=1):
+        if p_num > 1:
+            from multiprocessing import freeze_support, Pool, RLock
+            print(f'father process {os.getpid()}')
+            freeze_support()
+            p = Pool(p_num, initializer=tqdm.set_lock, initargs=(RLock(),))
+            cnt = 0
+            for ir in self.opt_tgt.iterrows():
+                ir1 = ir[1]
+                p.apply_async(self.optimize1,
+                              args=[(self.conf, ir1, self.mkdir_force, cnt % p_num)])
+                cnt += 1
+            p.close()
+            p.join()
+        else:
+            for ir in self.opt_tgt.iterrows():
+                ir1 = ir[1]
+                args = (self.conf, ir1, self.mkdir_force, 0)
+                self.optimize1(args)
+
+    @staticmethod
+    def optimize1(args):
+        optimizer = Optimizer(args)
+        optimizer.optimize()
+
+
+class Optimizer(object):
+
+    def __init__(self, args):
+        self.conf: dict = args[0]
+        self.mkdir_force: bool = args[2]
+        self.pos: int = args[3]
+
+        ir1: pd.Series = args[1]
+        self.mkt_type = ir1['mkt_type']
+        self.begin_date = ir1['begin_date']
+        self.end_date = ir1['end_date']
+        self.opt_verbose = (ir1['opt_verbose'] == 'TRUE')
+        self.wei_tole = float(ir1['wei_tole'])
+        self.N = float(ir1['N'])
+        self.B = float(ir1['B']) / 100
+        self.E = float(ir1['E']) / 100
+        self.H0 = float(ir1['H0'])
+        self.H1 = float(ir1['H1'])
+        self.D = float(ir1['D'])
+        self.G = float(ir1['G']) * 1e6
+        self.S = float(ir1['S'])
+        self.alpha_name = ir1['alpha_name']
+        self.beta_kind = ir1['beta_kind']
+        self.suffix = info2suffix(ir1)
+
+        self.info = {
+            'alpha_name': self.alpha_name,
+            'beta_kind': self.beta_kind,
+            'begin_date': self.begin_date,
+            'end_date': self.end_date,
+            'mkt_type': self.mkt_type,
+            'N': self.N,
+            'H0': self.H0,
+            'H1': self.H1,
+            'B': self.B,
+            'E': self.E,
+            'D': self.D,
+            'G': self.G,
+            'S': self.S,
+            'wei_tole': self.wei_tole,
+            'opt_verbose': self.opt_verbose,
+            'suffix': self.suffix,
+        }
+        self.beta_args = eval(ir1['beta_args'])
+
+    def optimize(self):
+        pass
+

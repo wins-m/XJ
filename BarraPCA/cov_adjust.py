@@ -6,10 +6,14 @@
 """
 import os
 import sys
+
+import pandas as pd
+
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
 from supporter.cov_a import *
 from supporter.transformer import cvg_f_fill
 from tqdm import tqdm
+
 R_MFM = True
 R_SRR = True
 R_MERGE = False
@@ -20,16 +24,30 @@ def factor_covariance_model(conf):
     """共同因子协方差矩阵 MFM"""
     fr = get_barra_factor_return_daily(conf)
     self = MFM(fr)  # self = MFM(fr.iloc[-1000:])
-    Newey_West_adj_cov = self.newey_west_adj_by_time()
-    eigen_risk_adj_cov = self.eigen_risk_adj_by_time()
-    vol_regime_adj_cov = self.vol_regime_adj_by_time()
+
+    self.newey_west_adj_by_time()
+    self.eigen_risk_adj_by_time()
+    self.vol_regime_adj_by_time()
     self.save_factor_covariance(conf['dat_path_barra'], level='NW')
     self.save_factor_covariance(conf['dat_path_barra'], level='Eigen')
     self.save_factor_covariance(conf['dat_path_barra'], level='VRA')
-    # mfm = self
+
+    # Newey_West_adj_cov = pd.read_csv(
+    #     '/mnt/c/Users/Winst/Documents/data_local/BARRA/F_NW[2013-01-17,2022-03-31].csv',
+    #     index_col=[0, 1], parse_dates=[0])
+    # eigen_risk_adj_cov = pd.read_csv(
+    #     '/mnt/c/Users/Winst/Documents/data_local/BARRA/F_NW_Eigen[2013-01-17,2022-03-31].csv',
+    #     index_col=[0, 1], parse_dates=[0])
+    # vol_regime_adj_cov = pd.read_csv(
+    #     '/mnt/c/Users/Winst/Documents/data_local/BARRA/F_NW_Eigen_VRA[2014-02-10,2022-03-30].csv',
+    #     index_col=[0, 1], parse_dates=[0])
     # self.Newey_West_adj_cov = Newey_West_adj_cov
     # self.eigen_risk_adj_cov = eigen_risk_adj_cov
     # self.vol_regime_adj_cov = vol_regime_adj_cov
+
+    # self.Newey_West_adj_cov.loc['2021-12-31'].beta
+    # self.eigen_risk_adj_cov.loc['2021-12-31'].beta
+    # self.vol_regime_adj_cov.loc['2021-12-31'].beta
 
 
 def specific_risk_model(conf):
@@ -55,7 +73,25 @@ def specific_risk_model(conf):
     self.save_vol_regime_adj_risk(conf['dat_path_barra'], level='SM')
     self.save_vol_regime_adj_risk(conf['dat_path_barra'], level='SH')
     self.save_vol_regime_adj_risk(conf['dat_path_barra'], level='VRA')
+
     # srr = self
+    Raw_var = pd.read_csv('/mnt/c/Users/Winst/Documents/data_local/BARRA/D_Raw[2013-01-17,2022-03-31].csv', index_col=0)
+    Newey_West_adj_var = pd.read_csv('/mnt/c/Users/Winst/Documents/data_local/BARRA/D_NW[2013-01-17,2022-03-31].csv',
+                                     index_col=0)
+    Sigma_STR = pd.read_csv('/mnt/c/Users/Winst/Documents/data_local/BARRA/D_NW_SM[2013-01-17,2022-03-31].csv',
+                            index_col=0)
+    Sigma_Shrink = pd.read_csv('/mnt/c/Users/Winst/Documents/data_local/BARRA/D_NW_SM_SH[2013-01-17,2022-03-31].csv',
+                               index_col=0)
+    Sigma_VRA = pd.read_csv('/mnt/c/Users/Winst/Documents/data_local/BARRA/D_NW_SM_SH_VRA[2014-02-10,2022-03-30].csv',
+                            index_col=0)
+
+    td = '2021-12-31'
+    sigma_1d = pd.concat([Raw_var.loc[td].rename('raw'),
+                          Newey_West_adj_var.loc[td].rename('NW'),
+                          Sigma_STR.loc[td].rename('NW+SM'),
+                          Sigma_Shrink.loc[td].rename('NW+SM+SH'),
+                          Sigma_VRA.loc[td].rename('NW+SM+SH+VRA')], axis=1)
+    sigma_1d.dropna().to_excel(f'/mnt/c/Users/Winst/Desktop/sigma[{td}].xlsx')
     # self.u = Ret_U
     # self.SigmaRaw, self.SigmaNW = Raw_var, Newey_West_adj_var
     # self.GammaSM, self.SigmaSM = Gamma_STR, Sigma_STR
@@ -152,4 +188,3 @@ def main():
 # %%
 if __name__ == '__main__':
     main()
-

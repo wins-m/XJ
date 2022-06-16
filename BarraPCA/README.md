@@ -12,10 +12,10 @@
 
 - 在截面内，资产收益率可以由下式表示
     $$
-    r_n =
-    	f_c + \sum_{i=1}^{P}{X_{ni} f_{i}} + \sum_{s=1}^{Q}{X_{ns} f_{s}} + \varepsilon_n \\
+    r_{n, t} =
+    	f_{c, t} + \sum_{i=1}^{P}{X_{ni,t-1} f_{i,t}} + \sum_{s=1}^{Q}{X_{ns,t-1} f_{s,t}} + \varepsilon_{n,t} \\
     \text{i.e.} \quad
-    \bold{Y} = \bold{F} \bold{X} + \bold{\Epsilon}
+    \bold{Y}_{t} = \bold{F}_{t} \bold{X}_{t-1} + \bold{\Epsilon}_{t}
     $$
 
     > - $\bold{X}$：N维资产在K维因子上的因子暴露
@@ -443,6 +443,8 @@ after missing-drop (537913, 41)
 
 用PCA选择指增
 
+- 结果
+
 ## 组合优化
 
 alpha: 未来因子 收益vs约束
@@ -479,7 +481,7 @@ $$
 \text{where }
 \begin{cases}
 \alpha : \text{alpha因子} = \text{FRtn5D(0.0,3.0)} \\
-B : \text{成分占比} = {0\%} \\
+B : \text{成分占比} = {0\%} \text{ or } {80\%} \\
 E : \text{权重偏离} = \max{\{1\%,\ w_b/2\}} \\
 H_0 : \text{风格偏离} = {0.20} \\
 H_1 : \text{行业偏离} = {0.02} \\
@@ -537,12 +539,9 @@ $$
 r_n = f_c + \sum_{i}{ X_{n,i} f_i} + \sum_{s}{X_{n, s} f_s} + \sum_{p}{X_{n, p} f_p} + u_n
 $$
 
-最小化投资组合风险
+最小化投资组合风险；合理估计股票收益协方差矩阵
 $$
-Risk(Portfolio) = w^T V w
-$$
-合理估计股票收益协方差矩阵
-$$
+Risk(Portfolio) = w^T V w \\
 V = X^T F X + \Delta
 $$
 对T期，只能用T-1期及以前的纯因子收益估计。
@@ -593,17 +592,19 @@ C_{kl, +\Delta}^{(d)}
         (f_{l,s} - \bar{f_l})
     }  \over 
     \sum_{s=t-h+\Delta}^{t} {\lambda^{t-s}}
-} \\
-= C_{kl, -\Delta}^{(d)} 
-= cov(f_{k, t}, f_{l, t-\Delta})
-= {
-    \sum_{s=t-h+\Delta}^{t} {
-        \lambda^{t-s} 
-        (f_{k,s} - \bar{f_k})
-        (f_{l,s-\Delta} - \bar{f_l})
-    }  \over 
-    \sum_{s=t-h+\Delta}^{t} {\lambda^{t-s}}
-} \\
+} 
+%\\
+= {C_{kl, -\Delta}^{(d)}}^T
+%= cov(f_{k, t}, f_{l, t-\Delta})
+%= {
+%    \sum_{s=t-h+\Delta}^{t} {
+%        \lambda^{t-s} 
+%        (f_{k,s} - \bar{f_k})
+%        (f_{l,s-\Delta} - \bar{f_l})
+%    }  \over 
+%    \sum_{s=t-h+\Delta}^{t} {\lambda^{t-s}}
+%} 
+\\
 
 \text{where} \quad D=2,\ h=252,\ \lambda = 0.5^{1/90}
 $$
@@ -611,7 +612,8 @@ $$
 #### 特征值调整 Eigenfactor Risk Adjustment
 
 $$
-U_0 D_0 U_0^T = F^{NW}
+U_0 D_0 U_0^T = F^{NW}  \\
+F^{Eigen} = U_0 \widetilde{D}_0 U_0^T
 $$
 
 - $M=10000$次蒙特卡洛模拟，第$m$次：
@@ -650,7 +652,6 @@ Gamma_STR, Sigma_STR = self.struct_mod_adj_by_time()  # Structural Model Adjustm
 Sigma_Shrink = self.bayesian_shrink_by_time()  # Bayesian Shrinkage Adjustment
 Lambda_VRA, Sigma_VRA = self.vol_regime_adj_by_time()  # Volatility Regime Adjustment
 self.save_vol_regime_adj_risk(conf['dat_path_barra'])
-
 ```
 
 横截面回归，不由公共因子解释的残差序列
@@ -658,10 +659,6 @@ $$
 \{u_{nt}\}:\ T \times N \\
 u_{nt} = r_{nt} - \sum_{k}{X_{nkt} f_{kt}}
 $$
-特异波动率252日计数，缺失来源：个股n当天因子暴露的缺失。
-
-![image-20220505155938140](https://s2.loli.net/2022/05/05/Q2uW8s3FrPRzp6Z.png)
-
 #### 特质风险（收益）Newey-West 方差
 
 EWM方差进行 Newey-West 调整（h=252, tau=90, d=5）

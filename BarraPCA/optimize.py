@@ -60,7 +60,7 @@ def main():
 
 
 def optimize(args):
-    # %%
+    # %% Decode setting and parameters
     conf: dict = args[0]
     ir1: pd.Series = args[1]
     dir_force: bool = args[2]
@@ -76,12 +76,11 @@ def optimize(args):
     H0 = float(ir1['H0'])
     H1 = float(ir1['H1'])
     D = float(ir1['D'])
-    G = float(ir1['G']) * 10000
+    G = float(ir1['G']) * 1e6
     S = float(ir1['S'])
     wei_tole = float(ir1['wei_tole'])
     alpha_name = ir1['alpha_name']
     beta_kind = ir1['beta_kind']
-    beta_args = eval(ir1['beta_args'])
     suffix = info2suffix(ir1)
     script_info = {
         'opt_verbose': opt_verbose, 'begin_date': begin_date, 'end_date': end_date, 'mkt_type': mkt_type,
@@ -89,6 +88,7 @@ def optimize(args):
         'alpha_name': alpha_name, 'beta_kind': beta_kind, 'alpha_5d_rank_ic': 'NA', 'suffix': suffix,
     }
 
+    beta_args = eval(ir1['beta_args'])
     # %% Load Data
     tradedates = get_tradedates(conf, begin_date, end_date, kind='tdays_w')
     beta_expo, beta_cnstr = get_beta_expo_cnstr(beta_kind, conf, begin_date, end_date, H0, H1, beta_args)
@@ -121,6 +121,33 @@ def optimize(args):
 
 
 def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Optimize
+    :param all_args:
+        tradedates: tradedates when you optimize your portfolio
+        beta_expo: beta exposure, columns={betas}, index={(tradedate, stockcode)}
+        beta_cnstr: beta constraint, columns=[H, L], index={betas}
+        ind_cons: index constituent weight
+        fct_cov: adjusted covariance matrix of pure factor return, columns={betas}, index={(tradedate, betas)}
+        stk_rsk: stock specific risk, sqrt(variance), columns={stockcode}, index={tradedates}
+        alpha: alpha to maximize, columns={stockcode}, index={tradedates}
+        args:
+            mkt_type: market index type (CSI500, or CSI300)
+            N: maximum pool number, e.g., select X stocks from 1000 candidate, with the largest alpha value
+            D: maximum turnover rate, less than 200(%)
+            B: minimum index-constituent weight-sum (%)
+            E: maximum excess holding weight (part of)
+            G: gamma, risk aversion coefficient
+            S: maximum risk exposure matrix
+            wei_tole: weight tolerance
+            opt_verbose: show solver process
+            desc: msg in progress bar
+            pos: position of progress bar
+    :param telling: show pool stock number and determent process for each day iteration
+    :return:
+        holding_weight: holding weight, columns={stockcode}, index={tradedate}
+        optimize_iter_info: optimize information, columns={infos}, index={tradedate}
+    """
     # %%
     tradedates, beta_expo, beta_cnstr, ind_cons, fct_cov, stk_rsk, alpha, args = all_args
     mkt_type, N, D, B, E, G, S, wei_tole, opt_verbose, desc, pos = args
@@ -137,8 +164,8 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
     optimize_iter_info: pd.DataFrame = pd.DataFrame()
     w_lst = None
 
-    # cur_td = 171
     # start_time = time.time()
+    cur_td = -100
     loop_bar = tqdm(range(len(tradedates)), ncols=99, desc=desc, delay=0.01, position=pos, ascii=False)
     # %%
     for cur_td in loop_bar:
@@ -166,17 +193,34 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
             print(f'\t{mkt_type.lower()} exposed ({len(ls_base)}/{len(stk_index)})')
             print(f'\tformer holdings not exposed ({len(ls_clear)}/{len(df_lst_w)}) [{",".join(ls_clear)}]')
 
-        a = alpha.loc[td, ls_pool].values.reshape(1, -1)  # alpha
+        # alpha.std(axis=1)
+        # cross_section_sd = alpha.loc['2013-01-01': '2022-03-31'].std(axis=1)
+        # cross_section_sd.plot()
+        # plt.title('cross-section standard deviation of FRtn5d(0.0,3.0)')
+        # plt.tight_layout()
+        # plt.show()
+        # cross_section_sd.describe()
+
         wb = ind_cons.loc[td, ls_base]
         wb /= wb.sum()  # part of index-constituent are not exposed to beta factors; (not) treat them as zero-exposure.
         wb_ls_pool = pd.Series(ind_cons.loc[td, ls_base], index=ls_pool).fillna(0)  # cons w, index broadcast as pool
-        xf = beta_expo.loc[td].loc[ls_pool].dropna(axis=1)
+        a = alpha.loc[td, ls_pool]  # alpha
         mat_F = fct_cov.loc[td]
         mat_F = mat_F.dropna(how='all').dropna(axis=1, how='all')
         mat_F = mat_F.loc[[x for x in mat_F.index if x != 'country'], [x for x in mat_F.columns if x != 'country']]
+        srs_D = stk_rsk.loc[td, ls_pool]
+        xf = beta_expo.loc[td].loc[ls_pool].dropna(axis=1)
         xf = xf[xf.columns.intersection(mat_F.index)]
+
+        # path = '/mnt/c/Users/Winst/desktop/'
+        # a.to_pickle(path + "alpha.pkl")
+        # mat_F.to_pickle(path + "factor_covariance.pkl")
+        # srs_D.to_pickle(path + "specific_risk.pkl")
+        # xf.to_pickle(path + "factor_exposure.pkl")
+
+        a = a.values.reshape(1, -1)
         mat_F = np.matrix(mat_F)
-        srs_D = np.matrix(stk_rsk.loc[td, ls_pool])
+        srs_D = np.matrix(srs_D**2)
         f_del = beta_expo.dropna(axis=1).loc[td].loc[ls_base].T @ wb  # - f_del_overflow
         fl = (f_del + beta_cnstr.loc[f_del.index, 'L']).dropna()
         fh = (f_del + beta_cnstr.loc[f_del.index, 'H']).dropna()
@@ -215,19 +259,19 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
             w_lst = np.zeros([len(ls_pool), 1]) if w_lst is None else w_lst  # former holding
 
         # (7) specific risk
-        # Attention: very slow if (G > 0) & (S < inf):
-        # (G > 0) or (S < inf) only: 80s one opt;
-        # (G > 0) and (S < inf): 300s one opt.
         if use_sigma:
             wbp = wb_ls_pool.values.reshape(-1, 1)
             x = w - wbp
             risk = cp.quad_form(xf.values.T @ x, mat_F) + srs_D @ (x**2)
-            # risk = cp.quad_form(w, Sigma * a.std() / np.sqrt(Sigma).mean() * 5)
+
             if S < np.inf:
                 opt_cnstr.add_constraints(risk <= S)
-            # G = 10000
+
+            # G = 1e6
             objective = cp.Maximize(a @ w - G * risk) if G > 0 else cp.Maximize(a @ w)
-            # opt_cnstr.add_constraints(risk <= 0.005)
+
+            # S = 1e-7
+            # opt_cnstr.add_constraints(risk <= S)
             # objective = cp.Maximize(a @ w)
         else:
             objective = cp.Maximize(a @ w)
@@ -236,8 +280,8 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
         constraints = opt_cnstr.get_constraints()
         prob = cp.Problem(objective, constraints)
         result = prob.solve(verbose=opt_verbose, solver='ECOS', max_iters=1000)
-        # result = prob.solve(verbose=True, solver='SCS', max_iters=1000)
         # result = prob.solve(verbose=True, solver='ECOS', max_iters=1000)
+        # result = prob.solve(verbose=True, solver='SCS', max_iters=1000)
         if prob.status == 'optimal_inaccurate':
             result = prob.solve(verbose=opt_verbose, solver='ECOS', max_iters=10000)
             #
@@ -252,10 +296,18 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
             turnover = np.abs(w_lst - df_w.values).sum() + D_offset
             hdn = (df_w.values > 0).sum()
             df_lst_w = df_w.replace(0, np.nan).dropna()
-
-            # # TODO
+            # # Graph:
+            # import matplotlib.pyplot as plt
+            # plt.rc("figure", figsize=(9, 5))
+            # plt.rc("font", size=12)
+            # plt.rcParams['axes.autolimit_mode'] = 'round_numbers'
+            # plt.rcParams['axes.xmargin'] = 0
+            # plt.rcParams['axes.ymargin'] = 0
+            # plt.rc("savefig", dpi=90)
+            # plt.rcParams["date.autoformatter.hour"] = "%H:%M:%S"
             # df_lst_w.sort_values(td, ascending=False).reset_index(drop=True).plot(
             #     title=f'{td}, $\gamma={G}$, res=' + f'{result:.3f} - {risk.value[0,0] * G:.3f}')
+            #     # title=f'{td}, $\S={S}$, res=' + f'{result:.3f} - {risk.value[0,0] * G:.3f}')
             # plt.tight_layout()
             # plt.show()
         else:
