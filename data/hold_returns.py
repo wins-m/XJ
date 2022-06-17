@@ -1,3 +1,8 @@
+"""
+(created by swmao)
+生成一些收益率
+
+"""
 import sys
 
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")

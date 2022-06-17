@@ -1,5 +1,6 @@
 """
 (created by swmao on Feb. 28th)
+自动更新EFR
 参考Wind-组合管理-调整持仓（EFR基准）-持仓文件导入-持仓权重模板 上传数据库 由数据库获取
 0. 数据库中，由event_first_report维护event_first_report_selected，多溯2天(duration=3)
 1. tradingdate, stockcode, fv, price, AR0, CAR_8, instnum, suspend, new_ipo, up, isTradeday

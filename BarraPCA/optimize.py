@@ -147,6 +147,7 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
     :return:
         holding_weight: holding weight, columns={stockcode}, index={tradedate}
         optimize_iter_info: optimize information, columns={infos}, index={tradedate}
+
     """
     # %%
     tradedates, beta_expo, beta_cnstr, ind_cons, fct_cov, stk_rsk, alpha, args = all_args
