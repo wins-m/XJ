@@ -13,7 +13,7 @@ import pandas as pd
 import sys
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
 from supporter.mysql import conn_mysql
-from data.auto_update import transfer_pe_residual_table
+from data.pe_residual.auto_update import transfer_pe_residual_table
 
 
 def main():
