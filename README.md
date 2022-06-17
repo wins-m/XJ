@@ -6,15 +6,33 @@
 
 
 - ***文件夹./AllSample/***
+- `argparse.example.py` 终端传参示例
 - `conn_mysql.py` 从mysql服务器获取dataframe
 - `create_table_rating_avg.py` 建表存表到数据库
+- `imap.py` 多进程进度条
 - `resultDemo.jpg` 回测结果示例
 - `template.py` 项目module模板
+- `tensorflow.py` 张量菜鸟语法
 - `update_idx_price.py` 更新数据库表的示例
 
 
 - ***文件夹./BarraPCA/***
-- 
+- `00.py` 统计收益率分布
+- `README.md` Barra和PCA收益分解、风格归因、组合优化文档
+- `Reference.md` 组合优化参考（部分）
+- `access_barra.xlsx` 数据库代获取的barra风格暴露
+- `attribution.py` 指增产品收益归因
+- `backtest.py` 指增选择的回测
+- `cal_factor_return.py` 计算纯因子收益
+- `cov_adjust.py` 方差矩阵估计
+- `daily_pca.py` 收益PCA分解
+- `fof.py` PCA选择指增
+- `get_barra.py` 从数据库获取风格暴露
+- `opt_res_ana.py` 由持仓分析组合表现
+- `optimize.py` 组合优化
+- `optimize_target.xlsx` 
+- `optimize_target_v2.xlsx` 
+- ***子文件夹./HoldingStatistics/***
 
 
 - ***文件夹./alpha101/***
