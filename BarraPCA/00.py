@@ -62,7 +62,6 @@ if __name__ == '__main__':
     figure_cross_section_sd(rtn2, msg='ctc rtn (no updown)')
     figure_cross_section_mean(rtn2, msg='ctc rtn (no updown)')
 
-
     np.nanmean(np.matrix(rtn))
     np.nanstd(np.matrix(rtn))
 

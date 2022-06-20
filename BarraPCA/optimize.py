@@ -12,9 +12,11 @@ from tqdm import tqdm
 from typing import Tuple
 import cvxpy as cp
 from multiprocessing import Pool, RLock, freeze_support
+
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
 from supporter.bata_etf import second2clock, info2suffix, get_tradedates, get_beta_expo_cnstr, get_index_constitution, \
-    get_factor_covariance, get_specific_risk, get_alpha_dat, io_make_sub_dir, get_accessible_stk, OptCnstr
+    get_factor_covariance, get_specific_risk, get_alpha_dat, get_save_path, io_make_sub_dir, get_accessible_stk, \
+    OptCnstr
 from BarraPCA.opt_res_ana import OptRes
 
 OPTIMIZE_TARGET = '/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/BarraPCA/optimize_target_v2.xlsx'
@@ -31,7 +33,8 @@ def main():
     # Configs:
     conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/config.yaml'
     conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
-    optimize_target: pd.DataFrame = pd.read_excel(OPTIMIZE_TARGET, index_col=0, dtype=object).loc[1:1]
+    # Optimize Target:
+    optimize_target = pd.read_excel(OPTIMIZE_TARGET, index_col=0, dtype=object).loc[1:1]
     print(optimize_target)
 
     # Run optimize:
@@ -54,12 +57,12 @@ def main():
             ir1 = ir[1]
             args = (conf, ir1, mkdir_force, 0)
             optimize(args)
-
-    # Exit:
+    # %% Exit:
     print(f'\nTime used: {second2clock(round(time.time() - t0))}')
 
 
 def optimize(args):
+    """"""
     # %% Decode setting and parameters
     conf: dict = args[0]
     ir1: pd.Series = args[1]
@@ -76,7 +79,7 @@ def optimize(args):
     H0 = float(ir1['H0'])
     H1 = float(ir1['H1'])
     D = float(ir1['D'])
-    G = float(ir1['G']) * 1e6
+    G = float(ir1['G']) * 1e4
     S = float(ir1['S'])
     wei_tole = float(ir1['wei_tole'])
     alpha_name = ir1['alpha_name']
@@ -89,13 +92,15 @@ def optimize(args):
     }
 
     beta_args = eval(ir1['beta_args'])
-    # %% Load Data
+    # %% Load DataFrames
     tradedates = get_tradedates(conf, begin_date, end_date, kind='tdays_w')
+    # tradedates = get_tradedates(conf, begin_date, end_date, kind='tdays_d')
     beta_expo, beta_cnstr = get_beta_expo_cnstr(beta_kind, conf, begin_date, end_date, H0, H1, beta_args)
     ind_cons = get_index_constitution(conf['idx_constituent'].format(mkt_type), begin_date, end_date)
     fct_cov = get_factor_covariance(path_F=conf['factor_covariance'], bd=begin_date, ed=end_date, fw=1)
     stk_rsk = get_specific_risk(path_D=conf['specific_risk'], bd=begin_date, ed=end_date, fw=1)
-    save_path, alpha = get_alpha_dat(alpha_name, mkt_type, conf, begin_date, end_date)
+    save_path = get_save_path(conf['factorsres_path'], mkt_type, alpha_name)
+    alpha = get_alpha_dat(alpha_name, conf, begin_date, end_date, save_path)
 
     # alpha_5d_rank_ic = check_ic_5d(conf['closeAdj'], dat, begin_date, end_date, lag=5)  # cal ic
     # script_info['alpha_5d_rank_ic'] = str(alpha_5d_rank_ic)
@@ -106,10 +111,10 @@ def optimize(args):
     all_args = tradedates, beta_expo, beta_cnstr, ind_cons, fct_cov, stk_rsk, alpha, (
         mkt_type, N, D, B, E, G, S, wei_tole, opt_verbose, desc, pos)
     telling = TELLING
-    # %% Optimize
+    # %% Optimize:
     portfolio_weight, optimize_iter_info = portfolio_optimize(all_args, telling=telling)
 
-    # Save:
+    # %% Save Historical Optimize Results:
     with open(save_path_sub + 'config_optimize.yaml', 'w', encoding='utf-8') as f:
         yaml.safe_dump(script_info, f)
     optimize_iter_info.T.to_excel(save_path_sub + f'opt_info_{suffix}.xlsx')
@@ -149,6 +154,7 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
         optimize_iter_info: optimize information, columns={infos}, index={tradedate}
 
     """
+
     # %%
     tradedates, beta_expo, beta_cnstr, ind_cons, fct_cov, stk_rsk, alpha, args = all_args
     mkt_type, N, D, B, E, G, S, wei_tole, opt_verbose, desc, pos = args
@@ -166,16 +172,13 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
     w_lst = None
 
     # start_time = time.time()
-    cur_td = -100
+    td = '2021-12-31'
     loop_bar = tqdm(range(len(tradedates)), ncols=99, desc=desc, delay=0.01, position=pos, ascii=False)
     # %%
     for cur_td in loop_bar:
-        # %%
         td = tradedates.iloc[cur_td].strftime('%Y-%m-%d')
-        # td = '2021-12-31'
-
-        # Specific Risk
-        use_sigma = (G > 0) or (S < np.inf)
+        # %%
+        use_sigma = (G > 0) or (S < np.inf)  # Specific Risk
         # sigma: pd.DataFrame = get_risk_matrix(path_sigma, td, max_backward=5, notify=False)
 
         # Asset pool accessible
@@ -213,119 +216,126 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
         xf = beta_expo.loc[td].loc[ls_pool].dropna(axis=1)
         xf = xf[xf.columns.intersection(mat_F.index)]
 
+        # %%
         # path = '/mnt/c/Users/Winst/desktop/'
         # a.to_pickle(path + "alpha.pkl")
         # mat_F.to_pickle(path + "factor_covariance.pkl")
         # srs_D.to_pickle(path + "specific_risk.pkl")
         # xf.to_pickle(path + "factor_exposure.pkl")
 
-        a = a.values.reshape(1, -1)
-        mat_F = np.matrix(mat_F)
-        srs_D = np.matrix(srs_D**2)
-        f_del = beta_expo.dropna(axis=1).loc[td].loc[ls_base].T @ wb  # - f_del_overflow
-        fl = (f_del + beta_cnstr.loc[f_del.index, 'L']).dropna()
-        fh = (f_del + beta_cnstr.loc[f_del.index, 'H']).dropna()
+        def wtf(a, mat_F, srs_D, xf, df_lst_w, w_lst, G, ishow=False):
+            a = a.values.reshape(1, -1)
+            mat_F = np.matrix(mat_F)
+            srs_D = np.matrix(srs_D ** 2)
+            f_del = beta_expo.dropna(axis=1).loc[td].loc[ls_base].T @ wb  # - f_del_overflow
+            fl = (f_del + beta_cnstr.loc[f_del.index, 'L']).dropna()
+            fh = (f_del + beta_cnstr.loc[f_del.index, 'H']).dropna()
 
-        D_offset = df_lst_w.loc[ls_clear].abs().sum().values[0] if len(ls_clear) > 0 else 0
-        # Sigma = np.matrix(sigma.loc[ls_pool, ls_pool])
+            D_offset = df_lst_w.loc[ls_clear].abs().sum().values[0] if len(ls_clear) > 0 else 0
 
-        # %% Constraints
-        wN = len(ls_pool)
-        w = cp.Variable((wN, 1), nonneg=True)
-        opt_cnstr = OptCnstr()
+            # Constraints
+            wN = len(ls_pool)
+            w = cp.Variable((wN, 1), nonneg=True)
+            opt_cnstr = OptCnstr()
 
-        # (1) sum 1
-        opt_cnstr.sum_bound(w, e=np.ones([1, wN]), down=None, up=1)
+            # (1) sum 1
+            opt_cnstr.sum_bound(w, e=np.ones([1, wN]), down=None, up=1)
 
-        # (2) cons component percentage
-        opt_cnstr.sum_bound(w, e=(1 - pd.Series(wb, index=ls_pool).isna()).values.reshape(1, -1), down=B, up=None)
+            # (2) cons component percentage
+            opt_cnstr.sum_bound(w, e=(1 - pd.Series(wb, index=ls_pool).isna()).values.reshape(1, -1), down=B, up=None)
 
-        # (3) cons weight deviation
-        offset = wb_ls_pool.apply(lambda _: max(E, _ / 2))  # max(E, 0.5w) as offset
-        down = (wb_ls_pool - offset).values.reshape(-1, 1)
-        up = (wb_ls_pool + offset).values.reshape(-1, 1)
-        opt_cnstr.uni_bound(w, down=down, up=up)
-        del offset, down, up
+            # (3) cons weight deviation
+            offset = wb_ls_pool.apply(lambda _: max(E, _ / 2))  # max(E, 0.5w) as offset
+            down = (wb_ls_pool - offset).values.reshape(-1, 1)
+            up = (wb_ls_pool + offset).values.reshape(-1, 1)
+            opt_cnstr.uni_bound(w, down=down, up=up)
+            del offset, down, up
 
-        # (4)(5) beta exposure
-        opt_cnstr.sum_bound(w, e=xf[fl.index].values.T, down=fl.values.reshape(-1, 1), up=fh.values.reshape(-1, 1))
+            # (4)(5) beta exposure
+            opt_cnstr.sum_bound(w, e=xf[fl.index].values.T, down=fl.values.reshape(-1, 1), up=fh.values.reshape(-1, 1))
 
-        # (6) turnover constraint
-        if len(df_lst_w) > 0:  # not first optimization
-            w_lst = df_lst_w.reindex_like(pd.DataFrame(index=ls_pool, columns=df_lst_w.columns)).fillna(0)
-            w_lst = w_lst.values
-            d = D - D_offset
-            opt_cnstr.norm_bound(w, w0=w_lst, d=d, L=1)
-        else:  # first iteration, holding 0
-            w_lst = np.zeros([len(ls_pool), 1]) if w_lst is None else w_lst  # former holding
+            # (6) turnover constraint
+            if len(df_lst_w) > 0:  # not first optimization
+                w_lst = df_lst_w.reindex_like(pd.DataFrame(index=ls_pool, columns=df_lst_w.columns)).fillna(0)
+                w_lst = w_lst.values
+                d = D - D_offset
+                opt_cnstr.norm_bound(w, w0=w_lst, d=d, L=1)
+            else:  # first iteration, holding 0
+                w_lst = np.zeros([len(ls_pool), 1]) if w_lst is None else w_lst  # former holding
 
-        # (7) specific risk
-        if use_sigma:
+            # (7) specific risk
+            # if use_sigma:
             wbp = wb_ls_pool.values.reshape(-1, 1)
             x = w - wbp
-            risk = cp.quad_form(xf.values.T @ x, mat_F) + srs_D @ (x**2)
-
+            risk = cp.quad_form(xf.values.T @ x, mat_F) + srs_D @ (x ** 2)
             if S < np.inf:
                 opt_cnstr.add_constraints(risk <= S)
-
-            # G = 1e6
+            # G = 20000
             objective = cp.Maximize(a @ w - G * risk) if G > 0 else cp.Maximize(a @ w)
-
             # S = 1e-7
             # opt_cnstr.add_constraints(risk <= S)
             # objective = cp.Maximize(a @ w)
-        else:
-            objective = cp.Maximize(a @ w)
+            #
+            # else:
+            #     objective = cp.Maximize(a @ w)
 
-        # %% Solve
-        constraints = opt_cnstr.get_constraints()
-        prob = cp.Problem(objective, constraints)
-        result = prob.solve(verbose=opt_verbose, solver='ECOS', max_iters=1000)
-        # result = prob.solve(verbose=True, solver='ECOS', max_iters=1000)
-        # result = prob.solve(verbose=True, solver='SCS', max_iters=1000)
-        if prob.status == 'optimal_inaccurate':
-            result = prob.solve(verbose=opt_verbose, solver='ECOS', max_iters=10000)
+            # Solve
+            constraints = opt_cnstr.get_constraints()
+            prob = cp.Problem(objective, constraints)
+            if ishow:
+                result = prob.solve(verbose=True, solver='ECOS', max_iters=1000)
+                # result = prob.solve(verbose=True, solver='SCS', max_iters=1000)
+            else:
+                result = prob.solve(verbose=opt_verbose, solver='ECOS', max_iters=1000)
+            if prob.status == 'optimal_inaccurate':
+                result = prob.solve(verbose=opt_verbose, solver='ECOS', max_iters=10000)
+                #
+            if prob.status == 'optimal_inaccurate':
+                result = prob.solve(verbose=opt_verbose, solver='SCS', max_iters=1000)
+                #
+            if prob.status == 'optimal':
+                w1 = w.value.copy()
+                w1[w1 < wei_tole] = 0
+                w1 /= w1.sum()
+                df_w = pd.DataFrame(w1, index=ls_pool, columns=[td])
+                turnover = np.abs(w_lst - df_w.values).sum() + D_offset
+                hdn = (df_w.values > 0).sum()
+                df_lst_w = df_w.replace(0, np.nan).dropna()
+                if ishow:  # Graph:
+                    import matplotlib.pyplot as plt
+                    plt.rc("figure", figsize=(9, 5))
+                    plt.rc("font", size=12)
+                    plt.rcParams['axes.autolimit_mode'] = 'round_numbers'
+                    plt.rcParams['axes.xmargin'] = 0
+                    plt.rcParams['axes.ymargin'] = 0
+                    plt.rc("savefig", dpi=90)
+                    plt.rcParams["date.autoformatter.hour"] = "%H:%M:%S"
+                    df_lst_w.sort_values(td, ascending=False).reset_index(drop=True).plot(
+                        title=f'{td}, $\gamma={G}$, res=' + f'{result:.3f} - {risk.value[0, 0] * G:.3f}')
+                    # title=f'{td}, $\S={S}$, res=' + f'{result:.3f} - {risk.value[0,0] * G:.3f}')
+                    plt.tight_layout()
+                    plt.show()
+            else:
+                raise Exception(f'{prob.status} problem')
+                # turnover = 0
+                # print(f'.{prob.status} problem, portfolio ingredient unchanged')
+                # if len(lst_w) > 0:
+                #     lst_w.columns = [td]
+            iter_info = {
+                '#alpha^beta': len(ls_pool), '#index^beta': len(ls_base), '#index': len(stk_index),
+                'turnover': turnover, 'holding': hdn, 'solver': prob.solver_stats.solver_name,
+                'status': prob.status, 'stime': prob.solver_stats.solve_time,
+                'opt0': result, 'opt1': (a @ w1)[0],
+            }
+
             #
-        if prob.status == 'optimal_inaccurate':
-            result = prob.solve(verbose=opt_verbose, solver='SCS', max_iters=1000)
-            #
-        if prob.status == 'optimal':
-            w1 = w.value.copy()
-            w1[w1 < wei_tole] = 0
-            w1 /= w1.sum()
-            df_w = pd.DataFrame(w1, index=ls_pool, columns=[td])
-            turnover = np.abs(w_lst - df_w.values).sum() + D_offset
-            hdn = (df_w.values > 0).sum()
-            df_lst_w = df_w.replace(0, np.nan).dropna()
-            # # Graph:
-            # import matplotlib.pyplot as plt
-            # plt.rc("figure", figsize=(9, 5))
-            # plt.rc("font", size=12)
-            # plt.rcParams['axes.autolimit_mode'] = 'round_numbers'
-            # plt.rcParams['axes.xmargin'] = 0
-            # plt.rcParams['axes.ymargin'] = 0
-            # plt.rc("savefig", dpi=90)
-            # plt.rcParams["date.autoformatter.hour"] = "%H:%M:%S"
-            # df_lst_w.sort_values(td, ascending=False).reset_index(drop=True).plot(
-            #     title=f'{td}, $\gamma={G}$, res=' + f'{result:.3f} - {risk.value[0,0] * G:.3f}')
-            #     # title=f'{td}, $\S={S}$, res=' + f'{result:.3f} - {risk.value[0,0] * G:.3f}')
-            # plt.tight_layout()
-            # plt.show()
-        else:
-            raise Exception(f'{prob.status} problem')
-            # turnover = 0
-            # print(f'.{prob.status} problem, portfolio ingredient unchanged')
-            # if len(lst_w) > 0:
-            #     lst_w.columns = [td]
+            return iter_info, f_del, df_lst_w, w_lst
+
+        # %%
+        iter_info, f_del, df_lst_w, w_lst = wtf(a, mat_F, srs_D, xf, df_lst_w, w_lst, G=G, ishow=False)
 
         # %% Update optimize iteration information
         holding_weight = pd.concat([holding_weight, df_lst_w.T])
-        iter_info = {
-            '#alpha^beta': len(ls_pool), '#index^beta': len(ls_base), '#index': len(stk_index),
-            'turnover': turnover, 'holding': hdn, 'solver': prob.solver_stats.solver_name,
-            'status': prob.status, 'stime': prob.solver_stats.solve_time,
-            'opt0': result, 'opt1': (a @ w1)[0],
-        }
         iter_info = iter_info | {'# cons w/o alpha': sp_info['#i_a'],
                                  '# cons w/o beta(sigma)': sp_info['#i_b(s)'],
                                  'cons w/o alpha': ', '.join(sp_info['i_a']),

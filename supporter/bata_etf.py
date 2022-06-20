@@ -72,74 +72,25 @@ def io_make_sub_dir(path, force=False):
     pass;  # print(f'Save in: {path}')
 
 
-def get_alpha_dat(alpha_name, mkt_type, conf, begin_date, end_date) -> Tuple[str, pd.DataFrame]:
-    """
-    Get Alpha Value
-    :param alpha_name:
-    :param mkt_type:
-    :param conf:
-    :param begin_date:
-    :param end_date:
-    :return:
-
-    """
-
-    def get_fval_alpha(_pred_days=5, _wn_m=0., _wn_s=0.) -> pd.DataFrame:
-        def wn(s):
-            mean = _wn_m
-            std = _wn_s
-            return np.random.normal(loc=mean, scale=std, size=s)
-
-        close_adj = pd.read_csv(conf['closeAdj'], index_col=0, parse_dates=True)
-        res = close_adj.pct_change(_pred_days).shift(-_pred_days).loc[begin_date: end_date]  # 未来5日的收益
-        if (_wn_m == 0) and (_wn_s == 0):
-            res = res.apply(lambda x: (x - x.mean()) / x.std(), axis=1)
-        else:
-            res = res.apply(lambda x: (x - x.mean()) / x.std() + wn(len(x)), axis=1)
-            pass;  # print("future return + white noise", end='\n\t')
-            pass;  # print(f"cross-section mu={res.mean(axis=1).mean():.3f} sigma={res.std(axis=1).mean():.3f}")
-
-        return res
-
-    def get_fval_apm(kind='zscore') -> Tuple[str, pd.DataFrame]:
-        """Get APM"""
-        res = pd.read_csv(conf['data_path'] + 'factor_apm.csv', index_col=0, parse_dates=True)
-        if kind == 'uniform':
-            res = res.rank(pct=True, axis=1) * 2 - 1
-            # alpha_name = 'APM(-1t1)'
-        elif kind == 'zscore':
-            res = res.apply(lambda s: (s - s.mean()) / s.std(), axis=1)
-            # alpha_name = 'APM'
-        elif kind == 'reverse':
-            res = res.apply(lambda s: (s.mean() - s) / s.std(), axis=1)
-            # alpha_name = 'APM(R)'
-        else:
-            raise Exception(f'APM kind not in `zscore, uniform, reverse`')
-        _alpha_name = f'APM({kind})'
-        res = res.shift(1).loc[begin_date: end_date]
-        return _alpha_name, res
-
-    pass;  # print(f"Factor name: {alpha_name}")
-    save_suffix = f'OptResWeekly[{mkt_type}]{alpha_name}'
-    save_path = f"{conf['factorsres_path']}{save_suffix}/"
-    os.makedirs(save_path, exist_ok=True)
-    alpha_save_name = save_path + f'factor_{alpha_name}.csv'
+def get_alpha_dat(alpha_name, conf, bd, ed, save_path) -> Tuple[str, pd.DataFrame]:
+    """"""
+    alpha_save_name = save_path + f'{alpha_name}.csv'
     if os.path.exists(alpha_save_name):
         dat = pd.read_csv(alpha_save_name, index_col=0, parse_dates=True)
     else:
-        a_kind, a_para = alpha_name[:-1].split('(')
-        if a_kind[:4] == 'FRtn':  # Use Fake Alpha
-            pred_days = int(a_kind[4:-1])
-            wn_m, wn_s = [float(_) for _ in a_para.split(',')]
-            assert alpha_name == f'FRtn{pred_days}D({wn_m},{wn_s})'
-            dat = get_fval_alpha(pred_days, wn_m, wn_s)
-        elif a_kind == 'APM':  # Use APM
-            a_name, dat = get_fval_apm(kind=a_para)
-            assert a_name == alpha_name
-        else:
-            raise Exception(f'Invalid alpha_name `{alpha_name}`')
+        dat = pd.read_csv(conf['factorscsv_path'] + alpha_name + '.csv', index_col=0, parse_dates=True)
         dat.to_csv(alpha_save_name)
-    return save_path, dat
+
+    return dat.loc[bd: ed]
+
+
+
+
+def get_save_path(res_path, mkt_type, alpha_name):
+    save_suffix = f'OptResWeekly[{mkt_type}]{alpha_name}'
+    save_path = f"{res_path}{save_suffix}/"
+    os.makedirs(save_path, exist_ok=True)
+    return save_path
 
 
 def check_ic_5d(closeAdj_path, dat, begin_date, end_date, lag=5, ranked=True) -> float:
@@ -525,6 +476,7 @@ class PortfolioOptimizer(object):
 
 
 class Optimizer(object):
+    """"""
 
     def __init__(self, args):
         self.conf: dict = args[0]
@@ -572,3 +524,21 @@ class Optimizer(object):
     def optimize(self):
         pass
 
+
+class OneDayOptimize(object):
+    """"""
+
+    def __init__(self, td, wb, a, bl, bh, Xf, F, d):
+        self.td = pd.to_datetime(td)  # current date
+        self.wb: pd.Series = wb  # constituent weight in index
+        self.a: pd.Series = a  # alpha
+        self.L: pd.Series = bl  # minimum beta exposure
+        self.H: pd.Series = bh  # maximum beta exposure
+        self.Xf: pd.DataFrame = Xf  # stk @ beta expo
+        self.F: pd.DataFrame = F  # beta @ beta return covariance
+        self.d: pd.Series = d  # stk specific risk (stddev)
+
+        self.w: pd.Series = pd.Series()  #
+
+    def optimize(self, cnstr):
+        pass

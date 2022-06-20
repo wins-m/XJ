@@ -3,6 +3,7 @@
 - `config.yaml` 参数、目录配置
 - `config2.yaml` swmao macOS下的参数、目录配置，由./setup/config_transfer.py转换
 - `main.py` 供外部访问的执行脚本
+- `requirements.txt` 包
 - ***文件夹./AllSample/***
     - `argparse.example.py` 终端传参示例
     - `conn_mysql.py` 从mysql服务器获取dataframe

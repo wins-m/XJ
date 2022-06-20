@@ -62,16 +62,14 @@ def column_look_up(tgt, src, delay=0, kw='r_1', msg=None, c0='tradingdate', c1='
 
 def get_winsorize_sr(sr: pd.Series, nsigma=3) -> pd.Series:
     """对series缩尾"""
-    df = sr.copy()
-    md = df.median()
-    mad = 1.483 * df.sub(md).abs().median()
-    up = df.apply(lambda k: k > md + mad * nsigma)
-    down = df.apply(lambda k: k < md - mad * nsigma)
-    df[up] = df[up].rank(pct=True).multiply(mad * 0.5).add(md + mad * (0 + nsigma))
-    df[down] = df[down].rank(pct=True).multiply(mad * 0.5).add(md - mad * (0 + nsigma))
-    # df[up] = df[up].rank(pct=True).multiply(mad * 0.5).add(md + mad * (0.5 + nsigma))
-    # df[down] = df[down].rank(pct=True).multiply(mad * 0.5).add(md - mad * (0.5 + nsigma))
-    return df
+    sr1 = sr.copy()
+    md = sr1.median()
+    mad = 1.483 * sr1.sub(md).abs().median()
+    up = sr1.apply(lambda k: k > md + mad * (0 + nsigma))
+    down = sr1.apply(lambda k: k < md - mad * (0 + nsigma))
+    sr1[up] = sr1[up].rank(pct=True).multiply(mad * 0.5).add(md + mad * (0 + nsigma))
+    sr1[down] = sr1[down].rank(pct=True).multiply(mad * 0.5).add(md - mad * (0 + nsigma))
+    return sr1
 
 
 def get_standardize(df):

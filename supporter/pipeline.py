@@ -45,14 +45,6 @@ class Factor(object):
         """Add configuration file to save path."""
         pass
 
-    def _get_fval_in_pool(self):
-        """截面因子值仅保留stk_pool成分股其余留空"""
-        src_path = self.conf['idx_constituent'].format(self.stk_pool)
-        stk_in_pool = ~pd.read_csv(src_path, index_col=0, parse_dates=True).loc[self.begin_date: self.end_date].isna()
-        fv_in_pool = self.fval_raw.reindex_like(stk_in_pool) * stk_in_pool.replace(False, np.nan)
-        self.fval_in_pool = fv_in_pool.dropna(how='all', axis=1)
-        print(f'{self.stk_pool}: fval_raw{self.fval_raw.shape} -> fval_in_pool{self.fval_in_pool.shape}')
-
     def get_fval_ranked(self, save_table=False) -> pd.DataFrame:
         if len(self.fval_ranked) == 0:
             self._get_fval_ranked()
@@ -62,12 +54,6 @@ class Factor(object):
             self.fval_ranked.to_csv(save_path)
             print(f'Rescaled factor value saved in {save_path}')
         return self.fval_ranked
-
-    def _get_fval_ranked(self):
-        """Rescale cross-sectional fval into (0, 1] rank order."""
-        if len(self.fval_in_pool) == 0:
-            self._get_fval_in_pool()
-        self.fval_ranked = self.fval_in_pool.rank(axis=1, pct=True)
 
     def evaluate_signal_ic(self):
         """计算不同预处理方式后的IC保存文件"""
@@ -117,6 +103,27 @@ class Factor(object):
         for chn in ['raw', f'500+raw', '500+winso+std', '500+neu_i', '500+neu_iv']:
             _evaluate_signal(channel=chn)
 
+    def conduct_pipeline(self):
+        """依次执行"""
+        self._get_tradeable_status()
+        self._get_all_ret()
+        self._get_fval_in_pool()
+        self._get_fval_ranked()
+
+    def _get_fval_in_pool(self):
+        """截面因子值仅保留stk_pool成分股其余留空"""
+        src_path = self.conf['idx_constituent'].format(self.stk_pool)
+        stk_in_pool = ~pd.read_csv(src_path, index_col=0, parse_dates=True).loc[self.begin_date: self.end_date].isna()
+        fv_in_pool = self.fval_raw.reindex_like(stk_in_pool) * stk_in_pool.replace(False, np.nan)
+        self.fval_in_pool = fv_in_pool.dropna(how='all', axis=1)
+        print(f'{self.stk_pool}: fval_raw{self.fval_raw.shape} -> fval_in_pool{self.fval_in_pool.shape}')
+
+    def _get_fval_ranked(self):
+        """Rescale cross-sectional fval into (0, 1] rank order."""
+        if len(self.fval_in_pool) == 0:
+            self._get_fval_in_pool()
+        self.fval_ranked = self.fval_in_pool.rank(axis=1, pct=True)
+
     def _get_tradeable_status(self):
         """加载可交易情况self.tradeable_status"""
 
@@ -155,15 +162,7 @@ class Factor(object):
 
         print(panel_2d_val_mean(rtn, kw=f'Return-{self.kind}'))
 
-    def conduct_pipeline(self):
-        """依次执行"""
-        self._get_tradeable_status()
-        self._get_all_ret()
-        self._get_fval_in_pool()
-        self._get_fval_ranked()
 
-
-# %%
 def main():
     # %%
     import yaml
@@ -179,5 +178,5 @@ def main():
 
 
 # %%
-if __name__ == '__main__':
-    main()
+# if __name__ == '__main__':
+#     main()
