@@ -17,16 +17,17 @@ OPTIMIZE_TARGET = '/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyChar
 
 class OptRes(object):
 
-    def __init__(self, ir1: pd.Series, conf: dict):
-        self.info = ir1
+    def __init__(self, ir1: pd.Series, close_adj, idx_cons, res_path):
+        self.closeAdj = close_adj  # conf['closeAdj']
+        self.idx_cons = idx_cons  # conf['idx_constituent']
+        self.res_path = res_path  # conf['factorsres_path']
+        self.alpha_name = ir1['alpha_name']
         self.mkt_type = ir1['mkt_type']
-        self.conf = conf
-        self.closeAdj = conf['closeAdj']
-        self.idx_cons = conf['idx_constituent']
+        self.suffix = info2suffix(ir1)
+        self.path = f"{self.res_path}OptResWeekly[{ir1['mkt_type']}]{self.alpha_name}/{self.suffix}/"
 
         self.suffix: str = ''
         self.path: str = ''
-        self.title: str = ''
         self.W: pd.DataFrame = pd.DataFrame()  # portfolio weight
         self.views: list = list()  # adjust dates
         self.opt_info: pd.DataFrame = pd.DataFrame()
@@ -34,14 +35,13 @@ class OptRes(object):
         self.ed: str = ''
         self.Return: pd.DataFrame = pd.DataFrame()  # returns next week
         self.Wealth: pd.DataFrame = pd.DataFrame()
-        self._get_path()
         self._get_portfolio_weight()
         self._get_optimize_information()
         self.port: Portfolio = Portfolio(w=self.W)
 
     def tf_portfolio_weight(self):
         plt.hist(self.W.values.flatten(), bins=100)
-        plt.title(self.title)
+        plt.title('Weight Distribution')
         plt.tight_layout()
         plt.savefig(self.path + 'figure_weight_hist_' + self.suffix + '.png')
         plt.close()
@@ -49,7 +49,7 @@ class OptRes(object):
         tmp = pd.DataFrame(self.W.count(axis=1).rename('W'))
         tmp['4W'] = tmp['W'].rolling(4).mean()
         tmp['26W'] = tmp['W'].rolling(26).mean()
-        tmp.plot(title=self.title, linewidth=2)
+        tmp.plot(title='Portfolio Asset Numbers (rolling mean)', linewidth=2)
         plt.tight_layout()
         plt.savefig(self.path + 'figure_portfolio_size_' + self.suffix + '.png')
         plt.close()
@@ -59,7 +59,7 @@ class OptRes(object):
         tmp['w-MAX'] = self.W.max(axis=1)
         tmp['w-MEDIAN'] = self.W.median(axis=1)
         tmp['w-AVERAGE'] = self.W.mean(axis=1)
-        tmp.plot(title=self.title, linewidth=2)
+        tmp.plot(title='Asset Weight', linewidth=2)
         plt.tight_layout()
         plt.savefig(self.path + 'figure_portfolio_weight_' + self.suffix + '.png')
         plt.close()
@@ -85,11 +85,11 @@ class OptRes(object):
         tmp = tmp.sort_values(['port', 'cons'], ascending=False)
         tmp['d'] = tmp.iloc[:, 0] - tmp.iloc[:, 1]
         tmp.to_excel(self.path + 'table_holding_diff_20211231' + self.suffix + '.xlsx')
-        tmp['d'].dropna().reset_index(drop=True).plot(style='o', title=self.title)
+        tmp['d'].dropna().reset_index(drop=True).plot(style='o', title=f'Weight Difference to {self.mkt_type}')
         plt.tight_layout()
         plt.savefig(self.path + 'figure_holding_diff_20211231_' + self.suffix + '.png')
         plt.close()
-        tmp['port'].dropna().reset_index(drop=True).plot(title=self.title)
+        tmp['port'].dropna().reset_index(drop=True).plot(title='Holding Weight')
         plt.tight_layout()
         plt.savefig(self.path + 'figure_holding_weight_20211231_' + self.suffix + '.png')
         plt.close()
@@ -99,14 +99,14 @@ class OptRes(object):
         self.Wealth['Excess'] = self.Wealth.iloc[:, 0] - self.Wealth.iloc[:, 1]
         self.Wealth = self.Wealth.add(1)
         self.Wealth.to_excel(self.path + 'table_result_wealth_' + self.suffix + '.xlsx')
-        self.Wealth.plot(title=self.title)
+        self.Wealth.plot(title='Wealth (1 week ahead)')
         plt.tight_layout()
         plt.savefig(self.path + 'figure_result_wealth_' + self.suffix + '.png')
         plt.close()
 
     def tf_turnover(self):
         sr = self.opt_info['turnover']
-        sr.plot(title=f'Turnover, M={sr.mean()*100:.2f}%')
+        sr.plot(title=f'Turnover, M={sr.mean() * 100:.2f}%')
         plt.tight_layout()
         plt.savefig(self.path + 'figure_turnover_' + self.suffix + '.png')
         plt.close()
@@ -127,15 +127,6 @@ class OptRes(object):
         plt.savefig('figure_alpha_risk_' + self.suffix + '.png')
         plt.close()
 
-    def _get_path(self):
-        res_path = self.conf['factorsres_path']
-        ir1 = self.info
-        self.suffix = info2suffix(ir1)
-        # self.suffix = f"{ir1['beta_suffix']}(B={ir1['B']},E={ir1['E']},D={ir1['D']},H0={ir1['H0']}" + \
-        #               (')' if np.isnan(float(ir1['H1'])) else f",H1={ir1['H1']})")  # suffix for all result file
-        self.path = res_path + f"OptResWeekly[{ir1['mkt_type']}]" + ir1['alpha_name'] + '/' + self.suffix + '/'
-        self.title = self.info['alpha_name'] + ': ' + self.suffix
-
     def _get_portfolio_weight(self):
         self.W = pd.read_csv(self.path + f"portfolio_weight_{self.suffix}.csv",
                              index_col=0, parse_dates=True)
@@ -149,13 +140,13 @@ class OptRes(object):
 
 def func(args):
     ir1, conf, msg = args
-    self = OptRes(ir1, conf)
+    self = OptRes(ir1, conf['closeAdj'], conf['idx_constituent'], conf['factorsres_path'])
     self.tf_historical_result()
     self.tf_portfolio_weight()
     self.tf_turnover()
     self.tf_optimize_time()
     self.tf_risk_and_result()
-    print(self.title, msg)
+    print(self.alpha_name + ': ' + self.suffix, msg)
 
 
 def opt_res_ana():
