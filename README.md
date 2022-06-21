@@ -11,7 +11,7 @@
     - `imap.py` 多进程进度条
     - `resultDemo.jpg` 回测结果示例
     - `template.py` 项目module模板
-    - `tensorflow.py` 张量菜鸟语法
+    - `tensorflow.py` 张量语法
     - `update_idx_price.py` 更新数据库表的示例
 - ***文件夹./BarraPCA/***
     - `00.py` 统计收益率分布
@@ -67,6 +67,7 @@
     - `factor_reformat.py` 各类因子的预处理，做成可进入回测的2D面板
     - `feature_extraction_level2.py` 计算level2价量因子
     - `feature_level2.xlsx` 所需更新的level2价量因子
+    - `simu_alpha.py` Alpha因子调整、生成
     - `turnover.py` 生成换手率（5日）因子
 - ***文件夹./res_analysis/***
     - `net_value_compare.py` 回测结果的比较，生成图像
