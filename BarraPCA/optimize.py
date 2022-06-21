@@ -120,9 +120,10 @@ def optimize(args):
     optimize_iter_info.T.to_excel(save_path_sub + f'opt_info_{suffix}.xlsx')
     portfolio_weight.to_csv(save_path_sub + 'portfolio_weight_{}.csv'.format(suffix))
     # Graphs & Tables:
-    opt_res = OptRes(ir1, conf)
+    opt_res = OptRes(ir1, conf['closeAdj'], conf['idx_constituent'], conf['factorsres_path'])
     opt_res.tf_historical_result()
     opt_res.tf_portfolio_weight()
+    # TODO: res ana
 
 
 def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -223,7 +224,7 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
         # srs_D.to_pickle(path + "specific_risk.pkl")
         # xf.to_pickle(path + "factor_exposure.pkl")
 
-        def wtf(a, mat_F, srs_D, xf, df_lst_w, w_lst, G, ishow=False):
+        def wtf(a, mat_F, srs_D, xf, df_lst_w, w_lst, G, ishow=False):  # TODO: out
             a = a.values.reshape(1, -1)
             mat_F = np.matrix(mat_F)
             srs_D = np.matrix(srs_D ** 2)
@@ -323,9 +324,9 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
                 #     lst_w.columns = [td]
             iter_info = {
                 '#alpha^beta': len(ls_pool), '#index^beta': len(ls_base), '#index': len(stk_index),
-                'turnover': turnover, 'holding': hdn, 'solver': prob.solver_stats.solver_name,
-                'status': prob.status, 'stime': prob.solver_stats.solve_time,
-                'opt0': result, 'opt1': (a @ w1)[0],
+                'turnover': turnover, 'holding': hdn,
+                'risk': risk.value, 'opt0': result, 'opt1': (a @ w1)[0],
+                'solver': prob.solver_stats.solver_name, 'status': prob.status, 'stime': prob.solver_stats.solve_time,
             }
 
             #
