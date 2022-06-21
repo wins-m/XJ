@@ -1,6 +1,6 @@
 """
 (created by swmao on June 20th)
-Class SimuAlpha to generate toy alphas
+Class SimAlpha to generate toy alphas
 
 """
 import yaml
