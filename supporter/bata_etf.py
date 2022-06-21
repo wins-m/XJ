@@ -220,10 +220,16 @@ def get_beta_expo_cnstr(beta_kind, conf, begin_date, end_date, H0, H1, beta_args
     return expo_beta, cnstr_beta
 
 
-def get_index_constitution(src, begin_date, end_date) -> pd.DataFrame:
-    """Baseline Portfolio 股指成分股权重"""
-    ind_cons = pd.read_csv(src, index_col=0, parse_dates=True)
-    ind_cons = ind_cons.loc[begin_date: end_date]
+def get_index_constitution(csv, bd, ed) -> pd.DataFrame:
+    """
+    Read csv file - index constituent, return cons stock weight, sum 1
+    :param csv: csv file path
+    :param bd: return begin date
+    :param ed: return end date
+    :return: DataFrame of shape (n_views, n_assets)
+    """
+    ind_cons = pd.read_csv(csv, index_col=0, parse_dates=True)
+    ind_cons = ind_cons.loc[bd: ed]
     ind_cons = ind_cons.dropna(how='all', axis=1)
     # ind_cons = ind_cons.fillna(0)
     ind_cons /= 100
