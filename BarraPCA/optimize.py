@@ -15,7 +15,7 @@ from multiprocessing import Pool, RLock, freeze_support
 
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
 from supporter.bata_etf import second2clock, info2suffix, get_tradedates, get_beta_expo_cnstr, get_index_constitution, \
-    get_factor_covariance, get_specific_risk, get_alpha_dat, get_save_path, io_make_sub_dir, get_accessible_stk, \
+    get_factor_covariance, get_specific_risk, link_alpha_dat, get_save_path, io_make_sub_dir, get_accessible_stk, \
     OptCnstr
 from BarraPCA.opt_res_ana import OptRes
 
@@ -100,7 +100,7 @@ def optimize(args):
     fct_cov = get_factor_covariance(path_F=conf['factor_covariance'], bd=begin_date, ed=end_date, fw=1)
     stk_rsk = get_specific_risk(path_D=conf['specific_risk'], bd=begin_date, ed=end_date, fw=1)
     save_path = get_save_path(conf['factorsres_path'], mkt_type, alpha_name)
-    alpha = get_alpha_dat(alpha_name, conf, begin_date, end_date, save_path)
+    alpha: pd.DataFrame = link_alpha_dat(alpha_name, conf['factorscsv_path'], begin_date, end_date, save_path)
 
     # alpha_5d_rank_ic = check_ic_5d(conf['closeAdj'], dat, begin_date, end_date, lag=5)  # cal ic
     # script_info['alpha_5d_rank_ic'] = str(alpha_5d_rank_ic)

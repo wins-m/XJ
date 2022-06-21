@@ -72,18 +72,16 @@ def io_make_sub_dir(path, force=False):
     pass;  # print(f'Save in: {path}')
 
 
-def get_alpha_dat(alpha_name, conf, bd, ed, save_path) -> Tuple[str, pd.DataFrame]:
+def link_alpha_dat(alpha_name, res_path, bd, ed, save_path) -> pd.DataFrame:
     """"""
     alpha_save_name = save_path + f'{alpha_name}.csv'
     if os.path.exists(alpha_save_name):
         dat = pd.read_csv(alpha_save_name, index_col=0, parse_dates=True)
     else:
-        dat = pd.read_csv(conf['factorscsv_path'] + alpha_name + '.csv', index_col=0, parse_dates=True)
+        dat = pd.read_csv(res_path + alpha_name + '.csv', index_col=0, parse_dates=True)
         dat.to_csv(alpha_save_name)
 
     return dat.loc[bd: ed]
-
-
 
 
 def get_save_path(res_path, mkt_type, alpha_name):
