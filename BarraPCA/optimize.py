@@ -123,7 +123,9 @@ def optimize(args):
     opt_res = OptRes(ir1, conf['closeAdj'], conf['idx_constituent'], conf['factorsres_path'])
     opt_res.tf_historical_result()
     opt_res.tf_portfolio_weight()
-    # TODO: res ana
+    opt_res.tf_turnover()
+    opt_res.tf_optimize_time()
+    opt_res.tf_risk_and_result()
 
 
 def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFrame]:
