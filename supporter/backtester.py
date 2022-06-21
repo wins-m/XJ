@@ -54,7 +54,8 @@ class Portfolio(object):
         self.w_2d = w
         self.panel: pd.DataFrame = pd.DataFrame(
             index=w.index, columns=['NStocks', 'Turnover', 'Return', 'Return_wc',
-                                    'Wealth(cumsum)', 'Wealth_wc(cumsum)', 'Wealth(cumprod)', 'Wealth_wc(cumprod)'])
+                                    'Wealth(cumsum)', 'Wealth_wc(cumsum)',
+                                    'Wealth(cumprod)', 'Wealth_wc(cumprod)'])
         self.cost_rate = None
         self.stat = {}
         self.mdd = {}
@@ -64,6 +65,8 @@ class Portfolio(object):
         self.panel = portfolio_statistics_from_weight(weight=self.w_2d, cost_rate=cr, all_ret=ret)
 
     def cal_half_year_stat(self, wc=False):
+        if self.panel.dropna().__len__() == 0:
+            raise Exception('Portfolio.cal_panel_result First')
         col = 'Return_wc' if wc else 'Return'
         self.stat[wc] = cal_result_stat(self.panel[[col]])
 
@@ -119,10 +122,15 @@ class Portfolio(object):
 
     def get_half_year_stat(self, wc=False, path=None) -> pd.DataFrame:
         if wc not in self.stat.keys():
-            print('Calculate half-year statistics before get_stat...')
+            print('Calculate half-year statistics before get_half_year_stat...')
             self.cal_half_year_stat(wc=wc)
         if path is not None:
-            self.stat[wc].to_csv(path)
+            if path[-4:] == '.csv':
+                self.stat[wc].to_csv(path)
+            elif path[-5:] == '.xlsx':
+                self.stat[wc].to_excel(path)
+            else:
+                raise Exception(f"Unknown file type `{path}`")
         return self.stat[wc]
 
 

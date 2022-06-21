@@ -10,6 +10,7 @@ from multiprocessing import Pool
 
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
 from supporter.bata_etf import info2suffix, get_index_constitution
+from supporter.backtester import Portfolio
 
 OPTIMIZE_TARGET = '/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/BarraPCA/optimize_target_v2.xlsx'
 
@@ -36,6 +37,7 @@ class OptRes(object):
         self._get_path()
         self._get_portfolio_weight()
         self._get_optimize_information()
+        self.port: Portfolio = Portfolio(w=self.W)
 
     def tf_portfolio_weight(self):
         plt.hist(self.W.values.flatten(), bins=100)
@@ -67,7 +69,11 @@ class OptRes(object):
         close_adj = pd.read_csv(self.closeAdj, index_col=0, parse_dates=True)
         close_adj_w = close_adj.loc[self.views]
         rtn_next_week = close_adj_w.pct_change().shift(-1)
-        # Table Return
+        # Half Year Statistics (without cost)
+        self.port.cal_panel_result(cr=0, ret=rtn_next_week)
+        self.port.cal_half_year_stat(wc=False)
+        self.port.get_half_year_stat(wc=False, path=self.path + 'table_half_year_stat_' + self.suffix + '.xlsx')
+        # Table Return  TODO: reuse methods in Portfolio
         self.Return['portfolio'] = (rtn_next_week.reindex_like(self.W) * self.W).sum(axis=1)
         ind_cons_w = get_index_constitution(self.idx_cons.format(self.mkt_type), self.bd, self.ed)
         ind_cons_w: pd.DataFrame = ind_cons_w.loc[self.views]
