@@ -1,9 +1,12 @@
 import sys
 from datetime import timedelta
 from typing import Dict
+
+import pandas as pd
+
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
 from supporter.factor_operator import *
-from supporter.io import get_time_suffix
+from supporter.io import get_time_suffix, table_save_safe
 
 
 def clip_backtest_conf(conf: dict):
@@ -16,7 +19,7 @@ def clip_backtest_conf(conf: dict):
         'marketvalue_path': conf['marketvalue'],
         'close_path': conf['closeAdj'],
         'open_path': conf['openAdj'],
-        'rtn_format' : conf['rtnFormat'],
+        'rtn_format': conf['rtnFormat'],
         'test_mode': str(conf['test_mode']),
         'exclude_tradeable': conf['exclude_tradeable'],
         'neu_mtd': conf['neu_mtd'],
@@ -49,37 +52,73 @@ class StkPool(object):
 
 
 class Portfolio(object):
+    r"""
+    w: DataFrame of shape (n_views, n_assets), holding weight row sum 1
+    cr: float, cost rate
 
-    def __init__(self, w: pd.DataFrame = None):
+    ------
+    port = Portfolio(w,[ cr, ret])
+    port.cal_panel_result(cr: float, ret: pd.DataFrame)
+    port.cal_half_year_stat(wc: bool)
+
+    """
+
+    def __init__(self, w: pd.DataFrame = None, **kwargs):
         self.w_2d = w
+        self.views = w.index.to_list()
+
         self.panel: pd.DataFrame = pd.DataFrame(
-            index=w.index, columns=['NStocks', 'Turnover', 'Return', 'Return_wc',
-                                    'Wealth(cumsum)', 'Wealth_wc(cumsum)',
-                                    'Wealth(cumprod)', 'Wealth_wc(cumprod)'])
+            index=self.views, columns=['NStocks', 'Turnover', 'Return', 'Return_wc',
+                                       'Wealth(cumsum)', 'Wealth_wc(cumsum)',
+                                       'Wealth(cumprod)', 'Wealth_wc(cumprod)'])
         self.cost_rate = None
-        self.stat = {}
+        if ('cr' in kwargs) and ('ret' in kwargs):
+            self.cal_panel_result(cr=kwargs['cr'], ret=kwargs['ret'])
+
+        self.stat = {True: pd.DataFrame(), False: pd.DataFrame()}  # half year statistics
         self.mdd = {}
 
-    def cal_panel_result(self, cr, ret):
+    def cal_panel_result(self, cr: float, ret: pd.DataFrame):
+        """From hist ret and hold weight, cal panel: NStocks, Turnover, Return(), Wealth()"""
         self.cost_rate = cr
         self.panel = portfolio_statistics_from_weight(weight=self.w_2d, cost_rate=cr, all_ret=ret)
 
     def cal_half_year_stat(self, wc=False):
+        """cal half year statistics from `panel`"""
         if self.panel.dropna().__len__() == 0:
-            raise Exception('Portfolio.cal_panel_result First')
+            raise Exception('Empty self.panel')
         col = 'Return_wc' if wc else 'Return'
         self.stat[wc] = cal_result_stat(self.panel[[col]])
 
-    def plot_turnover(self, ishow, path):
+    def get_position_weight(self, path=None) -> pd.DataFrame:
+        if path is not None:
+            table_save_safe(df=self.w_2d, tgt=path)
+        return self.w_2d.copy()
+
+    def get_panel_result(self, path=None) -> pd.DataFrame:
+        if path is not None:
+            table_save_safe(df=self.panel, tgt=path)
+        return self.panel.copy()
+
+    def get_half_year_stat(self, wc=False, path=None) -> pd.DataFrame:
+        if wc not in self.stat.keys():
+            print('Calculate half-year statistics before get_half_year_stat...')
+            self.cal_half_year_stat(wc=wc)
+        if path is not None:
+            table_save_safe(df=self.stat[wc], tgt=path)
+        return self.stat[wc]
+
+    def plot_turnover(self, ishow, path, title='Turnover'):
         if self.panel is None:
-            raise AssertionError('Calculate panel result before plot turnover!')
-        self.panel['Turnover'].plot(figsize=(9, 5), grid=True, title='Turnover')
+            raise Exception('Calculate panel result before plot turnover!')
+
+        sr = self.panel['Turnover']
+        sr.plot(figsize=(9, 5), grid=True, title=title+f', M={sr.mean() * 100:.2f}%')
         plt.tight_layout()
         plt.savefig(path)
         if ishow:
             plt.show()
-        else:
-            plt.close()
+        plt.close()
 
     def plot_cumulative_returns(self, ishow, path, kind='cumsum', title=None):
         title = f'Portfolio Absolute Result ({kind})' if title is None else title
@@ -88,8 +127,7 @@ class Portfolio(object):
         plt.savefig(path)
         if ishow:
             plt.plot()
-        else:
-            plt.close()
+        plt.close()
 
     def plot_max_drawdown(self, ishow, path, wc=False, kind='cumsum', title=None):
         col = f'Wealth_wc({kind})' if wc else f'Wealth({kind})'
@@ -98,15 +136,40 @@ class Portfolio(object):
         df = df + 1 if df.iloc[0] < .6 else df
         cal_sr_max_drawdown(df=df, ishow=ishow, title=title, save_path=path, kind=kind)
 
-    def get_position_weight(self, path=None) -> pd.DataFrame:
-        if path is not None:
-            self.w_2d.to_csv(path)
-        return self.w_2d.copy()
+    def plot_weight_hist(self, path, ishow=False, title='Weight Distribution'):
+        plt.hist(self.w_2d.values.flatten(), bins=100)
+        plt.title(title)
+        plt.tight_layout()
+        plt.savefig(path)
+        if ishow:
+            plt.show()
+        plt.close()
 
-    def get_panel(self, path=None) -> pd.DataFrame:
-        if path is not None:
-            self.panel.to_csv(path)
-        return self.panel.copy()
+    def plot_port_asset_num(self, path, ishow=False, rw=None):
+        if rw is None:
+            rw = {'D': 1, '20D': 20, '60D': 60}
+        n_stk = self.panel['NStocks']
+        tmp = pd.DataFrame()
+        for k, v in rw.items():
+            tmp[k] = n_stk.rolling(v).mean()
+        tmp.plot(title=f'Portfolio Asset Numbers (rolling mean), M={n_stk.mean():.2f}', linewidth=2)
+        plt.tight_layout()
+        plt.savefig(path)
+        if ishow:
+            plt.show()
+        plt.close()
+
+    def plot_asset_weight(self, path, ishow=False, title='Asset Weight'):
+        tmp = pd.DataFrame()
+        tmp['w-MAX'] = self.w_2d.max(axis=1)
+        tmp['w-MEDIAN'] = self.w_2d.median(axis=1)
+        tmp['w-AVERAGE'] = self.w_2d.mean(axis=1)
+        tmp.plot(title=title, linewidth=2)
+        plt.tight_layout()
+        plt.savefig(path)
+        if ishow:
+            plt.show()
+        plt.close()
 
     def get_stock_number(self) -> pd.Series:
         return self.panel['NStocks'].copy()
@@ -117,21 +180,8 @@ class Portfolio(object):
     def get_daily_ret(self, wc=False) -> pd.Series:
         return self.panel['Return_wc' if wc else 'Return'].copy()
 
-    def get_wealth(self, wc=False, kind='cumprod') -> pd.Series:
+    def get_wealth(self, wc=False, kind='cumsum') -> pd.Series:
         return self.panel[f'Wealth_wc({kind})' if wc else f'Wealth({kind})'].copy()
-
-    def get_half_year_stat(self, wc=False, path=None) -> pd.DataFrame:
-        if wc not in self.stat.keys():
-            print('Calculate half-year statistics before get_half_year_stat...')
-            self.cal_half_year_stat(wc=wc)
-        if path is not None:
-            if path[-4:] == '.csv':
-                self.stat[wc].to_csv(path)
-            elif path[-5:] == '.xlsx':
-                self.stat[wc].to_excel(path)
-            else:
-                raise Exception(f"Unknown file type `{path}`")
-        return self.stat[wc]
 
 
 class Signal(object):
@@ -291,7 +341,9 @@ class Strategy(object):
             plt.close()
 
     def plot_cumulative_returns(self, ishow, path, wc=False, kind='cumsum', excess=False):
-        df = pd.concat([self.portfolio[k].get_wealth(wc, kind).rename(k) for k in ['baseline', 'long_short', 'long', 'short']], axis=1)
+        df = pd.concat(
+            [self.portfolio[k].get_wealth(wc, kind).rename(k) for k in ['baseline', 'long_short', 'long', 'short']],
+            axis=1)
         if excess:
             df[['long_short', 'long', 'short']] -= df['baseline'].values.reshape(-1, 1)
             df = df[['long_short', 'long', 'short']]
@@ -360,10 +412,10 @@ class Strategy(object):
 
     def get_ls_panels(self, path_f: str = None) -> dict:
         if path_f is not None:
-            self.portfolio['long_short'].get_panel(path_f.format('PanelLongShort.csv'))
-            self.portfolio['long'].get_panel(path_f.format('PanelLong.csv'))
-            self.portfolio['short'].get_panel(path_f.format('PanelShort.csv'))
-        return {k: self.portfolio[k].get_panel() for k in self.portfolio.keys()}
+            self.portfolio['long_short'].get_panel_result(path_f.format('PanelLongShort.csv'))
+            self.portfolio['long'].get_panel_result(path_f.format('PanelLong.csv'))
+            self.portfolio['short'].get_panel_result(path_f.format('PanelShort.csv'))
+        return {k: self.portfolio[k].get_panel_result() for k in self.portfolio.keys()}
 
     def get_portfolio_statistics(self, kind='long', wc=False, path_f=None):
         """获取半年表现面板"""

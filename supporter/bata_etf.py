@@ -13,21 +13,7 @@ from typing import Tuple
 import time
 
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
-
-# %matplotlib inline
-import warnings
-warnings.simplefilter("ignore")
-import seaborn
-seaborn.set_style("darkgrid")
-import matplotlib.pyplot as plt
-plt.rc("figure", figsize=(9, 5))
-plt.rc("font", size=12)
-plt.rcParams['axes.autolimit_mode'] = 'round_numbers'
-plt.rcParams['axes.xmargin'] = 0
-plt.rcParams['axes.ymargin'] = 0
-plt.rc("savefig", dpi=90)
-plt.rcParams["date.autoformatter.hour"] = "%H:%M:%S"
-
+from supporter.plot_config import *
 np.random.seed(9)
 
 
@@ -72,7 +58,7 @@ def io_make_sub_dir(path, force=False):
     pass;  # print(f'Save in: {path}')
 
 
-def link_alpha_dat(alpha_name, res_path, bd, ed, save_path) -> pd.DataFrame:
+def get_alpha_dat(alpha_name, res_path, bd, ed, save_path, fw=1) -> pd.DataFrame:
     """"""
     alpha_save_name = save_path + f'{alpha_name}.csv'
     if os.path.exists(alpha_save_name):
@@ -81,7 +67,7 @@ def link_alpha_dat(alpha_name, res_path, bd, ed, save_path) -> pd.DataFrame:
         dat = pd.read_csv(res_path + alpha_name + '.csv', index_col=0, parse_dates=True)
         dat.to_csv(alpha_save_name)
 
-    return dat.loc[bd: ed]
+    return dat.shift(fw).loc[bd: ed]
 
 
 def get_save_path(res_path, mkt_type, alpha_name):

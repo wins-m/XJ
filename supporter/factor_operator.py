@@ -5,19 +5,11 @@
 """
 import pandas as pd
 import numpy as np
+from scipy import stats
 import sys
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
 from supporter.transformer import get_neutralize_sector, get_neutralize_sector_size, get_winsorize, get_standardize
-from scipy import stats
-from matplotlib import pyplot as plt
-plt.rc("figure", figsize=(9, 5))
-plt.rc("font", size=12)
-plt.rcParams['axes.autolimit_mode'] = 'round_numbers'
-plt.rcParams['axes.xmargin'] = 0
-plt.rcParams['axes.ymargin'] = 0
-plt.rc("savefig", dpi=90)
-plt.rcParams["date.autoformatter.hour"] = "%H:%M:%S"
-
+from supporter.plot_config import *
 # def keep_pool_stk(df: pd.DataFrame, pool_multi: pd.DataFrame):
 #     """
 #     只保留股池内的因子值，其余为空
@@ -202,8 +194,7 @@ def panel_long_short_absolute(long_short_return_nc, ishow=False, title='', save_
         plt.savefig(save_path)
         if ishow:
             plt.show()
-        else:
-            plt.close()
+        plt.close()
 
     return long_short_absolute_nc
 
@@ -229,8 +220,7 @@ def panel_long_short_excess(long_short_absolute_nc, ishow=False, title='Long-Sho
         plt.savefig(save_path)
         if ishow:
             plt.show()
-        else:
-            plt.close()
+        plt.close()
 
     return long_short_excess_nc
 
@@ -249,8 +239,7 @@ def plot_rtns_group(ret_group: pd.DataFrame, ishow=False, save_path=None, cumsum
         plt.savefig(save_path)
         if ishow:
             plt.show()
-        else:
-            plt.close()
+        plt.close()
 
     return ret_group_cumulative
 
@@ -327,8 +316,7 @@ def cal_total_ret_group(ret_group, ishow=False, save_path=None) -> pd.DataFrame:
         plt.savefig(save_path)
         if ishow:
             plt.show()
-        else:
-            plt.close()
+        plt.close()
 
     return ret_group_total
 
@@ -350,8 +338,7 @@ def cal_sr_max_drawdown(df: pd.Series, ishow=False, title=None, save_path=None, 
             plt.savefig(save_path)
             if ishow:
                 plt.show()
-            else:
-                plt.close()
+            plt.close()
 
     return mdd
 
@@ -369,8 +356,7 @@ def cal_yearly_return(data, ishow=False, title='Annual Return', save_path=None) 
         plt.savefig(save_path)
         if ishow:
             plt.show()
-        else:
-            plt.close()
+        plt.close()
 
     return aret
 
@@ -388,8 +374,7 @@ def cal_yearly_sharpe(data, ishow=False, title='Annual Sharpe', save_path=None, 
         plt.savefig(save_path)
         if ishow:
             plt.show()
-        else:
-            plt.close()
+        plt.close()
 
     return asharp
 
@@ -426,8 +411,7 @@ def cal_turnover_long_short(long_short_group, idx_weight, ngroups, ishow=False, 
         plt.savefig(save_path.replace('.csv', '.png'))
         if ishow:
             plt.show()
-        else:
-            plt.close()
+        plt.close()
 
     return dw
 
@@ -445,8 +429,7 @@ def cal_ic(fv_l1, ret, lag=1, ranked=False, ishow=False, save_path=None) -> pd.D
         plt.savefig(save_path)
         if ishow:
             plt.show()
-        else:
-            plt.close()
+        plt.close()
 
     return ic
 
@@ -485,8 +468,7 @@ def cal_ic_decay(fval_neutralized, ret, maxlag=20, ishow=False, save_path=None) 
         plt.savefig(save_path)
         if ishow:
             plt.show()
-        else:
-            plt.close()
+        plt.close()
 
     return res
 

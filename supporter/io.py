@@ -5,6 +5,8 @@ I/O支持
 """
 import time
 
+import pandas as pd
+
 
 def break_confirm(bo, msg):
     """返回1，强制终止"""
@@ -19,7 +21,7 @@ def break_confirm(bo, msg):
     return res
 
 
-def table_save_safe(df, tgt, kind='csv', notify=False):
+def table_save_safe(df: pd.DataFrame, tgt: str, kind=None, notify=False, **kwargs):
     """
     安全更新已有表格（当tgt在磁盘中被打开，5秒后再次尝试存储）
     :param df: 表格
@@ -28,18 +30,36 @@ def table_save_safe(df, tgt, kind='csv', notify=False):
     :param notify: 是否
     :return:
     """
+    kind = tgt.rsplit(sep='.', maxsplit=1)[-1] if kind is None else kind
+
     if kind == 'csv':
-        try:
-            df.to_csv(tgt)
-        except PermissionError:
-            print(f'Permission Error: saving `{tgt}`, retry in 5 seconds...')
-            time.sleep(5)
-            table_save_safe(df, tgt, kind)
-        finally:
-            if notify:
-                print(f'{df.shape} saved in `{tgt}`.')
+        func = df.to_csv
+    elif kind == 'xlsx':
+        func = df.to_excel
+    elif kind == 'pkl':
+        func = df.to_pickle
+    elif kind == 'h5':
+        if 'key' in kwargs:
+            hdf_k = kwargs['key']
+        elif 'k' in kwargs:
+            hdf_k = kwargs['k']
+        else:
+            raise Exception('Save FileType hdf but key not given in table_save_safe')
+
+        def func():
+            df.to_hdf(tgt, key=hdf_k)
     else:
-        raise ValueError(f'kind `{kind}` not supported.')
+        raise ValueError(f'Save table filetype `{kind}` not supported.')
+
+    try:
+        func(tgt)
+    except PermissionError:
+        print(f'Permission Error: saving `{tgt}`, retry in 5 seconds...')
+        time.sleep(5)
+        table_save_safe(df, tgt, kind)
+    finally:
+        if notify:
+            print(f'{df.shape} saved in `{tgt}`.')
 
 
 def get_time_suffix(suffix: str = None):
