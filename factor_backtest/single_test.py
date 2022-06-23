@@ -145,7 +145,7 @@ def single_test(conf: dict):
         if test_mode == '3':  # 由持仓计算持仓组合结果
             portfolio_l = Portfolio(w=signal.get_fv())
             portfolio_l.cal_panel_result(cr=cost_rate, ret=all_ret)
-            portfolio_l.get_panel(path_format.format('PanelLong.csv'))
+            portfolio_l.get_panel_result(path_format.format('PanelLong.csv'))
             portfolio_l.plot_cumulative_returns(ishow=ishow, path=path_format.format('LAbsRes.png'), kind='cumsum')
             portfolio_l.get_half_year_stat(wc=False, path=path_format.format('ResLongNC.csv'))
             portfolio_l.get_half_year_stat(wc=True, path=path_format.format('ResLongWC.csv'))
