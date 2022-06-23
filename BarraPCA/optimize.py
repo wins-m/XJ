@@ -15,40 +15,47 @@ from multiprocessing import Pool, RLock, freeze_support
 
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
 from supporter.bata_etf import second2clock, info2suffix, get_tradedates, get_beta_expo_cnstr, get_index_constitution, \
-    get_factor_covariance, get_specific_risk, link_alpha_dat, get_save_path, io_make_sub_dir, get_accessible_stk, \
+    get_factor_covariance, get_specific_risk, get_alpha_dat, get_save_path, io_make_sub_dir, get_accessible_stk, \
     OptCnstr
 from BarraPCA.opt_res_ana import OptRes
-
-OPTIMIZE_TARGET = '/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/BarraPCA/optimize_target_v2.xlsx'
-PROCESS_NUM = 4
-mkdir_force = True
-TELLING = False
+from supporter.plot_config import *
 
 
-# %%
-def main():
-    # %%
+def load_optimize_target(opt_tgt: str) -> pd.DataFrame:
+    df = pd.read_excel(opt_tgt, index_col=0, dtype=object).loc[1:1]
+    df['N'] = df['N'].apply(lambda x: float(x))
+    df['H0'] = df['H0'].apply(lambda x: float(x))
+    df['H1'] = df['H1'].apply(lambda x: float(x))
+    df['B'] = df['B'].apply(lambda x: float(x) / 100)
+    df['E'] = df['E'].apply(lambda x: float(x) / 100)
+    df['D'] = df['D'].apply(lambda x: float(x))
+    df['G'] = df['G'].apply(lambda x: float(x) * 1e4)
+    df['S'] = df['S'].apply(lambda x: float(x))
+    df['wei_tole'] = df['wei_tole'].apply(lambda x: float(x))
+    df['opt_verbose'] = df['opt_verbose'].apply(lambda x: x == 'TRUE')
+
+    return df
+
+
+def optimize(conf: dict, mkdir_force: bool, process_num: int):
     t0 = time.time()
 
-    # Configs:
-    conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/config.yaml'
-    conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
     # Optimize Target:
-    optimize_target = pd.read_excel(OPTIMIZE_TARGET, index_col=0, dtype=object).loc[1:1]
+    opt_tgt_path = conf['optimize_target']
+
+    # optimize_target = pd.read_excel(opt_tgt_path, index_col=0, dtype=object).loc[1:1]
+    optimize_target = load_optimize_target(opt_tgt=opt_tgt_path)
     print(optimize_target)
 
     # Run optimize:
-    ir1 = optimize_target.iloc[0]
-    args = (conf, ir1, mkdir_force, 0)
-    # %%
-    if PROCESS_NUM > 1:
+    if process_num > 1:
         print(f'father process {os.getpid()}')
         freeze_support()
-        p = Pool(PROCESS_NUM, initializer=tqdm.set_lock, initargs=(RLock(),))
+        p = Pool(process_num, initializer=tqdm.set_lock, initargs=(RLock(),))
         cnt = 0
         for ir in optimize_target.iterrows():
             ir1 = ir[1]
-            p.apply_async(optimize, args=[(conf, ir1, mkdir_force, cnt % PROCESS_NUM)])
+            p.apply_async(optimize1, args=[(conf, ir1, mkdir_force, cnt % process_num)])
             cnt += 1
         p.close()
         p.join()
@@ -56,76 +63,133 @@ def main():
         for ir in optimize_target.iterrows():
             ir1 = ir[1]
             args = (conf, ir1, mkdir_force, 0)
-            optimize(args)
-    # %% Exit:
+            optimize1(args)
+
+    # Exit:
     print(f'\nTime used: {second2clock(round(time.time() - t0))}')
 
 
-def optimize(args):
+def optimize1(args, telling=False):
     """"""
-    # %% Decode setting and parameters
+    # Decode setting and parameters  # TODO: de config & track args in dict
     conf: dict = args[0]
     ir1: pd.Series = args[1]
     dir_force: bool = args[2]
     pos: int = args[3]
 
-    mkt_type = ir1['mkt_type']
+    res_path: str = conf['factorscsv_path']
+    idx_cons_path: str = conf['idx_constituent']
+    fct_cov_path: str = conf['fct_cov_path']
+    stk_rsk_path: str = conf['specific_risk']
+    close_adj_path: str = conf['closeAdj']
+    trade_cost: float = float(conf['tc'])
+
+    script_info = ir1.to_dict()
+    opt_verbose = (ir1['opt_verbose'] == 'TRUE')
     begin_date = ir1['begin_date']
     end_date = ir1['end_date']
-    N = float(ir1['N'])
-    opt_verbose = (ir1['opt_verbose'] == 'TRUE')
-    B = float(ir1['B']) / 100
-    E = float(ir1['E']) / 100
-    H0 = float(ir1['H0'])
-    H1 = float(ir1['H1'])
-    D = float(ir1['D'])
-    G = float(ir1['G']) * 1e4
-    S = float(ir1['S'])
-    wei_tole = float(ir1['wei_tole'])
+    mkt_type = ir1['mkt_type']
+    N = ir1['N']
+    H0 = ir1['H0']
+    H1 = ir1['H1']
+    B = ir1['B']
+    E = ir1['E']
+    D = ir1['D']
+    G = ir1['G']
+    S = ir1['S']
+    wei_tole = ir1['wei_tole']
     alpha_name = ir1['alpha_name']
     beta_kind = ir1['beta_kind']
-    suffix = info2suffix(ir1)
-    script_info = {
-        'opt_verbose': opt_verbose, 'begin_date': begin_date, 'end_date': end_date, 'mkt_type': mkt_type,
-        'N': N, 'H0': H0, 'H1': H1, 'B': B, 'E': E, 'D': D, 'G': G, 'S': S, 'wei_tole': wei_tole,
-        'alpha_name': alpha_name, 'beta_kind': beta_kind, 'alpha_5d_rank_ic': 'NA', 'suffix': suffix,
-    }
-
+    script_info['suffix'] = suffix = info2suffix(ir1)
     beta_args = eval(ir1['beta_args'])
-    # %% Load DataFrames
-    tradedates = get_tradedates(conf, begin_date, end_date, kind='tdays_w')
-    # tradedates = get_tradedates(conf, begin_date, end_date, kind='tdays_d')
-    beta_expo, beta_cnstr = get_beta_expo_cnstr(beta_kind, conf, begin_date, end_date, H0, H1, beta_args)
-    ind_cons = get_index_constitution(conf['idx_constituent'].format(mkt_type), begin_date, end_date)
-    fct_cov = get_factor_covariance(path_F=conf['factor_covariance'], bd=begin_date, ed=end_date, fw=1)
-    stk_rsk = get_specific_risk(path_D=conf['specific_risk'], bd=begin_date, ed=end_date, fw=1)
-    save_path = get_save_path(conf['factorsres_path'], mkt_type, alpha_name)
-    alpha: pd.DataFrame = link_alpha_dat(alpha_name, conf['factorscsv_path'], begin_date, end_date, save_path)
 
-    # alpha_5d_rank_ic = check_ic_5d(conf['closeAdj'], dat, begin_date, end_date, lag=5)  # cal ic
-    # script_info['alpha_5d_rank_ic'] = str(alpha_5d_rank_ic)
+    #  Load DataFrames  TODO: option1 load from local; option2 load remote
+    tradedates = get_tradedates(
+        conf=conf,
+        begin_date=begin_date,
+        end_date=end_date,
+        kind='tdays_w')  # TODO: daily optimize
+    beta_expo, beta_cnstr = get_beta_expo_cnstr(
+        beta_kind=beta_kind,
+        conf=conf,
+        begin_date=begin_date,
+        end_date=end_date,
+        H0=H0,
+        H1=H1,
+        beta_args=beta_args)
+    ind_cons = get_index_constitution(
+        csv=idx_cons_path.format(mkt_type),
+        bd=begin_date,
+        ed=end_date)
+    fct_cov = get_factor_covariance(
+        path_F=fct_cov_path,
+        bd=begin_date,
+        ed=end_date,
+        fw=1)
+    stk_rsk = get_specific_risk(
+        path_D=stk_rsk_path,
+        bd=begin_date,
+        ed=end_date,
+        fw=1)
+    save_path = get_save_path(
+        res_path=res_path,
+        mkt_type=mkt_type,
+        alpha_name=alpha_name)
+    alpha: pd.DataFrame = get_alpha_dat(
+        alpha_name=alpha_name,
+        res_path=res_path,
+        bd=begin_date,
+        ed=end_date,
+        save_path=save_path,
+        fw=1)
+
     save_path_sub = f'{save_path}{suffix}/'
     io_make_sub_dir(save_path_sub, force=dir_force)
 
-    desc = suffix
-    all_args = tradedates, beta_expo, beta_cnstr, ind_cons, fct_cov, stk_rsk, alpha, (
-        mkt_type, N, D, B, E, G, S, wei_tole, opt_verbose, desc, pos)
-    telling = TELLING
-    # %% Optimize:
-    portfolio_weight, optimize_iter_info = portfolio_optimize(all_args, telling=telling)
+    desc = suffix  # TODO: init class 1) iterable groups of series 2) dict of parameters
+    all_args = (
+        tradedates,
+        beta_expo,
+        beta_cnstr,
+        ind_cons,
+        fct_cov,
+        stk_rsk,
+        alpha, (
+            mkt_type,
+            N,
+            D,
+            B,
+            E,
+            G,
+            S,
+            wei_tole,
+            opt_verbose,
+            desc,
+            pos
+        )
+    )
+    #  Optimize:
+    portfolio_weight, optimize_iter_info = portfolio_optimize(
+        all_args=all_args,
+        telling=telling)
 
-    # %% Save Historical Optimize Results:
+    #  Save Historical Optimize Results:
     with open(save_path_sub + 'config_optimize.yaml', 'w', encoding='utf-8') as f:
         yaml.safe_dump(script_info, f)
     optimize_iter_info.T.to_excel(save_path_sub + f'opt_info_{suffix}.xlsx')
     portfolio_weight.to_csv(save_path_sub + 'portfolio_weight_{}.csv'.format(suffix))
+
     # Graphs & Tables:
-    opt_res = OptRes(ir1, conf['closeAdj'], conf['idx_constituent'], conf['factorsres_path'])
-    opt_res.tf_historical_result()
-    opt_res.tf_portfolio_weight()
-    opt_res.tf_turnover()
-    opt_res.tf_optimize_time()
-    opt_res.tf_risk_and_result()
+    opt_res = OptRes(ir1=ir1,
+                     close_adj=close_adj_path,
+                     idx_cons=idx_cons_path,
+                     res_path=res_path,
+                     tc=trade_cost)
+    opt_res.figure_historical_result()
+    opt_res.figure_portfolio_weight()
+    opt_res.figure_turnover()
+    opt_res.figure_opt_time()
+    opt_res.figure_risk_a_result()
 
 
 def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -158,7 +222,7 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
 
     """
 
-    # %%
+    #
     tradedates, beta_expo, beta_cnstr, ind_cons, fct_cov, stk_rsk, alpha, args = all_args
     mkt_type, N, D, B, E, G, S, wei_tole, opt_verbose, desc, pos = args
 
@@ -177,14 +241,14 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
     # start_time = time.time()
     td = '2021-12-31'
     loop_bar = tqdm(range(len(tradedates)), ncols=99, desc=desc, delay=0.01, position=pos, ascii=False)
-    # %%
+    #
     for cur_td in loop_bar:
         td = tradedates.iloc[cur_td].strftime('%Y-%m-%d')
-        # %%
+        #
         use_sigma = (G > 0) or (S < np.inf)  # Specific Risk
         # sigma: pd.DataFrame = get_risk_matrix(path_sigma, td, max_backward=5, notify=False)
 
-        # Asset pool accessible
+        # Asset pool accessible: beta exposure + risk matrix, ^ alpha, ^ ind_cons
         stk_alpha = get_stk_alpha(alpha.loc[td])
         stk_index = set(ind_cons.loc[td].dropna().index)
         stk_beta = set(beta_expo.loc[td].index)
@@ -219,7 +283,7 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
         xf = beta_expo.loc[td].loc[ls_pool].dropna(axis=1)
         xf = xf[xf.columns.intersection(mat_F.index)]
 
-        # %%
+        #
         # path = '/mnt/c/Users/Winst/desktop/'
         # a.to_pickle(path + "alpha.pkl")
         # mat_F.to_pickle(path + "factor_covariance.pkl")
@@ -305,14 +369,6 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
                 hdn = (df_w.values > 0).sum()
                 df_lst_w = df_w.replace(0, np.nan).dropna()
                 if ishow:  # Graph:
-                    import matplotlib.pyplot as plt
-                    plt.rc("figure", figsize=(9, 5))
-                    plt.rc("font", size=12)
-                    plt.rcParams['axes.autolimit_mode'] = 'round_numbers'
-                    plt.rcParams['axes.xmargin'] = 0
-                    plt.rcParams['axes.ymargin'] = 0
-                    plt.rc("savefig", dpi=90)
-                    plt.rcParams["date.autoformatter.hour"] = "%H:%M:%S"
                     df_lst_w.sort_values(td, ascending=False).reset_index(drop=True).plot(
                         title=f'{td}, $\gamma={G}$, res=' + f'{result:.3f} - {risk.value[0, 0] * G:.3f}')
                     # title=f'{td}, $\S={S}$, res=' + f'{result:.3f} - {risk.value[0,0] * G:.3f}')
@@ -327,17 +383,17 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
             iter_info = {
                 '#alpha^beta': len(ls_pool), '#index^beta': len(ls_base), '#index': len(stk_index),
                 'turnover': turnover, 'holding': hdn,
-                'risk': risk.value, 'opt0': result, 'opt1': (a @ w1)[0],
+                'risk': risk.value[0, 0] * G, 'opt0': result, 'opt1': (a @ w1)[0, 0],
                 'solver': prob.solver_stats.solver_name, 'status': prob.status, 'stime': prob.solver_stats.solve_time,
             }
 
             #
             return iter_info, f_del, df_lst_w, w_lst
 
-        # %%
+        #
         iter_info, f_del, df_lst_w, w_lst = wtf(a, mat_F, srs_D, xf, df_lst_w, w_lst, G=G, ishow=False)
 
-        # %% Update optimize iteration information
+        #  Update optimize iteration information
         holding_weight = pd.concat([holding_weight, df_lst_w.T])
         iter_info = iter_info | {'# cons w/o alpha': sp_info['#i_a'],
                                  '# cons w/o beta(sigma)': sp_info['#i_b(s)'],
@@ -349,6 +405,13 @@ def portfolio_optimize(all_args, telling=False) -> Tuple[pd.DataFrame, pd.DataFr
     print()
 
     return holding_weight, optimize_iter_info
+
+
+def main():
+    # Configs:
+    conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/config.yaml'
+    conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
+    optimize(conf, mkdir_force=False, process_num=1)
 
 
 if __name__ == '__main__':
