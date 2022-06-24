@@ -64,6 +64,7 @@ def optimize1(args, telling=False):
     pos: int = args[3]
     f_pid: int = args[4]
 
+    csv_path: str = conf['factorscsv_path']
     res_path: str = conf['factorsres_path']
     idx_cons_path: str = conf['idx_constituent']
     fct_cov_path: str = conf['fct_cov_path']
@@ -93,34 +94,13 @@ def optimize1(args, telling=False):
         'alpha_name': alpha_name, 'beta_kind': beta_kind, 'alpha_5d_rank_ic': 'NA', 'suffix': suffix,
     }
 
-    # script_info = ir1.to_dict()
-    # opt_verbose = (ir1['opt_verbose'] == 'TRUE')
-    # begin_date = ir1['begin_date']
-    # end_date = ir1['end_date']
-    # mkt_type = ir1['mkt_type']
-    # N = ir1['N']
-    # H0 = ir1['H0']
-    # H1 = ir1['H1']
-    # B = ir1['B']
-    # E = ir1['E']
-    # D = ir1['D']
-    # G = ir1['G']
-    # S = ir1['S']
-    # wei_tole = ir1['wei_tole']
-    # alpha_name = ir1['alpha_name']
-    # beta_kind = ir1['beta_kind']
-    # script_info['suffix'] = suffix = info2suffix(ir1)
-
     beta_args = eval(ir1['beta_args'])
-
     save_path = get_save_path(
         res_path=res_path,
         mkt_type=mkt_type,
         alpha_name=alpha_name)
     save_path_sub = f'{save_path}{suffix}/'
-    if io_make_sub_dir(save_path_sub, force=dir_force, inp=(os.getpid() != f_pid)) == 1:
-        pass
-    else:
+    if io_make_sub_dir(save_path_sub, force=dir_force, inp=(os.getpid() != f_pid)) == 0:
         return
     #  Load DataFrames  TODO: option1 load from local; option2 load remote
     tradedates = get_tradedates(
@@ -152,7 +132,7 @@ def optimize1(args, telling=False):
         fw=1)
     alpha: pd.DataFrame = get_alpha_dat(
         alpha_name=alpha_name,
-        res_path=res_path,
+        csv_path=csv_path,
         bd=begin_date,
         ed=end_date,
         save_path=save_path,

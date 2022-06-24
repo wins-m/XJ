@@ -58,31 +58,13 @@ def progressbar(cur, total, msg, stt=None):
         print("\r[%-25s] %s (%s<%s)" % ('=' * lth, percent, time_used, time_left) + msg, end='')
 
 
-def io_make_sub_dir(path, force=False, inp=False):
-    if force:
-        os.makedirs(path, exist_ok=True)
-    else:
-        if os.path.exists(path):
-            if os.path.isdir(path) and len(os.listdir(path)) == 0:
-                pass;  # print(f"Write in empty dir '{path}'")
-            else:
-                if inp:
-                    return 0
-                cmd = input(f"Write in non-empty dir '{path}' ?(y/N)")
-                if cmd != 'y' and cmd != 'Y':
-                    raise FileExistsError(path)
-        else:
-            os.makedirs(path, exist_ok=False)
-    return 1
-
-
-def get_alpha_dat(alpha_name, res_path, bd, ed, save_path, fw=1) -> pd.DataFrame:
+def get_alpha_dat(alpha_name, csv_path, bd, ed, save_path, fw=1) -> pd.DataFrame:
     """"""
     alpha_save_name = save_path + f'{alpha_name}.csv'
     if os.path.exists(alpha_save_name):
         dat = pd.read_csv(alpha_save_name, index_col=0, parse_dates=True)
     else:
-        dat = pd.read_csv(res_path + alpha_name + '.csv', index_col=0, parse_dates=True)
+        dat = pd.read_csv(csv_path + alpha_name + '.csv', index_col=0, parse_dates=True)
         dat.to_csv(alpha_save_name)
 
     return dat.shift(fw).loc[bd: ed]
