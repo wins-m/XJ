@@ -26,7 +26,7 @@ def cross_section_regress_adj(x: pd.DataFrame, y: pd.DataFrame, wl=1, intercept=
         y_train: pd.Series = y.loc[views].loc[td0:td1].stack().dropna()
         idx = x_train.index.intersection(y_train.index)
         x_train, y_train = x_train.loc[idx], y_train.loc[idx]
-        xv, yv = np.matrix(x_train), np.matrix(y_train)
+        xv, yv = np.matrix(x_train).reshape(-1, 1), np.matrix(y_train).reshape(-1, 1)
         if intercept:
             beta: float = (np.linalg.inv(xv.T @ xv) @ xv.T @ yv)[0, 0]
             alpha: float = yv.mean() - beta * xv.mean()
@@ -65,7 +65,12 @@ class SimAlpha(object):
         print(f'Generate Alpha `{self._name}` saved in `{save_path}`')
 
     def adjust_fval(self, mtd='zscore', **kwargs):
-        """"""
+        """
+        adjust cross-section distribution of factor value
+        :param mtd: str, method used
+        :param kwargs: additional args config
+        :return:
+        """
         if mtd == 'uniform':
             self._fval = self._fval.rank(pct=True, axis=1) * 2 - 1
         elif mtd == 'zscore':
@@ -84,14 +89,16 @@ class SimAlpha(object):
             self._fval, self._reg_coefficient = cross_section_regress_adj(x=self._fval, y=y, wl=wl, intercept=intercept)
         else:
             raise Exception(f'Alpha adjust method not in `zscore, uniform, reverse`')
-        self._name += f"_{mtd}"
 
+        self._name += f"_{mtd}"
         if 'centre' in kwargs:
             self._fval += kwargs['centre']
-            self._name += f"_M({kwargs['centre']})"
+            self._name += f"(m={kwargs['centre']})"
         if 'scale' in kwargs:
             self._fval *= kwargs['scale']
-            self._name += f"_SD({kwargs['scale']})"
+            self._name += f"(sd={kwargs['scale']})"
+        if ('wl' in kwargs) and ('intercept' in kwargs):
+            self._name += f"(wl={kwargs['wl']},i={'T' if kwargs['intercept'] else 'F'})"
 
         print(f'Adjust alpha `{self._name}`')
 
@@ -133,9 +140,7 @@ class SimAlpha(object):
         self._name = fname
 
 
-def main():
-    conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/config.yaml'
-    conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
+def simu_alpha(conf):
     begin_date_0 = '2015-12-01'
     begin_date = '2016-01-01'
     end_date = '2022-03-31'
@@ -151,7 +156,7 @@ def main():
     # sim_alpha.adjust_fval(mtd='zscore', centre=0, scale=2.25e-2)
     # Adjust Reg
     close_adj: pd.DataFrame = pd.read_csv(conf['closeAdj'], index_col=0, parse_dates=True)
-    close_adj = close_adj.loc[begin_date_0, end_date]
+    close_adj = close_adj.loc[begin_date_0: end_date]
     d, wl = 1, 60
     rtn_next_view = close_adj.pct_change(periods=d).shift(-d).loc[begin_date:]
     sim_alpha.adjust_fval(mtd=f'reg{d}d', y=rtn_next_view, wl=wl, intercept=True)
@@ -159,6 +164,12 @@ def main():
 
     sim_alpha.show_fval()
     sim_alpha.save_fval(save_path=conf['factorscsv_path'])
+
+
+def main():
+    conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/config.yaml'
+    conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
+    simu_alpha(conf)
 
 
 if __name__ == '__main__':
