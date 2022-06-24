@@ -9,10 +9,8 @@ import sys
 from multiprocessing import Pool
 
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
-from supporter.bata_etf import info2suffix, get_index_constitution
+from supporter.bata_etf import info2suffix, get_index_constitution, load_optimize_target
 from supporter.backtester import Portfolio
-
-OPTIMIZE_TARGET = '/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/BarraPCA/optimize_target_v2.xlsx'
 
 
 class OptRes(object):
@@ -53,11 +51,11 @@ class OptRes(object):
 
         # Half Year Statistics (without cost)
         self.port.cal_panel_result(cr=0, ret=rtn_next_week)
-        self.port.cal_half_year_stat(wc=False)
+        self.port.cal_half_year_stat(wc=False, freq='W', lang='CH')
         self.port.get_half_year_stat(wc=False, path=self.path + 'table_half_year_stat_' + self.suffix + '.xlsx')
         if isinstance(self.trade_cost, float):
             self.port.cal_panel_result(cr=self.trade_cost, ret=rtn_next_week)
-            self.port.cal_half_year_stat(wc=True)
+            self.port.cal_half_year_stat(wc=True, freq='W', lang='CH')
             _path = self.path + 'table_half_year_stat_' + self.suffix + f'(cr={self.trade_cost}).xlsx'
             self.port.get_half_year_stat(wc=True, path=_path)
 
@@ -133,14 +131,15 @@ def func(args):
 
 
 def opt_res_ana(conf, test=False):
-    # %% Configs:
-    optimize_target: pd.DataFrame = pd.read_excel(OPTIMIZE_TARGET, index_col=0, dtype=object).loc[1:1]
+    # Configs:
+    optimize_target = conf['optimize_target']
+    optimize_target = load_optimize_target(optimize_target)
     print(optimize_target)
 
-    # %%
     if test:
-        ir1 = optimize_target.iloc[0]
-        func((ir1, conf, ''))
+        for ir in optimize_target.iterrows():
+            ir1 = ir[1]
+            func((ir1, conf, ''))
     else:
         p = Pool(7)
         cnt = 0
@@ -155,8 +154,11 @@ def opt_res_ana(conf, test=False):
         p.join()
 
 
-# %%
-if __name__ == '__main__':
+def main():
     conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/config.yaml'
     conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
     opt_res_ana(conf, test=False)
+
+
+if __name__ == '__main__':
+    main()

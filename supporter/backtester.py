@@ -83,12 +83,12 @@ class Portfolio(object):
         self.cost_rate = cr
         self.panel = portfolio_statistics_from_weight(weight=self.w_2d, cost_rate=cr, all_ret=ret)
 
-    def cal_half_year_stat(self, wc=False):
+    def cal_half_year_stat(self, wc=False, freq='D', lang='EN'):
         """cal half year statistics from `panel`"""
         if self.panel.dropna().__len__() == 0:
             raise Exception('Empty self.panel')
         col = 'Return_wc' if wc else 'Return'
-        self.stat[wc] = cal_result_stat(self.panel[[col]])
+        self.stat[wc] = cal_result_stat(self.panel[[col]], freq=freq, lang=lang)
 
     def get_position_weight(self, path=None) -> pd.DataFrame:
         if path is not None:

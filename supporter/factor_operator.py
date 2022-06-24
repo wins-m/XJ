@@ -9,7 +9,9 @@ from scipy import stats
 import sys
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
 from supporter.transformer import get_neutralize_sector, get_neutralize_sector_size, get_winsorize, get_standardize
+from supporter.io import table_save_safe
 from supporter.plot_config import *
+
 # def keep_pool_stk(df: pd.DataFrame, pool_multi: pd.DataFrame):
 #     """
 #     只保留股池内的因子值，其余为空
@@ -361,8 +363,8 @@ def cal_yearly_return(data, ishow=False, title='Annual Return', save_path=None) 
     return aret
 
 
-def cal_yearly_sharpe(data, ishow=False, title='Annual Sharpe', save_path=None, y_len=240) -> pd.DataFrame:
-    """计算年度夏普（240天年化）"""
+def cal_yearly_sharpe(data, ishow=False, title='Annual Sharpe', save_path=None, y_len=242) -> pd.DataFrame:
+    """计算年度夏普（242天年化）"""
     year_group = data.index.to_series().apply(lambda dt: dt.year)
     asharp = data.groupby(year_group).apply(lambda s: s.mean() / s.std() * np.sqrt(y_len / s.count()))
 
@@ -473,12 +475,14 @@ def cal_ic_decay(fval_neutralized, ret, maxlag=20, ishow=False, save_path=None) 
     return res
 
 
-def cal_result_stat(df: pd.DataFrame, save_path: str = None, kind='cumsum') -> pd.DataFrame:
+def cal_result_stat(df: pd.DataFrame, save_path: str = None, kind='cumsum', freq='D', lang='EN') -> pd.DataFrame:
     """
     对日度收益序列df计算相关结果
+    :param lang:
     :param df: 值为日收益率小r，列index为日期DateTime
     :param save_path: 存储名（若有）
     :param kind: 累加/累乘
+    :param freq: M D W Y
     :return: 结果面板
     """
     if kind == 'cumsum':
@@ -487,6 +491,18 @@ def cal_result_stat(df: pd.DataFrame, save_path: str = None, kind='cumsum') -> p
         df1 = df.add(1).cumprod()
     else:
         raise ValueError(f"""Invalid kind={kind}, only support('cumsum', 'cumprod')""")
+
+    if freq == 'D':
+        freq_year_adj = 242
+    elif freq == 'W':
+        freq_year_adj = 48
+    elif freq == 'M':
+        freq_year_adj = 12
+    elif freq == 'Y':
+        freq_year_adj = 1
+    else:
+        raise ValueError(f"""Invalid freq={freq}, only support('D', 'W', 'M', 'Y')""")
+
     data = df.copy()
     data['Date'] = data.index
     data['SemiYear'] = data['Date'].apply(lambda s: f'{s.year}-H{s.month // 7 + 1}')
@@ -497,19 +513,25 @@ def cal_result_stat(df: pd.DataFrame, save_path: str = None, kind='cumsum') -> p
     res['TotalRet'] = res['UnitValue'] - 1
     res['PeriodRetOnBookSize'] = res['UnitValue'].pct_change()
     res.iloc[0, -1] = res['UnitValue'].iloc[0] - 1
-    res['PeriodSharpe'] = df.groupby(data.SemiYear).apply(lambda s: s.mean() / s.std() * np.sqrt(240)).values
+    res['PeriodSharpe'] = df.groupby(data.SemiYear).apply(lambda s: s.mean() / s.std() * np.sqrt(freq_year_adj)).values
     mdd = df1 / df1.cummax() - 1 if kind == 'cumprod' else df1 - df1.cummax()
     res['PeriodMaxDD'] = mdd.groupby(data.SemiYear).min().values
     res['PeriodCalmar'] = res['PeriodRetOnBookSize'] / res['PeriodMaxDD'].abs()
     res['TotalMaxDD'] = mdd.min().values[0]
-    res['TotalSharpe'] = (df.mean() / df.std() * np.sqrt(240)).values[0]
+    res['TotalSharpe'] = (df.mean() / df.std() * np.sqrt(freq_year_adj)).values[0]
     res['AverageCalmar'] = res['TotalSharpe'] / res['TotalMaxDD'].abs()
-    res['TotalAnnualRet'] = (df1.iloc[-1] ** (240 / len(df1)) - 1).values[0]
+    res['TotalAnnualRet'] = (df1.iloc[-1] ** (freq_year_adj / len(df1)) - 1).values[0]
 
     res['Date'] = res['Date'].apply(lambda x: x.strftime('%Y-%m-%d'))
+    if lang == 'CH':
+        res1 = pd.DataFrame(columns=res.columns, index=['CH'])
+        res1.loc['CH', :] = ['日期', '年度', '资金', '净值', '累计收益', '收益', '夏普',
+                             '回撤', '卡玛', '总回撤', '总夏普', '平均卡玛', '年化总收益']
+        res = pd.concat([res, res1], ignore_index=True)
+        pass
+
     res = res.set_index('SemiYear')
     if save_path is not None:
-        res.to_excel(save_path.replace('.csv', '.xlsx'))
+        table_save_safe(res, save_path)
     return res
-
 
