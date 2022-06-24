@@ -65,7 +65,7 @@ class Portfolio(object):
 
     def __init__(self, w: pd.DataFrame = None, **kwargs):
         self.w_2d = w
-        self.views = w.index.to_list()
+        self.views = w.index.to_list() if isinstance(w, pd.DataFrame) else list()
 
         self.panel: pd.DataFrame = pd.DataFrame(
             index=self.views, columns=['NStocks', 'Turnover', 'Return', 'Return_wc',

@@ -405,7 +405,7 @@ def main():
     # Configs:
     conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/config.yaml'
     conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
-    optimize(conf, mkdir_force=False, process_num=1)
+    optimize(conf, mkdir_force=False, process_num=4)
 
 
 if __name__ == '__main__':

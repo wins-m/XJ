@@ -187,3 +187,17 @@ def cvg_f_fill(fr: pd.DataFrame, w=10, q=.75, ishow=False, notify=False) -> pd.D
         plt.show()
         plt.close()
     return fr
+
+
+def df_union_sub(df0: pd.DataFrame, df1: pd.DataFrame) -> pd.DataFrame:
+    """Align index and columns and calculate df0 - df1"""
+    assets0 = df0.columns
+    assets1 = df1.columns
+    views0 = df0.index
+    views1 = df1.index
+    assets = assets0.union(assets1)
+    views = views0.union(views1)
+    df0 = pd.DataFrame(df0, columns=assets, index=views).fillna(0)
+    df1 = pd.DataFrame(df1, columns=assets, index=views).fillna(0)
+    res = df0.sub(df1)
+    return res

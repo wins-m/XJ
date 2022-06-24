@@ -157,11 +157,11 @@ def simu_alpha(conf):
     # Adjust Reg
     close_adj: pd.DataFrame = pd.read_csv(conf['closeAdj'], index_col=0, parse_dates=True)
     close_adj = close_adj.loc[begin_date_0: end_date]
-    d, wl = 1, 60
+    d, wl = 1, 5
     rtn_next_view = close_adj.pct_change(periods=d).shift(-d).loc[begin_date:]
     sim_alpha.adjust_fval(mtd=f'reg{d}d', y=rtn_next_view, wl=wl, intercept=True)
-    sim_alpha.save_reg_coefficient(save_path=conf['factorscsv_path'])
 
+    sim_alpha.save_reg_coefficient(save_path=conf['factorscsv_path'])
     sim_alpha.show_fval()
     sim_alpha.save_fval(save_path=conf['factorscsv_path'])
 

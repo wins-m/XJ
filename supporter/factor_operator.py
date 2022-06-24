@@ -7,10 +7,12 @@ import pandas as pd
 import numpy as np
 from scipy import stats
 import sys
+
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
 from supporter.transformer import get_neutralize_sector, get_neutralize_sector_size, get_winsorize, get_standardize
 from supporter.io import table_save_safe
 from supporter.plot_config import *
+
 
 # def keep_pool_stk(df: pd.DataFrame, pool_multi: pd.DataFrame):
 #     """
@@ -22,7 +24,8 @@ from supporter.plot_config import *
 #     return df.reindex_like(pool_multi) * pool_multi
 
 
-def read_single_factor(path: str, begin_date=None, end_date=None, dtype=None, pool_multi=None, hdf_k=None) -> pd.DataFrame:
+def read_single_factor(path: str, begin_date=None, end_date=None, dtype=None, pool_multi=None,
+                       hdf_k=None) -> pd.DataFrame:
     """
     从磁盘csv文件读取2D格式的因子面板
     :param path: 因子csv文件地址
@@ -509,29 +512,31 @@ def cal_result_stat(df: pd.DataFrame, save_path: str = None, kind='cumsum', freq
     res: pd.DataFrame = data.groupby('SemiYear')[['Date']].last().reset_index()
     res.index = res['Date']
     res['Cash'] = (2e7 * df1.loc[res.index]).round(1)
-    res['UnitValue'] = df1.loc[res.index]
-    res['TotalRet'] = res['UnitValue'] - 1
-    res['PeriodRetOnBookSize'] = res['UnitValue'].pct_change()
-    res.iloc[0, -1] = res['UnitValue'].iloc[0] - 1
-    res['PeriodSharpe'] = df.groupby(data.SemiYear).apply(lambda s: s.mean() / s.std() * np.sqrt(freq_year_adj)).values
+    res['UnitVal'] = df1.loc[res.index]
+    res['TRet'] = res['UnitVal'] - 1
+    res['PRet'] = res['UnitVal'].pct_change()
+    res.iloc[0, -1] = res['UnitVal'].iloc[0] - 1
+    res['PSharpe'] = df.groupby(data.SemiYear).apply(lambda s: s.mean() / s.std() * np.sqrt(freq_year_adj)).values
     mdd = df1 / df1.cummax() - 1 if kind == 'cumprod' else df1 - df1.cummax()
-    res['PeriodMaxDD'] = mdd.groupby(data.SemiYear).min().values
-    res['PeriodCalmar'] = res['PeriodRetOnBookSize'] / res['PeriodMaxDD'].abs()
-    res['TotalMaxDD'] = mdd.min().values[0]
-    res['TotalSharpe'] = (df.mean() / df.std() * np.sqrt(freq_year_adj)).values[0]
-    res['AverageCalmar'] = res['TotalSharpe'] / res['TotalMaxDD'].abs()
-    res['TotalAnnualRet'] = (df1.iloc[-1] ** (freq_year_adj / len(df1)) - 1).values[0]
+    res['PMaxDD'] = mdd.groupby(data.SemiYear).min().values
+    res['PCalmar'] = res['PRet'] / res['PMaxDD'].abs()
+    res['PWinR'] = df.groupby(data['SemiYear']).apply(lambda s: (s > 0).mean()).values
+    res['TMaxDD'] = mdd.min().values[0]
+    res['TSharpe'] = (df.mean() / df.std() * np.sqrt(freq_year_adj)).values[0]
+    res['TCalmar'] = res['TSharpe'] / res['TMaxDD'].abs()
+    res['TWinR'] = (df > 0).mean().values[0]
+    res['TAnnRet'] = (df1.iloc[-1] ** (freq_year_adj / len(df1)) - 1).values[0]
 
     res['Date'] = res['Date'].apply(lambda x: x.strftime('%Y-%m-%d'))
     if lang == 'CH':
         res1 = pd.DataFrame(columns=res.columns, index=['CH'])
-        res1.loc['CH', :] = ['日期', '年度', '资金', '净值', '累计收益', '收益', '夏普',
-                             '回撤', '卡玛', '总回撤', '总夏普', '平均卡玛', '年化总收益']
+        res1.loc['CH', :] = ['日期', '年度', '资金', '净值', '累计收益',
+                             '收益', '夏普', '回撤', '卡玛', '胜率',
+                             '总回撤', '总夏普', '总卡玛', '总胜率',
+                             '年化收益', ]
         res = pd.concat([res, res1], ignore_index=True)
-        pass
 
     res = res.set_index('SemiYear')
     if save_path is not None:
         table_save_safe(res, save_path)
     return res
-
