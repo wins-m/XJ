@@ -17,6 +17,22 @@ from supporter.plot_config import *
 np.random.seed(9)
 
 
+def load_optimize_target(opt_tgt: str) -> pd.DataFrame:
+    df = pd.read_excel(opt_tgt, index_col=0, dtype=object).loc[1:1]
+    # df['N'] = df['N'].apply(lambda x: float(x))
+    # df['H0'] = df['H0'].apply(lambda x: float(x))
+    # df['H1'] = df['H1'].apply(lambda x: float(x))
+    # df['B'] = df['B'].apply(lambda x: float(x) / 100)
+    # df['E'] = df['E'].apply(lambda x: float(x) / 100)
+    # df['D'] = df['D'].apply(lambda x: float(x))
+    # df['G'] = df['G'].apply(lambda x: float(x) * 1e4)
+    # df['S'] = df['S'].apply(lambda x: float(x))
+    # df['wei_tole'] = df['wei_tole'].apply(lambda x: float(x))
+    # df['opt_verbose'] = df['opt_verbose'].apply(lambda x: x == 'TRUE')
+
+    return df
+
+
 def second2clock(x: int):
     if x < 3600:
         return f"{(x // 60):02d}:{x % 60:02d}"
@@ -42,7 +58,7 @@ def progressbar(cur, total, msg, stt=None):
         print("\r[%-25s] %s (%s<%s)" % ('=' * lth, percent, time_used, time_left) + msg, end='')
 
 
-def io_make_sub_dir(path, force=False):
+def io_make_sub_dir(path, force=False, inp=False):
     if force:
         os.makedirs(path, exist_ok=True)
     else:
@@ -50,12 +66,14 @@ def io_make_sub_dir(path, force=False):
             if os.path.isdir(path) and len(os.listdir(path)) == 0:
                 pass;  # print(f"Write in empty dir '{path}'")
             else:
+                if inp:
+                    return 0
                 cmd = input(f"Write in non-empty dir '{path}' ?(y/N)")
                 if cmd != 'y' and cmd != 'Y':
                     raise FileExistsError(path)
         else:
             os.makedirs(path, exist_ok=False)
-    pass;  # print(f'Save in: {path}')
+    return 1
 
 
 def get_alpha_dat(alpha_name, res_path, bd, ed, save_path, fw=1) -> pd.DataFrame:
@@ -87,7 +105,7 @@ def check_ic_5d(closeAdj_path, dat, begin_date, end_date, lag=5, ranked=True) ->
     return dat_ic
 
 
-def get_beta_expo_cnstr(beta_kind, conf, begin_date, end_date, H0, H1, beta_args, l_cvg_fill=True):
+def get_beta_expo_cnstr(beta_kind, conf, bd, ed, H0, H1, beta_args, l_cvg_fill=True):
     from supporter.transformer import cvg_f_fill
 
     def get_barra_exposure() -> pd.DataFrame:
@@ -108,12 +126,12 @@ def get_beta_expo_cnstr(beta_kind, conf, begin_date, end_date, H0, H1, beta_args
                    689009.SH -1.174486  ...              0.0
         """
         expo = pd.DataFrame()
-        begin_year = int(begin_date.split('-')[0])
-        end_year = int(end_date.split('-')[0])
+        begin_year = int(bd.split('-')[0])
+        end_year = int(ed.split('-')[0])
         for _ in range(begin_year, end_year + 1):
             df = pd.DataFrame(pd.read_hdf(conf['barra_panel'], key=f'y{_}'))
             expo = pd.concat([expo, df])
-        expo: pd.DataFrame = expo.loc[begin_date: end_date]
+        expo: pd.DataFrame = expo.loc[bd: ed]
 
         cols_style = [c for c in expo.columns if 'rtn' not in c and 'ind' not in c and 'country' != c]
         mask = expo[cols_style].index.get_level_values(0)
@@ -151,7 +169,7 @@ def get_beta_expo_cnstr(beta_kind, conf, begin_date, end_date, H0, H1, beta_args
             for pn in tqdm(range(PN)):
                 kw = f'pc{pn:03d}'
                 df = pd.read_csv(src + f'{kw}.csv', index_col=0, parse_dates=True)
-                df = df.loc[begin_date: end_date]
+                df = df.loc[bd: ed]
                 expo = pd.concat([expo, df.stack().rename(kw)], axis=1)
             #
             expo.to_pickle(tgt)
@@ -161,7 +179,7 @@ def get_beta_expo_cnstr(beta_kind, conf, begin_date, end_date, H0, H1, beta_args
             s1 = s.split('-')
             return s1[0][-2:] + s1[1]
 
-        suffix = f"{get_suffix(begin_date)}_{get_suffix(end_date)}"
+        suffix = f"{get_suffix(bd)}_{get_suffix(ed)}"
         pkl_path = conf['data_path'] + f"exposure_pca{PN}_{suffix}.pkl"
         if os.path.exists(pkl_path):
             expo_pca: pd.DataFrame = pd.read_pickle(pkl_path)

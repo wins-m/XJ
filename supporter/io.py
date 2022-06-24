@@ -3,6 +3,7 @@
 I/O支持
 
 """
+import os
 import time
 import pandas as pd
 
@@ -66,3 +67,23 @@ def get_time_suffix(suffix: str = None):
     if suffix is None or suffix == '':
         return time.strftime("%m%d_%H%M%S", time.localtime())
     return suffix
+
+
+def io_make_sub_dir(path, force=False, inp=False):
+    if force:
+        os.makedirs(path, exist_ok=True)
+    else:
+        if os.path.exists(path):
+            if os.path.isdir(path) and len(os.listdir(path)) == 0:
+                return 1
+            else:
+                if inp:
+                    return 0
+                cmd = input(f"Write in non-empty dir '{path}' ?(y/N)")
+                if cmd != 'y' and cmd != 'Y':
+                    raise FileExistsError(path)
+        else:
+            os.makedirs(path, exist_ok=False)
+    return 1
+
+

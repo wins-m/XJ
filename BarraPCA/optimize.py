@@ -15,26 +15,11 @@ from multiprocessing import Pool, RLock, freeze_support
 
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
 from supporter.bata_etf import second2clock, info2suffix, get_tradedates, get_beta_expo_cnstr, get_index_constitution, \
-    get_factor_covariance, get_specific_risk, get_alpha_dat, get_save_path, io_make_sub_dir, get_accessible_stk, \
-    OptCnstr
+    get_factor_covariance, get_specific_risk, get_alpha_dat, get_save_path, get_accessible_stk, \
+    OptCnstr, load_optimize_target
 from BarraPCA.opt_res_ana import OptRes
 from supporter.plot_config import *
-
-
-def load_optimize_target(opt_tgt: str) -> pd.DataFrame:
-    df = pd.read_excel(opt_tgt, index_col=0, dtype=object).loc[1:1]
-    df['N'] = df['N'].apply(lambda x: float(x))
-    df['H0'] = df['H0'].apply(lambda x: float(x))
-    df['H1'] = df['H1'].apply(lambda x: float(x))
-    df['B'] = df['B'].apply(lambda x: float(x) / 100)
-    df['E'] = df['E'].apply(lambda x: float(x) / 100)
-    df['D'] = df['D'].apply(lambda x: float(x))
-    df['G'] = df['G'].apply(lambda x: float(x) * 1e4)
-    df['S'] = df['S'].apply(lambda x: float(x))
-    df['wei_tole'] = df['wei_tole'].apply(lambda x: float(x))
-    df['opt_verbose'] = df['opt_verbose'].apply(lambda x: x == 'TRUE')
-
-    return df
+from supporter.io import io_make_sub_dir
 
 
 def optimize(conf: dict, mkdir_force: bool, process_num: int):
@@ -48,21 +33,22 @@ def optimize(conf: dict, mkdir_force: bool, process_num: int):
     print(optimize_target)
 
     # Run optimize:
+    f_pid = os.getpid()
     if process_num > 1:
-        print(f'father process {os.getpid()}')
+        print(f'father process {f_pid}')
         freeze_support()
         p = Pool(process_num, initializer=tqdm.set_lock, initargs=(RLock(),))
         cnt = 0
         for ir in optimize_target.iterrows():
             ir1 = ir[1]
-            p.apply_async(optimize1, args=[(conf, ir1, mkdir_force, cnt % process_num)])
+            p.apply_async(optimize1, args=[(conf, ir1, mkdir_force, cnt % process_num, f_pid)])
             cnt += 1
         p.close()
         p.join()
     else:
         for ir in optimize_target.iterrows():
             ir1 = ir[1]
-            args = (conf, ir1, mkdir_force, 0)
+            args = (conf, ir1, mkdir_force, 0, f_pid)
             optimize1(args)
 
     # Exit:
@@ -76,33 +62,66 @@ def optimize1(args, telling=False):
     ir1: pd.Series = args[1]
     dir_force: bool = args[2]
     pos: int = args[3]
+    f_pid: int = args[4]
 
-    res_path: str = conf['factorscsv_path']
+    res_path: str = conf['factorsres_path']
     idx_cons_path: str = conf['idx_constituent']
     fct_cov_path: str = conf['fct_cov_path']
     stk_rsk_path: str = conf['specific_risk']
     close_adj_path: str = conf['closeAdj']
     trade_cost: float = float(conf['tc'])
 
-    script_info = ir1.to_dict()
-    opt_verbose = (ir1['opt_verbose'] == 'TRUE')
+    mkt_type = ir1['mkt_type']
     begin_date = ir1['begin_date']
     end_date = ir1['end_date']
-    mkt_type = ir1['mkt_type']
-    N = ir1['N']
-    H0 = ir1['H0']
-    H1 = ir1['H1']
-    B = ir1['B']
-    E = ir1['E']
-    D = ir1['D']
-    G = ir1['G']
-    S = ir1['S']
-    wei_tole = ir1['wei_tole']
+    N = float(ir1['N'])
+    opt_verbose = (ir1['opt_verbose'] == 'TRUE')
+    B = float(ir1['B']) / 100
+    E = float(ir1['E']) / 100
+    H0 = float(ir1['H0'])
+    H1 = float(ir1['H1'])
+    D = float(ir1['D'])
+    G = float(ir1['G']) * 1e4
+    S = float(ir1['S'])
+    wei_tole = float(ir1['wei_tole'])
     alpha_name = ir1['alpha_name']
     beta_kind = ir1['beta_kind']
-    script_info['suffix'] = suffix = info2suffix(ir1)
+    suffix = info2suffix(ir1)
+    script_info = {
+        'opt_verbose': opt_verbose, 'begin_date': begin_date, 'end_date': end_date, 'mkt_type': mkt_type,
+        'N': N, 'H0': H0, 'H1': H1, 'B': B, 'E': E, 'D': D, 'G': G, 'S': S, 'wei_tole': wei_tole,
+        'alpha_name': alpha_name, 'beta_kind': beta_kind, 'alpha_5d_rank_ic': 'NA', 'suffix': suffix,
+    }
+
+    # script_info = ir1.to_dict()
+    # opt_verbose = (ir1['opt_verbose'] == 'TRUE')
+    # begin_date = ir1['begin_date']
+    # end_date = ir1['end_date']
+    # mkt_type = ir1['mkt_type']
+    # N = ir1['N']
+    # H0 = ir1['H0']
+    # H1 = ir1['H1']
+    # B = ir1['B']
+    # E = ir1['E']
+    # D = ir1['D']
+    # G = ir1['G']
+    # S = ir1['S']
+    # wei_tole = ir1['wei_tole']
+    # alpha_name = ir1['alpha_name']
+    # beta_kind = ir1['beta_kind']
+    # script_info['suffix'] = suffix = info2suffix(ir1)
+
     beta_args = eval(ir1['beta_args'])
 
+    save_path = get_save_path(
+        res_path=res_path,
+        mkt_type=mkt_type,
+        alpha_name=alpha_name)
+    save_path_sub = f'{save_path}{suffix}/'
+    if io_make_sub_dir(save_path_sub, force=dir_force, inp=(os.getpid() != f_pid)) == 1:
+        pass
+    else:
+        return
     #  Load DataFrames  TODO: option1 load from local; option2 load remote
     tradedates = get_tradedates(
         conf=conf,
@@ -112,8 +131,8 @@ def optimize1(args, telling=False):
     beta_expo, beta_cnstr = get_beta_expo_cnstr(
         beta_kind=beta_kind,
         conf=conf,
-        begin_date=begin_date,
-        end_date=end_date,
+        bd=begin_date,
+        ed=end_date,
         H0=H0,
         H1=H1,
         beta_args=beta_args)
@@ -131,10 +150,6 @@ def optimize1(args, telling=False):
         bd=begin_date,
         ed=end_date,
         fw=1)
-    save_path = get_save_path(
-        res_path=res_path,
-        mkt_type=mkt_type,
-        alpha_name=alpha_name)
     alpha: pd.DataFrame = get_alpha_dat(
         alpha_name=alpha_name,
         res_path=res_path,
@@ -142,9 +157,6 @@ def optimize1(args, telling=False):
         ed=end_date,
         save_path=save_path,
         fw=1)
-
-    save_path_sub = f'{save_path}{suffix}/'
-    io_make_sub_dir(save_path_sub, force=dir_force)
 
     desc = suffix  # TODO: init class 1) iterable groups of series 2) dict of parameters
     all_args = (
@@ -169,22 +181,24 @@ def optimize1(args, telling=False):
         )
     )
     #  Optimize:
-    portfolio_weight, optimize_iter_info = portfolio_optimize(
-        all_args=all_args,
-        telling=telling)
+    portfolio_weight, optimize_iter_info = portfolio_optimize(all_args=all_args,
+                                                              telling=telling)
 
     #  Save Historical Optimize Results:
     with open(save_path_sub + 'config_optimize.yaml', 'w', encoding='utf-8') as f:
         yaml.safe_dump(script_info, f)
-    optimize_iter_info.T.to_excel(save_path_sub + f'opt_info_{suffix}.xlsx')
-    portfolio_weight.to_csv(save_path_sub + 'portfolio_weight_{}.csv'.format(suffix))
+    optimize_iter_info.T.to_excel(
+        save_path_sub + f'opt_info_{suffix}.xlsx')
+    portfolio_weight.to_csv(
+        save_path_sub + 'portfolio_weight_{}.csv'.format(suffix))
 
     # Graphs & Tables:
-    opt_res = OptRes(ir1=ir1,
-                     close_adj=close_adj_path,
-                     idx_cons=idx_cons_path,
-                     res_path=res_path,
-                     tc=trade_cost)
+    opt_res = OptRes(
+        ir1=ir1,
+        close_adj=close_adj_path,
+        idx_cons=idx_cons_path,
+        res_path=res_path,
+        tc=trade_cost)
     opt_res.figure_historical_result()
     opt_res.figure_portfolio_weight()
     opt_res.figure_turnover()
