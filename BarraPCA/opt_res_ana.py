@@ -8,11 +8,11 @@ import yaml
 import sys
 import os
 from multiprocessing import Pool
-from supporter.transformer import df_union_sub
 
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
 from supporter.bata_etf import info2suffix, get_index_constitution, load_optimize_target
 from supporter.backtester import Portfolio
+from supporter.transformer import df_union_sub
 
 
 class OptRes(object):

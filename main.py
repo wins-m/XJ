@@ -28,7 +28,7 @@ if __name__ == '__main__':
 
     # * optimize etf portfolio *
     # from BarraPCA.optimize import optimize
-    # optimize(conf, mkdir_force=False, process_num=4)
+    # optimize(conf, mkdir_force=False, process_num=5)
 
     # * regenerate optimize results *
     # from BarraPCA.opt_res_ana import opt_res_ana

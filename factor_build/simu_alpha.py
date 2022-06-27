@@ -28,14 +28,14 @@ def cross_section_regress_adj(x: pd.DataFrame, y: pd.DataFrame, wl=1, intercept=
         x_train, y_train = x_train.loc[idx], y_train.loc[idx]
         xv, yv = np.matrix(x_train).reshape(-1, 1), np.matrix(y_train).reshape(-1, 1)
         if intercept:
-            beta: float = (np.linalg.inv(xv.T @ xv) @ xv.T @ yv)[0, 0]
-            alpha: float = yv.mean() - beta * xv.mean()
+            b1: float = (np.linalg.inv(xv.T @ xv) @ xv.T @ yv)[0, 0]
+            b0: float = yv.mean() - b1 * xv.mean()
         else:
-            alpha, beta = 0, yv.mean() / xv.mean()
+            b0, b1 = 0, yv.mean() / xv.mean()
 
-        x_rescaled.loc[td1, :] = alpha + beta * x.loc[td1, :]
-        coefficient.loc[td1, 'alpha'] = alpha
-        coefficient.loc[td1, 'beta'] = beta
+        x_rescaled.loc[td1, :] = b0 + b1 * x.loc[td1, :]
+        coefficient.loc[td1, 'b0'] = b0
+        coefficient.loc[td1, 'b1'] = b1
 
     return x_rescaled, coefficient
 
@@ -88,7 +88,7 @@ class SimAlpha(object):
                 raise Exception("**kwargs {'y': DataFrame, 'wl': int, 'intercept': bool} must be given for mtd 'reg'")
             self._fval, self._reg_coefficient = cross_section_regress_adj(x=self._fval, y=y, wl=wl, intercept=intercept)
         else:
-            raise Exception(f'Alpha adjust method not in `zscore, uniform, reverse`')
+            raise Exception(f'Alpha adjust method not in `zscore, uniform, reverse, reg*`')
 
         self._name += f"_{mtd}"
         if 'centre' in kwargs:

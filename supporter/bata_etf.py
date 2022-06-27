@@ -14,11 +14,13 @@ import time
 
 sys.path.append("/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/")
 from supporter.plot_config import *
+
 np.random.seed(9)
 
 
 def load_optimize_target(opt_tgt: str) -> pd.DataFrame:
-    df = pd.read_excel(opt_tgt, index_col=0, dtype=object).loc[1:1]
+    df = pd.read_excel(opt_tgt, index_col=0, dtype=object)
+    df = df[df.index == 1]
     # df['N'] = df['N'].apply(lambda x: float(x))
     # df['H0'] = df['H0'].apply(lambda x: float(x))
     # df['H1'] = df['H1'].apply(lambda x: float(x))
