@@ -455,7 +455,8 @@ alpha: 未来因子 收益vs约束
 
 Beta: Barra.style & PCA因子暴露，截面标准化
 
-**version 1**
+##### **version 1**
+
 $$
 \max_{w \ge 0}{ 
 	\alpha^T w - \lambda \left[
@@ -481,17 +482,18 @@ $$
 \text{where }
 \begin{cases}
 \alpha : \text{alpha因子} = \text{FRtn5D(0.0,3.0)} \\
-B : \text{成分占比} = {0\%} \text{ or } {80\%} \\
-E : \text{权重偏离} = \max{\{1\%,\ w_b/2\}} \\
+B : \text{成分占比} = {0\%} \\
+E : \text{权重偏离} = \max{\{0.5\%\text{ or }1.5\%,\ w_b/2\}} \\
 H_0 : \text{风格偏离} = {0.20} \\
 H_1 : \text{行业偏离} = {0.02} \\
 D : \text{换手限制} = {2} \\
-\lambda : \text{风险厌恶} = 0 \\
+\lambda : \text{风险厌恶} \in {1.0e4, 2.5e4} \\
 S : \text{特异波动} = {+\infin} \\
 \end{cases}
 $$
 
-**version 0**
+##### **version 0**
+
 $$
 \max_{w} {
 	\sum_{i} {\alpha w} - {1\over2} \gamma w' \Sigma w 

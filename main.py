@@ -27,11 +27,11 @@ if __name__ == '__main__':
     # simu_alpha(conf)
 
     # * optimize etf portfolio *
-    # from BarraPCA.optimize import optimize
-    # optimize(conf, mkdir_force=False, process_num=5)
+    from BarraPCA.optimize import optimize
+    optimize(conf, mkdir_force=False, process_num=4)
 
     # * regenerate optimize results *
-    # from BarraPCA.opt_res_ana import opt_res_ana
-    # opt_res_ana(conf, test=False)
+    from BarraPCA.opt_res_ana import opt_res_ana
+    opt_res_ana(conf, test=False)
 
     print(f'total time cost {time.time() - time_start : .3f} s\n')

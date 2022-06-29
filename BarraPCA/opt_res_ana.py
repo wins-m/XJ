@@ -88,7 +88,7 @@ class OptRes(object):
             self.e_port.cal_panel_result(cr=self.trade_cost, ret=self.rtn_next)
             self.e_port.cal_half_year_stat(wc=True, freq='W', lang='CH')
             _path = self.path + 'table_half_year_stat_' + self.suffix + f'(cr={self.trade_cost})[E].xlsx'
-            self.port.get_half_year_stat(wc=True, path=_path)
+            self.e_port.get_half_year_stat(wc=True, path=_path)
 
         # Table Return
         self.Return['portfolio'] = (self.rtn_next.reindex_like(self.W) * self.W).sum(axis=1)
