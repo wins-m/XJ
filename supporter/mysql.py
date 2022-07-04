@@ -14,11 +14,11 @@ from sqlalchemy.dialects.mysql import \
 import pandas as pd
 
 
-def sql_delete(sql: str, eg: dict):
+def sql_delete(sql: str, eng: dict):
     """执行删除语句"""
     import pymysql
-    db = pymysql.connect(user=eg['user'], password=eg['password'], host=eg['host'], database=eg['dbname'],
-                         port=int(eg['port']))
+    db = pymysql.connect(user=eng['user'], password=eng['password'], host=eng['host'], database=eng['dbname'],
+                         port=int(eng['port']))
     cursor = db.cursor()
     # try:
     cursor.execute(sql)

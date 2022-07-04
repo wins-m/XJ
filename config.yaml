@@ -134,6 +134,7 @@ barra_exposure : '/mnt/c/Users/Winst/Documents/data_local/BARRA/barra_exposure.h
 barra_panel : '/mnt/c/Users/Winst/Documents/data_local/BARRA/barra_panel.h5'  # key= 'y2022'  正交化后的暴露面板
 barra_panel_1222 : '/mnt/c/Users/Winst/Documents/data_local/BARRA/barra_panel_1201_2203.h5'  # 暴露面板合并
 barra_factor_value : '/mnt/c/Users/Winst/Documents/data_local/BARRA/barra_fval.h5'  # key= 'y2022' 纯因子收益率
+barra_wls_omega : '/mnt/c/Users/Winst/Documents/data_local/BARRA/barra_omega.h5'  # key= 'y2022' 纯因子收益率
 barra_fval : '/mnt/c/Users/Winst/Documents/data_local/BARRA/barra_fval_20120104_20220331.csv'  # 历年因子收益合并  TODO: 纯因子收益率计算前，是否需要填充
 fct_cov_path : '/mnt/c/Users/Winst/Documents/data_local/BARRA/F_NW_Eigen_VRA[2014-02-10,2022-03-30].csv'  # path_F
 specific_risk : '/mnt/c/Users/Winst/Documents/data_local/BARRA/D_NW_SM_SH_VRA[2014-02-10,2022-03-30].csv'  # path_D

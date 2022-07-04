@@ -22,16 +22,22 @@ if __name__ == '__main__':
     # from data.save_remote import save_remote
     # save_remote(conf)
 
+    from BarraPCA.cal_factor_return import main
+    main()
+
     # * build simulated alpha *
     # from factor_build.simu_alpha import simu_alpha
     # simu_alpha(conf)
 
     # * optimize etf portfolio *
-    from BarraPCA.optimize import optimize
-    optimize(conf, mkdir_force=False, process_num=4)
+    # from BarraPCA.optimize import optimize
+    # optimize(conf, mkdir_force=False, process_num=4)
 
     # * regenerate optimize results *
-    from BarraPCA.opt_res_ana import opt_res_ana
-    opt_res_ana(conf, test=False)
+    # from BarraPCA.opt_res_ana import opt_res_ana
+    # opt_res_ana(conf, test=False)
 
+    # from supporter.request import test
+    # test()
+    #
     print(f'total time cost {time.time() - time_start : .3f} s\n')

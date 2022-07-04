@@ -1,5 +1,16 @@
 [toc]
 
+# BARRA/PCA - Portfolio Optimization
+
+1. get_barra.py
+2. cal_factor_return.py
+3. cov_adjust.py
+4. optimize.py
+5. opt_res_ana.py
+
+1. daily_pca.py
+
+
 ## BARRA模型
 
 ### 模型：截面WLS

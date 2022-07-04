@@ -112,8 +112,6 @@ def transfer_data(mysql_engine, data_path, access_target, force_update=False):
         'UPDATE': int, 'SERVER': int, 'BASE': str, 'TABLE': str, 'IND': str,
         'B_DATE': str, 'E_DATE': str, 'COL': str, 'VAL': str, 'WHERE': str, 'CSV': str
     })
-    # grid['B_DATE'] = pd.to_datetime(grid['B_DATE'])
-    # grid['E_DATE'] = pd.to_datetime(grid['E_DATE'])
     grid_mv = grid[grid['CSV'] == 'stk_marketvalue.csv']
     grid = grid if force_update else grid[grid['UPDATE'] == 1]
     if len(grid) == 0:

@@ -256,7 +256,7 @@ def update_efr_weight(conf):
 
     def delete_and_upload(tname, efr_df, data_path, begin_date=begin_date, end_date=end_date):
         sql = f"DELETE FROM intern.{tname} WHERE 调整日期 >= '{begin_date}'"
-        sql_delete(sql=sql, eg=engine_info)
+        sql_delete(sql=sql, eng=engine_info)
         efr_df.to_sql(tname, con=engine_list['engine4'], if_exists='append', index=False, dtype=dtypedict)
         print(tname, begin_date, end_date, 'Uploaded.')
         filename = f'{tname}[{begin_date},{end_date}].xlsx'

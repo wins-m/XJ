@@ -17,7 +17,7 @@
     - `00.py` 统计收益率分布
     - `README.md` Barra和PCA收益分解、风格归因、组合优化文档
     - `Reference.md` 组合优化参考（部分）
-    - `access_barra.xlsx` 数据库代获取的barra风格暴露
+    - `access_barra.xlsx` 从数据库获取的barra风格暴露
     - `attribution.py` 指增产品收益归因
     - `backtest.py` 指增选择的回测
     - `cal_factor_return.py` 计算纯因子收益
