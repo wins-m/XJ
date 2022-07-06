@@ -277,11 +277,14 @@ class MFM(object):
 
     def __init__(self, fr: pd.DataFrame = None):
         self.factor_ret = fr
-        self.sorted_dates = pd.to_datetime(fr.index.to_series())
-        self.T = len(fr)
+        if fr is None:
+            self.views = pd.Series(dtype=object)
+            self.T = 0
+        else:
+            self.views = pd.to_datetime(fr.index.to_series())
+            self.T = len(fr)
 
         self.Newey_West_adj_cov: Dict[str, pd.DataFrame] = dict()
-        # self.Newey_West_adj_cov: pd.DataFrame = pd.DataFrame()
         self.eigen_risk_adj_cov: Dict[str, pd.DataFrame] = dict()
         self.vol_regime_adj_cov: Dict[str, pd.DataFrame] = dict()
 
@@ -299,7 +302,7 @@ class MFM(object):
         # Newey_West_cov = {}
         print('\nNewey West Adjust...')
         for t in range(h, self.T):
-            td = self.sorted_dates[t].strftime('%Y-%m-%d')
+            td = self.views[t].strftime('%Y-%m-%d')
             try:
                 ret = self.factor_ret[t - h:t]
                 # ret.count()  TODO: check factor return missing
@@ -309,7 +312,7 @@ class MFM(object):
             except:
                 self.Newey_West_adj_cov[td] = (pd.DataFrame())
 
-            progressbar(cur=t - h + 1, total=self.T - h, msg=f'\tdate: {self.sorted_dates[t - 1].strftime("%Y-%m-%d")}')
+            progressbar(cur=t - h + 1, total=self.T - h, msg=f'\tdate: {self.views[t - 1].strftime("%Y-%m-%d")}')
         print()
 
         return self.Newey_West_adj_cov
@@ -420,12 +423,12 @@ class SRR(object):
     """Specific Return Risk"""
 
     def __init__(self, sr, fr, expo, mv):
-        self.stk_rtn: pd.DataFrame = sr
-        self.fct_rtn: pd.DataFrame = fr
-        self.exposure: pd.DataFrame = expo
+        self.asset_ret: pd.DataFrame = sr
+        self.factor_ret: pd.DataFrame = fr
+        self.expo_panel: pd.DataFrame = expo
         self.mkt_val: pd.DataFrame = mv
 
-        self.sorted_dates = pd.to_datetime(fr.index.to_series())
+        self.views = pd.to_datetime(fr.index.to_series())
         self.T = len(fr)
 
         self.u: pd.DataFrame = pd.DataFrame()
@@ -439,7 +442,7 @@ class SRR(object):
 
     def specific_return_by_time(self):
         print('\nSpecific Return...')
-        self.u = specific_return_yxf(Y=self.stk_rtn, X=self.exposure, F=self.fct_rtn)
+        self.u = specific_return_yxf(Y=self.asset_ret, X=self.expo_panel, F=self.factor_ret)
         return self.u
 
     def newey_west_adj_by_time(self, h=252, NA_bar=.75, tau=90, q=5) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -460,7 +463,7 @@ class SRR(object):
         SigmaNW = []
         t = h
         for t in range(h, self.T):
-            td = self.sorted_dates[t].strftime('%Y-%m-%d')
+            td = self.views[t].strftime('%Y-%m-%d')
             try:
                 u0 = self.u.iloc[t - h:t]
                 # u0.count().plot.hist(bins=100, title=f'{u0.index[0].strftime("%Y-%m-%d")},{td}')
@@ -491,12 +494,12 @@ class SRR(object):
         SigmaSM = []
         cnt = 0
         # td = self.sorted_dates[-2]
-        for td in self.sorted_dates[h: self.T]:
+        for td in self.views[h: self.T]:
             # %
             sigNW = self.SigmaNW.loc[td].dropna()
             U = self.u.loc[:td].iloc[-h:]
             U = U.loc[:, U.count() > h * NA_bar]
-            expo = self.exposure.loc[td].dropna(axis=1, how='all').dropna(axis=0, how='any')  # 全空的风格暴露&有空的个股
+            expo = self.expo_panel.loc[td].dropna(axis=1, how='all').dropna(axis=0, how='any')  # 全空的风格暴露&有空的个股
             MV = self.mkt_val.loc[td].dropna()
             # %
             try:
