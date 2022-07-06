@@ -37,7 +37,6 @@ from sqlalchemy import create_engine
 from typing import List
 from tqdm import tqdm
 from sqlalchemy.dialects.mysql import DOUBLE, VARCHAR, DATE
-from supporter.cov_a import MFM, SRR
 
 _PATH = '/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/'  # PyCharmProject
 
