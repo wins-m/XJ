@@ -284,11 +284,12 @@ class MFM(object):
             self.views = pd.to_datetime(fr.index.to_series())
             self.T = len(fr)
 
-        self.Newey_West_adj_cov: Dict[str, pd.DataFrame] = dict()
-        self.eigen_risk_adj_cov: Dict[str, pd.DataFrame] = dict()
-        self.vol_regime_adj_cov: Dict[str, pd.DataFrame] = dict()
+        # self.Newey_West_adj_cov: Dict[str, pd.DataFrame] = dict()
+        self.Newey_West_adj_cov: pd.DataFrame = pd.DataFrame()
+        self.eigen_risk_adj_cov: pd.DataFrame = pd.DataFrame()
+        self.vol_regime_adj_cov: pd.DataFrame = pd.DataFrame()
 
-    def newey_west_adj_by_time(self, h=252, tau=90, q=2) -> Dict[str, pd.DataFrame]:
+    def newey_west_adj_by_time(self, h=252, tau=90, q=2) -> pd.DataFrame:
         """
         纯因子收益率全历史计算协方差进行 Newey West 调整
         :param h: 计算协方差回看的长度 T-h, T-1
@@ -300,6 +301,7 @@ class MFM(object):
             raise Exception('No factor return value')
 
         # Newey_West_cov = {}
+        tmp_cov = []
         print('\nNewey West Adjust...')
         for t in range(h, self.T):
             td = self.views[t].strftime('%Y-%m-%d')
@@ -307,17 +309,29 @@ class MFM(object):
                 ret = self.factor_ret[t - h:t]
                 # ret.count()  TODO: check factor return missing
                 cov = cov_newey_west_adj(ret=ret, tau=tau, q=q)
-                # self.Newey_West_adj_cov = self.Newey_West_adj_cov.append(frame1d_2d(cov, td))
-                self.Newey_West_adj_cov[td] = cov
+                # self.Newey_West_adj_cov[td] = cov
+
+                cov.index = pd.MultiIndex.from_arrays(
+                    arrays=[[pd.to_datetime(td)] * len(cov),
+                            cov.index.to_series()],
+                    names=['tradingdate', 'fname']
+                )
+                tmp_cov.append(cov)
+
             except:
-                self.Newey_West_adj_cov[td] = (pd.DataFrame())
+                tmp_cov.append(
+                    pd.DataFrame(index=pd.MultiIndex.from_arrays([[pd.to_datetime(td)], ['NA']],
+                                                                 names=['tradingdate', 'fname']))
+                )
+                # self.Newey_West_adj_cov[td] = (pd.DataFrame())
 
             progressbar(cur=t - h + 1, total=self.T - h, msg=f'\tdate: {self.views[t - 1].strftime("%Y-%m-%d")}')
         print()
+        self.Newey_West_adj_cov = pd.concat(tmp_cov)
 
         return self.Newey_West_adj_cov
 
-    def eigen_risk_adj_by_time(self, T=1000, M=100, scal=1.4) -> Dict[str, pd.DataFrame]:
+    def eigen_risk_adj_by_time(self, T=1000, M=100, scal=1.4) -> pd.DataFrame:
         """
         逐个F_NW进行 Eigenfactor Rist Adjustment
         :param T: 模拟序列长度
@@ -330,21 +344,38 @@ class MFM(object):
 
         print('\nEigen-value Risk Adjust...')
         cnt = 0
-        td = '2019-03-19'
-        for td in self.Newey_West_adj_cov.keys():
+        tmp_cov = []
+        # td = '2019-03-19'
+
+        # for td in self.Newey_West_adj_cov.keys():
+        tradedates = self.Newey_West_adj_cov.index.get_level_values(0).unique().to_list()
+        for td0 in tradedates:
+            td = td0.strftime('%Y-%m-%d')
             try:
-                cov = self.Newey_West_adj_cov[td]
-                self.eigen_risk_adj_cov[td] = cov_eigen_risk_adj(cov=cov, T=T, M=M, scal=scal)
+                # cov = self.Newey_West_adj_cov[td]
+                # self.eigen_risk_adj_cov[td] = cov_eigen_risk_adj(cov=cov, T=T, M=M, scal=scal)
+                cov = cov_eigen_risk_adj(cov=self.Newey_West_adj_cov.loc[td], T=T, M=M, scal=scal)
+                cov.index = pd.MultiIndex.from_arrays(
+                    arrays=[[pd.to_datetime(td)] * len(cov),
+                            cov.index.to_series()],
+                    names=['tradingdate', 'fname']
+                )
+                tmp_cov.append(cov)
             except:
-                self.eigen_risk_adj_cov[td] = pd.DataFrame()
+                # self.eigen_risk_adj_cov[td] = pd.DataFrame()
+                tmp_cov.append(
+                    pd.DataFrame(index=pd.MultiIndex.from_arrays([[pd.to_datetime(td)], ['NA']],
+                                                                 names=['tradingdate', 'fname']))
+                )
 
             cnt += 1
-            progressbar(cnt, len(self.Newey_West_adj_cov), f'\tdate: {td}')
+            progressbar(cnt, len(tradedates), f'\tdate: {td}')
         print()
 
+        self.eigen_risk_adj_cov = pd.concat(tmp_cov)
         return self.eigen_risk_adj_cov
 
-    def vol_regime_adj_by_time(self, h=252, tau=42) -> Dict[str, pd.DataFrame]:
+    def vol_regime_adj_by_time(self, h=252, tau=42) -> pd.DataFrame:
         """
         Volatility Regime Adjustment
         :param h: 波动率乘数的回看时长
@@ -357,9 +388,10 @@ class MFM(object):
         T, K = self.factor_ret.shape
 
         factor_var = list()
-        tradedates = list(self.eigen_risk_adj_cov.keys())
+        # tradedates = list(self.eigen_risk_adj_cov.keys())
+        tradedates = self.Newey_West_adj_cov.index.get_level_values(0).unique().to_list()
         for td in tradedates:
-            f_var_i = np.diag(self.eigen_risk_adj_cov[td])
+            f_var_i = np.diag(self.eigen_risk_adj_cov.loc[td])
             if len(f_var_i) == 0:
                 f_var_i = np.array(K * [np.nan])
             factor_var.append(f_var_i)
@@ -373,14 +405,21 @@ class MFM(object):
         # lamb2 = {}
         print('\nVolatility Regime Adjustment...')
         cnt = 0
+        tmp_cov = []
         for td0, td1 in zip(tradedates[:-h], tradedates[h - 1:]):
-            # lamb2[td1] = B2.loc[td0: td1] @ weights
             lamb2 = B2.loc[td0: td1] @ weights
-            self.vol_regime_adj_cov[td1] = self.eigen_risk_adj_cov[td1] * lamb2
+            # self.vol_regime_adj_cov[td1] = self.eigen_risk_adj_cov[td1] * lamb2
+            cov = self.eigen_risk_adj_cov.loc[td1] * lamb2
+            cov.index = pd.MultiIndex.from_arrays(
+                arrays=[[pd.to_datetime(td1)] * len(cov),
+                        cov.index.to_series()],
+                names=['tradingdate', 'fname']
+            )
+            tmp_cov.append(cov)
             cnt += 1
-            progressbar(cnt, len(self.eigen_risk_adj_cov) - h, f'\tdate: {td1}')
+            progressbar(cnt, len(tradedates) - h, f"\tdate: {td1.strftime('%Y-%m-%d')}")
         print()
-
+        self.vol_regime_adj_cov = pd.concat(tmp_cov)
         return self.vol_regime_adj_cov
 
     def save_factor_covariance(self, path, level='VRA'):
@@ -413,8 +452,13 @@ class MFM(object):
 
         if len(cov_d) == 0:
             raise Exception('run *_adj_by_time first for factor_covariance_*')
-        cov = dict2frame(cov_d)
-        file_name = file_name.format(','.join(list(cov.index.get_level_values(0)[[0, -1]])))
+        # cov = dict2frame(cov_d)
+        cov = cov_d
+        file_name = file_name.format(
+            ','.join(
+                [_.strftime('%Y-%m-%d') for _ in cov.index.get_level_values(0)[[0, -1]]]
+            )
+        )
         print(f'\nSave as `{file_name}`')
         cov.to_csv(path + '/' + file_name)
 
