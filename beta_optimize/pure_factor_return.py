@@ -1,9 +1,10 @@
 """
 (created by swmao on July 4th)
 
-Calculate pure factor return (daily).
-Cache table in local disk is optional,
-TODO: once cached, shall be manually removed
+Step1: Calculate pure factor return (daily).
+------
+Cache table in local disk is optional;
+Once cached, shall be manually removed;
 
 `Y (T+1 asset return) ~ X (T+1 beta return) @ B (T0 beta exposure)`
 
@@ -18,12 +19,12 @@ Config:
 Input:
 - beta exposure (country + style + industry)
 - close, daily close return
-- TODO ipo date: without new ipo
 
-Output: TODO upload
-- barra_panel (orthogonal w. size & indus)
+Output:
+- barra_panel, `barra_exposure_orthogonal`
+- barra_fval, `barra_pure_factor_return`
 - barra_omega
-- barra_fval
+
 
 """
 import time
@@ -99,10 +100,9 @@ def main():
     os.makedirs(conf['data_path'] + 'barra_omega/', exist_ok=True)
     os.makedirs(conf['data_path'] + 'barra_fval/', exist_ok=True)
 
-    self = BarraFM(conf)
-    self.cache_all_style_exposure()  # 一次性将begin_date到end_date的style暴露读到本地；可以不执行。
-    self.cal_pure_return_by_time(cache=True)  # cache=False时不保留本地缓存，但会尝试从本地读取缓存。
-
+    bfm = BarraFM(conf)
+    bfm.cache_all_style_exposure()  # 一次性将begin_date到end_date的style暴露读到本地；可以不执行。
+    bfm.cal_pure_return_by_time(cache=True)  # cache=False时不保留本地缓存，但会尝试从本地读取缓存。
     # self.upload_results(eng=conf['mysql_engine']['engine4'], how='insert')  # TODO: 无法去重
 
     return
@@ -146,7 +146,9 @@ class BarraFM(object):
                               local_path=None,
                               d_type=float,
                               cache=True)  # adjusted close price
+        # TODO: exclude new IPO
         df = df.pct_change().shift(-1).iloc[:-1]
+        # TODO: other winsorize methods
         df[df > 0.11] = 0.11
         df[df < -0.11] = -0.11
         return df
@@ -261,8 +263,6 @@ class BarraFM(object):
         :param cache: bool, True than save local cache
         :return:
         """
-        # td: str = self.views[0]
-
         tmp_panel = []
         tmp_fval = []
         print('\nCalculate pure factor returns ...')
@@ -324,8 +324,6 @@ class BarraFM(object):
             tmp_panel.append(expo1do)
             fv_1d.index.name = 'tradingdate'
             tmp_fval.append(fv_1d)
-            # self.expo_panel = pd.concat([self.expo_panel, expo1do])
-            # self.factor_ret = pd.concat([self.factor_ret, fv_1d])
 
         self.expo_panel = pd.concat(
             [self.expo_panel,
@@ -442,6 +440,7 @@ def wls_1d(beta_exposure_csi: pd.DataFrame,
            ls_indus: list,
            rtn_next_period: pd.Series,
            s_mv_raw: str = 'size',
+           cross_check: bool = False,
            ) -> Tuple[pd.DataFrame, pd.Series]:
     """
     WLS, calculate pure factor return (1 period),
@@ -461,6 +460,9 @@ def wls_1d(beta_exposure_csi: pd.DataFrame,
     :param s_mv_raw:
         str,
         column name 'size' asset market value (non-neutralized) this period
+    :param cross_check:
+        bool,
+        check WLS result with statsmodels.api.WLS
     :return Tuple[pf_w, fv_1d]:
         pf_w:
             DataFrame of shape (n_assets, n_features),
@@ -502,11 +504,12 @@ def wls_1d(beta_exposure_csi: pd.DataFrame,
     mat_y = rtn_next_period.loc[mask].values
     fv_1d = pd.Series(mat_omega @ mat_y, index=f_cols)
 
-    # # 等效计算，条件处理后的WLS
-    # mod = sm.WLS(mat_y, mat_x @ mat_r, weights=w_mv)
-    # res = mod.fit()
-    # fv = pd.Series(mat_r @ res.params, index=f_cols)
-    # assert (fv - fv_1d).abs().sum() < 1e-12
+    # 等效计算，条件处理后的WLS
+    if cross_check:
+        mod = sm.WLS(mat_y, mat_x @ mat_r, weights=w_mv)
+        res = mod.fit()
+        fv = pd.Series(mat_r @ res.params, index=f_cols)
+        assert (fv - fv_1d).abs().sum() < 1e-12
 
     return pf_w, fv_1d
 
@@ -675,8 +678,6 @@ def load_tradedate_view(eng: dict, bd: str, ed: str, freq='d') -> pd.Series:
         raise Exception(f"No {col} from {bd}"
                         f" to {ed}, freq='{freq}'")
 
-    # res = df[col].apply(lambda x: x if isinstance(x, str) else x.strftime('%Y-%m-%d'))
-    # return res.to_list()
     return pd.to_datetime(df[col])
 
 
