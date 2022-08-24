@@ -93,6 +93,7 @@ plt.rcParams["date.autoformatter.hour"] = "%H:%M:%S"
 # plt.rc("font", family="sans-serif")
 
 _PATH = '/home/swmao/'  # 修改这个地址！
+_BASE = 'intern'  # 注意 main() - conf - mysql_engine - engine4 同步修改
 
 
 def main():
@@ -472,14 +473,14 @@ class BarraFM(object):
             td1 = min(td_1, self.views[-1])  # 请求数据的结束日期
 
             # Barra pure factor return, existed in remote database
-            query = f"SELECT * FROM intern.barra_pure_factor_return" \
+            query = f"SELECT * FROM {_BASE}.barra_pure_factor_return" \
                     f" WHERE tradingdate>='{td_2}' AND tradingdate<='{td1}'"
             df = mysql_query(query, conn_mysql(eng=conf['mysql_engine']['engine4']))
             df['tradingdate'] = pd.to_datetime(df['tradingdate'])
             self.factor_ret = df.set_index('tradingdate')
 
             # Barra orthogonal factor exposure, existed in remote database
-            query = f"""SELECT * FROM intern.barra_exposure_orthogonal WHERE tradingdate>='{td_2}' AND tradingdate<='{td1}'"""
+            query = f"""SELECT * FROM {_BASE}.barra_exposure_orthogonal WHERE tradingdate>='{td_2}' AND tradingdate<='{td1}'"""
             df = mysql_query(query, conn_mysql(eng=conf['mysql_engine']['engine4']))
             df['tradingdate'] = pd.to_datetime(df['tradingdate'])
             self.expo_panel = df.set_index(['tradingdate', 'stockcode'])
@@ -526,7 +527,7 @@ class BarraFM(object):
         elif how == 'insert' or how == 'i':
             bd_ed = mysql_query(
                 query=f"SELECT MIN(tradingdate) AS bd, MAX(tradingdate) as ed"
-                      f" FROM intern.barra_pure_factor_return",
+                      f" FROM {_BASE}.barra_pure_factor_return",
                 engine=conn_mysql(eng)
             )
             bd = bd_ed['bd'][0]
@@ -580,7 +581,7 @@ class BarraFM(object):
         elif how == 'insert':
             bd_ed = mysql_query(
                 query=f"SELECT MIN(tradingdate) AS bd, MAX(tradingdate) AS ed"
-                      f" FROM intern.barra_exposure_orthogonal",
+                      f" FROM {_BASE}.barra_exposure_orthogonal",
                 engine=conn_mysql(eng)
             )
             bd = bd_ed['bd'][0]

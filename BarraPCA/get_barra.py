@@ -11,7 +11,7 @@ conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProj
 conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
 
 
-def get_barra():
+def get_barra(force_update):
     from data.get_data import transfer_data
 
     mysql_engine = {
@@ -21,7 +21,7 @@ def get_barra():
                     'port': '3306',
                     'dbname': 'alphas_jqdata'}
     }
-    force_update = False
+    # force_update = False
     data_pat = '/mnt/c/Users/Winst/Documents/data_local/BARRA/'
     os.makedirs(data_pat, exist_ok=True)
     access_target = '/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/BarraPCA/access_barra.xlsx'
@@ -80,7 +80,7 @@ def split():
 
 
 if __name__ == '__main__':
-    # get_barra()
+    get_barra(force_update=True)
     # get_fund()
     # split()
     pass

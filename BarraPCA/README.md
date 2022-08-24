@@ -178,88 +178,7 @@
 
 **运行记录**
 
-```zsh
-(base) swmao:PyCharmProject/ (master✗) $ python BarraPCA/cal_factor_return.py                  [8:55:13]
-
- 2022
-Industry Missing 0.09 %
-Return Missing 1.74 %
-before (269146, 42)
-after missing-drop (264066, 42)
-100%|█████████████████████████████████████████████████████████████████| 57/57 [00:20<00:00,  2.78it/s]
-
- 2021
-Industry Missing 0.02 %
-Return Missing 0.00 %
-before (1062384, 42)
-after missing-drop (1062273, 42)
-100%|███████████████████████████████████████████████████████████████| 243/243 [01:49<00:00,  2.22it/s]
-
- 2020
-Industry Missing 0.42 %
-Return Missing 0.00 %
-before (951992, 42)
-after missing-drop (951276, 42)
-100%|███████████████████████████████████████████████████████████████| 243/243 [01:47<00:00,  2.26it/s]
-
- 2019
-Industry Missing 0.48 %
-Return Missing 0.00 %
-before (890251, 42)
-after missing-drop (889682, 42)
-100%|███████████████████████████████████████████████████████████████| 244/244 [01:34<00:00,  2.57it/s]
-
- 2018
-Industry Missing 0.40 %
-Return Missing 0.03 %
-before (857076, 41)
-after missing-drop (856683, 41)
-100%|███████████████████████████████████████████████████████████████| 243/243 [01:34<00:00,  2.56it/s]
-
- 2017
-Industry Missing 1.87 %
-Return Missing 0.06 %
-before (799553, 41)
-after missing-drop (798213, 41)
-100%|███████████████████████████████████████████████████████████████| 244/244 [01:30<00:00,  2.69it/s]
-
- 2016
-Industry Missing 1.34 %
-Return Missing 0.07 %
-before (704632, 41)
-after missing-drop (703988, 41)
-100%|███████████████████████████████████████████████████████████████| 244/244 [01:21<00:00,  2.98it/s]
-
- 2015
-Industry Missing 0.38 %
-Return Missing 0.07 %
-before (665670, 41)
-after missing-drop (665179, 41)
-100%|███████████████████████████████████████████████████████████████| 244/244 [01:20<00:00,  3.03it/s]
-
- 2014
-Industry Missing 0.31 %
-Return Missing 0.08 %
-before (620558, 41)
-after missing-drop (619576, 41)
-100%|███████████████████████████████████████████████████████████████| 245/245 [01:19<00:00,  3.07it/s]
-
- 2013
-Industry Missing 0.12 %
-Return Missing 0.08 %
-before (588055, 41)
-after missing-drop (587435, 41)
-100%|███████████████████████████████████████████████████████████████| 238/238 [01:16<00:00,  3.12it/s]
-
- 2012
-Industry Missing 0.41 %
-Return Missing 0.08 %
-before (587190, 41)
-after missing-drop (586492, 41)
-100%|███████████████████████████████████████████████████████████████| 243/243 [01:19<00:00,  3.06it/s]
-```
-
-0607: 修改为，先填充Barra暴露（q=0.75，w=10），后计算纯因子收益（即存在相邻日期重复）
+先填充Barra暴露（q=0.75，w=10）；去除不完整的记录；计算纯因子收益（即存在相邻日期重复）。分年处理时缺失情况见下：
 
 ```sh
 (base) swmao:PyCharmProject/ (main✗) $ python BarraPCA/cal_factor_return.py
@@ -458,7 +377,7 @@ after missing-drop (537913, 41)
 
 ## 组合优化
 
-alpha: 未来因子 收益vs约束
+Alpha: 最大化的因子；APM或者人工构造的未来因子：
 
 - T+1收盘到T+6收盘为alpha
 - IC > 0 for delay = 1..5
@@ -503,7 +422,7 @@ S : \text{特异波动} = {+\infin} \\
 \end{cases}
 $$
 
-##### **version 0**
+##### **version 0** (depreciated)
 
 $$
 \max_{w} {
@@ -862,5 +781,7 @@ Heaton, J. B., Polson, N. G., & Witte, J. H. (2018). *Deep Portfolio Theory* (ar
 [量化攻城狮-再聊组合优化的约束条件](https://mp.weixin.qq.com/s/KKbmLkOgdSPi0UaqHVDiRw)
 
 *不同条件下的组合优化模型结果分析*. (2020). 渤海证券.
+
+---
 
 [toc]

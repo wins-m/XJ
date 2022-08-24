@@ -6,8 +6,8 @@ import time
 
 # %% Main
 if __name__ == '__main__':
-    import yaml
-    conf = yaml.safe_load(open('config.yaml', encoding='utf-8'))
+    # import yaml
+    # conf = yaml.safe_load(open('config.yaml', encoding='utf-8'))
     time_start = time.time()
 
     # * data to local *
@@ -22,8 +22,10 @@ if __name__ == '__main__':
     # from data.save_remote import save_remote
     # save_remote(conf)
 
-    from BarraPCA.cal_factor_return import main
+    from beta_optimize.barra_factor_model import main
     main()
+    # from beta_optimize.opt import main
+    # main()
 
     # * build simulated alpha *
     # from factor_build.simu_alpha import simu_alpha
@@ -31,7 +33,7 @@ if __name__ == '__main__':
 
     # * optimize etf portfolio *
     # from BarraPCA.optimize import optimize
-    # optimize(conf, mkdir_force=False, process_num=4)
+    # optimize(conf, mkdir_force=False, process_num=1)
 
     # * regenerate optimize results *
     # from BarraPCA.opt_res_ana import opt_res_ana
@@ -40,4 +42,4 @@ if __name__ == '__main__':
     # from supporter.request import test
     # test()
     #
-    print(f'total time cost {time.time() - time_start : .3f} s\n')
+    print(f'\ntotal time cost {time.time() - time_start : .3f} s\n')

@@ -42,13 +42,13 @@ def win_percentage(price_adj: pd.DataFrame, eve2d: pd.DataFrame, dur: int, save_
     return win_r_df
 
 
-# %%
+# %
 def main():
-    # %%
+    # %
     import yaml
     conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/config.yaml'
     conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
-    # %%  计算胜率等
+    # %  计算胜率等
     src_path = conf['data_path'] + 'event_first_report.csv'  # 格式和服务器一致
     event = pd.read_csv(src_path)
     eve2d = event.pivot('tradingdate', 'stockcode', 'fv')
@@ -63,7 +63,7 @@ def main():
 
     win_percentage(price_adj, eve2d, dur=3, save_path=save_path_.format('daily_wp.xlsx'))
 
-    # %% single test
+    # % single test
     eve2d3f = eve2d.fillna(method='ffill', limit=2)
 
 

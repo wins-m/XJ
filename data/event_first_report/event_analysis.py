@@ -203,13 +203,13 @@ def table_2d_one_day(conf, folder='event_first_report/'):
         df2d.to_hdf(save_path + 'one_day_AR_after_event_2d.hdf', key=f'D{di}')
 
 
-# %%
+# %
 def table_ar_adjacent_events(conf: dict, gap=20, drop_dret_over=.20, folder='event_first_report/'):
     """计算事件超额收益
         - 机构首次关注event（原instnum<5)前后-gap~gap+1日，大市为等权
 
     """
-    # %%
+    # %
     data_path = conf['data_path']
     res_path = conf['factorsres_path']
     tradeable_path = conf['a_list_tradeable']
@@ -241,12 +241,12 @@ def table_ar_adjacent_events(conf: dict, gap=20, drop_dret_over=.20, folder='eve
     adjret_ab = adjret.apply(lambda s: s - s.mean(), axis=1)  # 异常大，特殊公司，此处保留异常
 
     """
-    # %% eventid为index的面板
+    # % eventid为index的面板
     event_panel = event[['id', 'tradingdate', 'stockcode', 'stockname']].copy().sort_values('id')
     mask = event_panel.tradingdate <= '2021-12-31'
     event_panel = event_panel[mask]
 
-    # %% 按列新增（所有事件）
+    # % 按列新增（所有事件）
     def visit_2d_v(td, stk, df, shift=0):
         td_idx = -1
         try:
@@ -279,7 +279,7 @@ def table_ar_adjacent_events(conf: dict, gap=20, drop_dret_over=.20, folder='eve
     event_panel = column_look_up(tgt=event_panel, src=maxDown, delay=0, kw='maxDown')
     event_panel = column_look_up(tgt=event_panel, src=maxDownO, delay=0, kw='maxDownO')
 
-    # %% 按行新增（指定时间编号or日期股票，给出所有）
+    # % 按行新增（指定时间编号or日期股票，给出所有）
     # T-120 ~ T+20 R
     td, stk = '2017-01-03', '000001.SZ'
     shift_, shift = -120, 20
@@ -331,7 +331,7 @@ def table_ar_adjacent_events(conf: dict, gap=20, drop_dret_over=.20, folder='eve
     # car_10_2d = event_panel.pivot(index='tradingdate', columns='stockcode', values='CAR_10')
     # car_10_2d.count(axis=1).rolling(20).mean().plot(); plt.show()
 
-    # %%
+    # %
     # absolute return
     r141 = visit_2d_ls(adjret, td, stk, shift_, shift); len(r141)
     # excess return
@@ -348,15 +348,15 @@ def table_ar_adjacent_events(conf: dict, gap=20, drop_dret_over=.20, folder='eve
     pass
 
 
-    # %%
+    # %
     # Daily Return (ctc, -120~15)  16报错?
     for _delay in tqdm(range(-120, 16)):
         event_panel = column_look_up(tgt=event_panel, src=adjret, delay=_delay, kw=f"r{str(_delay).replace('-','_')}")
-    # %% Daily Excess Return
+    # % Daily Excess Return
     for _delay in tqdm(range(-120, 16)):
         event_panel = column_look_up(tgt=event_panel, src=adjret_ab, delay=_delay, kw=f"ar{str(_delay).replace('-','_')}")
 
-    # %% check holding
+    # % check holding
     # path_noupdown = '/mnt/c/Users/Winst/Documents/factors_res/first_report_dur3_noupdown_n_NAew_1g(回测中不筛涨跌停)/LSGroup.csv'
     path_noupdown = '/mnt/c/Users/Winst/Documents/factors_res/first_report_dur3_updown_n_NAew_1g(回测中去新上市和停牌)/LSGroup.csv'
     # path_withupdown = '/mnt/c/Users/Winst/Documents/factors_res/first_report_dur3_withupdown_n_NAew_1g(回测中不筛涨跌停)/LSGroup.csv'
@@ -386,17 +386,17 @@ def table_ar_adjacent_events(conf: dict, gap=20, drop_dret_over=.20, folder='eve
 
     tmp.to_csv('/home/swmao/tmp.csv', encoding='GBK')
 
-    # %%
+    # %
     hdf_file = '/mnt/c/Users/Winst/Documents/factors_res/event_first_report/' + 'event_panel.h5'
     event_panel = pd.DataFrame(pd.read_hdf(hdf_file, key='r141ar141'))
 
-    # %%
+    # %
     hdf_file = '/mnt/c/Users/Winst/Documents/data_local/' + 'event_panel.h5'
     event_panel.to_hdf(hdf_file, key='r141ar141')
     
     """
 
-    # %% 表：记录id，事件日+-120日（不够则空），复权收盘价收益率（当日比昨日）
+    # % 表：记录id，事件日+-120日（不够则空），复权收盘价收益率（当日比昨日）
     event_adjacent_returns = pd.DataFrame(columns=event.id, index=range(-gap, gap+1))
     for irow in tqdm(range(len(event))):  # 15996个事件，规模极大
         row = event.iloc[irow, :]
@@ -422,18 +422,22 @@ def table_ar_adjacent_events(conf: dict, gap=20, drop_dret_over=.20, folder='eve
     event_adjacent_returns.to_csv(save_path)
 
 
-# %%
-if __name__ == '__main__':
-    # %%
+# %
+def main():
     import yaml
     conf_path = r'/mnt/c/Users/Winst/Nutstore/1/我的坚果云/XJIntern/PyCharmProject/config.yaml'
     conf = yaml.safe_load(open(conf_path, encoding='utf-8'))
     folder = 'event_first_report/'
-    drop_dret_over = 0.10
+    drop_daily_return_over = 0.10
 
-    # %%
-    table_ar_adjacent_events(conf, gap=240, drop_dret_over=drop_dret_over, folder=folder)
+    # %
+    table_ar_adjacent_events(conf, gap=240, drop_dret_over=drop_daily_return_over, folder=folder)
     graph_ar_car(conf, folder=folder)
     graph_corr_d_ar_cumsum(conf, ishow=False, folder=folder)
     graph_dist_d_ar_afterwards(conf, ishow=False, folder=folder)
     table_2d_one_day(conf, folder=folder)
+
+
+# %
+if __name__ == '__main__':
+    main()

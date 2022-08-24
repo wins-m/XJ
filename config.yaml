@@ -192,6 +192,12 @@ mysql_engine :
     host : '192.168.1.104'
     port : '3306'
     dbname : 'jqdata'
+  engine6 :
+    user : "intern01"
+    password : "rh35th"
+    host : '192.168.1.104'
+    port : '3306'
+    dbname : 'alphas_jqdata'
 #  engine3: # 上传使用engine3的配置，即存在intern库
 #    user: "intern01"
 #    password: "rh35th"
